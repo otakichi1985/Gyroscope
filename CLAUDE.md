@@ -31,6 +31,13 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
 - フィード取得・パース・永続化はすべて Rust 側で行う（WebView の CORS 制約回避、SPEC §2.2）
 - HTMLサニタイズはフロント側で DOMPurify（Rust の ammonia は不使用。描画層と同じ言語で完結させるため）
 - 状態管理は Zustand
+- フレームレス窓: `decorations: false` + `transparent: true` + CSS `rounded-2xl overflow-hidden`。
+  Windows 11 では Mica、失敗時は Acrylic、それも失敗したら不透明単色（`src-tauri/src/window/vibrancy.rs`）。
+  どちらかの適用に成功した場合のみ `DWMWA_WINDOW_CORNER_PREFERENCE` で HWND 自体も丸める
+  （フレームレス窓は自動では丸くならないため）。適用結果はコマンド `get_vibrancy_mode` でフロントに渡し、
+  `App.tsx` がパネル背景の不透明度（mica/acrylic=半透明、none=不透明）を切り替える
+- ウィンドウの閉じる/最小化ボタンは自作タイトルバー（`src/components/TitleBar.tsx`）から
+  `@tauri-apps/api/window` の `getCurrentWindow()` を呼ぶ。ドラッグ移動は `data-tauri-drag-region` 属性のみで実現
 
 ## 依存関係の選定理由
 
@@ -40,7 +47,12 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
 
 ## 既知の落とし穴
 
-- (随時追記)
+- フレームレス窓は Windows 11 でも自動的に角丸にならない（システム標準タイトルバー窓のみ自動）。
+  CSS の `border-radius` だけでは Mica/Acrylic の描画（DWM がHWND全体に敷く）が四隅で角ばって見えるため、
+  `DwmSetWindowAttribute(DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND)` の明示呼び出しが必須
+- CSP は `style-src` に `unsafe-inline` を含めていない。Phase 3 で `@tanstack/react-virtual` を組み込む際、
+  同ライブラリは要素位置決めに inline `style` 属性を使うため、ブラウザに inline style attribute がブロックされないか
+  要検証（ブロックされる場合は仮想リスト行の位置指定方法を見直すか、CSPのその部分だけ緩和して理由を明記する）
 
 ## バージョン固定方針
 
