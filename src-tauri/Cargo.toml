@@ -1,0 +1,40 @@
+[package]
+name = "rss-widget"
+version = "0.1.0"
+description = "Windows 11 desktop RSS/Atom widget"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "rss_widget_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.5", features = [] }
+tauri-plugin-opener = "2.5.4"
+tauri-plugin-notification = "2.3.3"
+tauri-plugin-window-state = "2.4.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "sync", "time"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "gzip", "brotli", "json"] }
+feed-rs = "2.4.0"
+rusqlite = { version = "0.40.1", features = ["bundled", "chrono"] }
+scraper = "0.27.0"
+quick-xml = "0.41.0"
+chrono = { version = "0.4.45", features = ["serde"] }
+thiserror = "2.0.19"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+window-vibrancy = "0.8.0"
+
+[dev-dependencies]
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros"] }
