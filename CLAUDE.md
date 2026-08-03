@@ -38,6 +38,16 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
   `App.tsx` がパネル背景の不透明度（mica/acrylic=半透明、none=不透明）を切り替える
 - ウィンドウの閉じる/最小化ボタンは自作タイトルバー（`src/components/TitleBar.tsx`）から
   `@tauri-apps/api/window` の `getCurrentWindow()` を呼ぶ。ドラッグ移動は `data-tauri-drag-region` 属性のみで実現
+- DB: `rusqlite::Connection` 1本を `Mutex` で包んで `app.manage`（`src-tauri/src/db/mod.rs`）。
+  マイグレーションは `PRAGMA user_version` ベースで `db/migrations.rs` に追記していく方式
+- フィード取得〜保存の流れ: `fetch::discovery::discover`（サイトURLなら`<link rel=alternate>`探索）→
+  `parse::feed::parse_feed`（feed-rsで統一パース、重複排除キーは自前実装 = `parse::dedupe`）→
+  `db::upsert_entries`（`ON CONFLICT(feed_id, guid) DO UPDATE`で本文更新しつつ既読/スター状態は保持）
+- Tauriの capabilities/permissions は `#[tauri::command]` で自作したコマンド（feeds/entries/opml）には不要
+  （ACLはTauri組み込みプラグインのコマンド用。自作コマンドは `invoke_handler` 登録のみで呼び出せる）
+- 自作コマンドのエラーは `error::AppError`（thiserror）を文字列にシリアライズしてフロントに渡す。
+  `refresh_feed` はエラー時もコマンド自体は失敗させず、`feeds.last_error` に格納して返す
+  （SPEC §7: フィード横の警告アイコン表示に使うため、エラーを握りつぶさない）
 
 ## 依存関係の選定理由
 
@@ -53,6 +63,15 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
 - CSP は `style-src` に `unsafe-inline` を含めていない。Phase 3 で `@tanstack/react-virtual` を組み込む際、
   同ライブラリは要素位置決めに inline `style` 属性を使うため、ブラウザに inline style attribute がブロックされないか
   要検証（ブロックされる場合は仮想リスト行の位置指定方法を見直すか、CSPのその部分だけ緩和して理由を明記する）
+- `feed-rs` の既定 `id_generator` は `<guid>`/`<id>` が無い場合に自動でハッシュ値を補完してしまい、
+  `Entry::id` が常に非空になる（＝spec通りの「guid→link→title+published」の段階的フォールバックを後段で
+  再現できなくなる）。そのため `parse::feed::parse_feed` は `Builder::id_generator` を空文字列を返す関数で
+  上書きし、guidが無いことを自前の `dedupe_key` が検出できるようにしている
+- OPMLの `folder` はDBスキーマ上は単一文字列（階層なし）。ネストした `<outline>` フォルダがある入力は
+  最も内側のフォルダ名だけを採用する（`opml::parse_opml` 参照）
+- サムネイル抽出は `media:thumbnail` → 画像タイプの enclosure(`media:content`) → 本文内最初の `<img>` まで。
+  `og:image`（追加リクエストが要る任意タイア）は未実装（設定画面ができるPhase 5以降でON/OFFトグルと合わせて追加）
+- favicon（`feeds.icon_path`）はまだ未取得。列だけ用意してあり、値は常にNULL
 
 ## バージョン固定方針
 

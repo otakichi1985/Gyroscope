@@ -1,3 +1,4 @@
+import { FeedManager } from "./components/FeedManager";
 import { TitleBar } from "./components/TitleBar";
 import { useVibrancyMode } from "./hooks/useVibrancyMode";
 
@@ -15,9 +16,7 @@ function App() {
       className={`flex h-screen w-screen flex-col overflow-hidden rounded-2xl text-neutral-900 dark:text-neutral-100 ${PANEL_BG[vibrancy]}`}
     >
       <TitleBar />
-      <main className="flex flex-1 items-center justify-center px-4 text-center text-sm opacity-70">
-        RSS Widget — scaffold ready (Phase 1: frameless + vibrancy)
-      </main>
+      <FeedManager />
     </div>
   );
 }

@@ -3198,6 +3198,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "feed-rs",
+ "mediatype",
  "quick-xml",
  "raw-window-handle",
  "reqwest",
@@ -3212,6 +3213,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "thiserror 2.0.19",
  "tokio",
+ "url",
  "window-vibrancy 0.8.0",
  "windows-sys 0.60.2",
 ]
