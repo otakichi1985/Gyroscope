@@ -1,14 +1,19 @@
+use std::sync::Arc;
+
 use rusqlite::{params, Connection, OptionalExtension};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
+use tokio::sync::Semaphore;
 use url::Url;
 
 use crate::db::models::{Feed, FEED_COLUMNS};
 use crate::db::{upsert_entries, Db};
 use crate::error::{AppError, AppResult};
 use crate::fetch::client::{fetch_conditional, FetchOutcome};
-use crate::fetch::{discovery, HttpClient};
+use crate::fetch::{discovery, favicon, HttpClient};
 use crate::parse::feed::parse_feed;
+
+const MAX_CONCURRENT_FAVICON_FETCHES: usize = 6;
 
 /// SPEC §5: user-supplied URLs may only be http(s); file:// and javascript:
 /// (or anything else) must be rejected before any network activity happens.
@@ -41,15 +46,24 @@ pub async fn add_feed(db: State<'_, Db>, client: State<'_, HttpClient>, url: Str
     let discovered = discovery::discover(&client.0, &parsed_url).await?;
     let parsed = parse_feed(&discovered.body, Some(&discovered.feed_url))?;
 
+    // Best-effort: a feed with no discoverable site icon just keeps
+    // icon_path NULL (frontend shows no thumbnail substitute for it),
+    // same as any other missing-image case -- never fails the add itself.
+    let icon_path = match &parsed.site_url {
+        Some(site_url) => favicon::discover_favicon(&client.0, site_url).await,
+        None => None,
+    };
+
     let conn = db.0.lock().unwrap();
     conn.execute(
-        "INSERT INTO feeds (url, site_url, title, etag, last_modified, last_fetched_at, sort_order) \
-         VALUES (?1, ?2, ?3, ?4, ?5, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), \
+        "INSERT INTO feeds (url, site_url, title, icon_path, etag, last_modified, last_fetched_at, sort_order) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), \
                  (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM feeds))",
         params![
             discovered.feed_url,
             parsed.site_url,
             parsed.title,
+            icon_path,
             discovered.etag,
             discovered.last_modified,
         ],
@@ -268,6 +282,53 @@ pub async fn refresh_all_feeds(app: AppHandle, db: State<'_, Db>) -> AppResult<(
         ids?
     };
     crate::scheduler::refresh_many(&app, ids).await
+}
+
+/// One-time-per-feed catch-up for feeds added before favicon discovery
+/// existed (`add_feed` only calls `favicon::discover_favicon` for newly
+/// added feeds, so anything added earlier is stuck with a NULL
+/// `icon_path` forever otherwise). Mirrors `scheduler::refresh_many`'s
+/// concurrency-limited batch pattern. Spawned from `lib.rs`'s `.setup()`
+/// rather than run synchronously at startup: this needs network access
+/// per feed, and SPEC §7 requires startup to stay under 2s.
+pub(crate) async fn backfill_favicons(app: &AppHandle) {
+    let targets: Vec<(i64, String)> = {
+        let db = app.state::<Db>();
+        let conn = db.0.lock().unwrap();
+        let Ok(mut stmt) =
+            conn.prepare("SELECT id, site_url FROM feeds WHERE icon_path IS NULL AND site_url IS NOT NULL")
+        else {
+            return;
+        };
+        let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))) else {
+            return;
+        };
+        rows.filter_map(Result::ok).collect()
+    };
+    if targets.is_empty() {
+        return;
+    }
+
+    let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_FAVICON_FETCHES));
+    let mut handles = Vec::with_capacity(targets.len());
+    for (id, site_url) in targets {
+        let app = app.clone();
+        let semaphore = Arc::clone(&semaphore);
+        handles.push(tauri::async_runtime::spawn(async move {
+            let _permit = semaphore.acquire_owned().await;
+            let client = app.state::<HttpClient>();
+            let Some(icon_path) = favicon::discover_favicon(&client.0, &site_url).await else {
+                return;
+            };
+            let db = app.state::<Db>();
+            let conn = db.0.lock().unwrap();
+            let _ = conn.execute("UPDATE feeds SET icon_path = ?1 WHERE id = ?2", params![icon_path, id]);
+        }));
+    }
+    for handle in handles {
+        let _ = handle.await;
+    }
+    let _ = app.emit("feeds-updated", ());
 }
 
 fn fetch_feed_by_id(conn: &Connection, id: i64) -> AppResult<Feed> {

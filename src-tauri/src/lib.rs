@@ -61,6 +61,15 @@ pub fn run() {
             });
             scheduler::start(app.handle());
 
+            // Catch-up for feeds added before favicon discovery existed
+            // (add_feed only fetches a favicon for newly-added feeds).
+            // Network-bound and per-feed, so it's spawned rather than run
+            // inline here -- SPEC §7 requires startup to stay under 2s.
+            let favicon_app = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                commands::feeds::backfill_favicons(&favicon_app).await;
+            });
+
             // Once a tray exists, closing the main window should hide it
             // rather than quit the whole process -- true quit only happens
             // via the tray menu's "終了" item (`app.exit(0)`).
