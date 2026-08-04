@@ -12,7 +12,8 @@ const VIEW_MODES: { mode: ViewMode; label: string }[] = [
 export function FilterBar() {
   const feeds = useFeedsStore((s) => s.feeds);
   const refreshFeeds = useFeedsStore((s) => s.refresh);
-  const { filterFeedId, setFilterFeedId, viewMode, setViewMode, markAllRead } = useEntriesStore();
+  const { filterFeedId, setFilterFeedId, viewMode, setViewMode, markAllRead, markAllUnread } =
+    useEntriesStore();
   const toggleFeedManager = useUiStore((s) => s.toggleFeedManager);
   const toggleHistory = useUiStore((s) => s.toggleHistory);
   const toggleSettings = useUiStore((s) => s.toggleSettings);
@@ -60,6 +61,14 @@ export function FilterBar() {
         className="shrink-0 rounded px-1.5 py-1 opacity-60 hover:opacity-100"
       >
         すべて既読
+      </button>
+
+      <button
+        type="button"
+        onClick={() => markAllUnread()}
+        className="shrink-0 rounded px-1.5 py-1 opacity-60 hover:opacity-100"
+      >
+        すべて未読
       </button>
 
       <button

@@ -1,6 +1,20 @@
-use tauri::WebviewWindow;
+use std::sync::Mutex;
+
+use tauri::{State, WebviewWindow};
 
 use crate::error::AppResult;
+
+/// The last alpha byte (0-255) applied via `apply()`. Windows can drop a
+/// layered window's alpha on certain size transitions (observed: maximizing
+/// resets it to fully opaque), so callers re-apply this value whenever the
+/// window is resized -- see the `WindowEvent::Resized` handler in lib.rs.
+pub struct LastOpacity(pub Mutex<u8>);
+
+impl Default for LastOpacity {
+    fn default() -> Self {
+        Self(Mutex::new(255))
+    }
+}
 
 /// True window-level opacity (blends the whole window -- including
 /// whatever Mica/Acrylic itself rendered -- against everything actually
@@ -13,8 +27,7 @@ use crate::error::AppResult;
 /// `SetLayeredWindowAttributes` call, same style as the Win32 calls already
 /// used in `vibrancy.rs`.
 #[cfg(target_os = "windows")]
-#[tauri::command]
-pub fn set_window_opacity(window: WebviewWindow, alpha: f64) -> AppResult<()> {
+pub fn apply(window: &WebviewWindow, alpha_byte: u8) -> AppResult<()> {
     use raw_window_handle::HasWindowHandle;
     use windows_sys::Win32::Foundation::HWND;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -31,7 +44,6 @@ pub fn set_window_opacity(window: WebviewWindow, alpha: f64) -> AppResult<()> {
         return Err(AppError::Other("not a Win32 window".to_string()));
     };
     let hwnd = win32.hwnd.get() as HWND;
-    let alpha_byte = (alpha.clamp(0.0, 1.0) * 255.0).round() as u8;
 
     unsafe {
         let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
@@ -46,7 +58,14 @@ pub fn set_window_opacity(window: WebviewWindow, alpha: f64) -> AppResult<()> {
 }
 
 #[cfg(not(target_os = "windows"))]
+pub fn apply(_window: &WebviewWindow, _alpha_byte: u8) -> AppResult<()> {
+    Ok(())
+}
+
 #[tauri::command]
-pub fn set_window_opacity(_window: WebviewWindow, _alpha: f64) -> AppResult<()> {
+pub fn set_window_opacity(window: WebviewWindow, state: State<'_, LastOpacity>, alpha: f64) -> AppResult<()> {
+    let alpha_byte = (alpha.clamp(0.0, 1.0) * 255.0).round() as u8;
+    apply(&window, alpha_byte)?;
+    *state.0.lock().unwrap() = alpha_byte;
     Ok(())
 }

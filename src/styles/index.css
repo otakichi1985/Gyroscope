@@ -8,6 +8,17 @@ body,
   margin: 0;
 }
 
+/* Without this, native form controls (the <select> dropdown popup,
+   scrollbars, etc.) render with the browser's light-theme default
+   regardless of our dark: Tailwind classes -- but <select>'s *text*
+   color still inherits from our dark-mode text classes, so the popup
+   ends up white text on a white background. `light dark` tells the
+   browser both themes are supported and to match prefers-color-scheme,
+   same signal our own dark: classes already follow. */
+html {
+  color-scheme: light dark;
+}
+
 /* Panel background color driven by a CSS custom property set from React
    (the selected skin's RGB, see App.tsx / lib/skins.ts) -- Tailwind's
    dark: variant can't respond to arbitrary computed inline styles, so

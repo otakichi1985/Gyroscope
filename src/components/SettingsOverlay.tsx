@@ -1,11 +1,24 @@
 import { SKINS } from "../lib/skins";
 import { useVibrancyMode } from "../hooks/useVibrancyMode";
-import { useAppearanceStore } from "../stores/appearanceStore";
+import { useAppearanceStore, type CardGap, type CardSize } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
+
+const CARD_SIZES: { id: CardSize; label: string }[] = [
+  { id: "small", label: "小" },
+  { id: "medium", label: "中" },
+  { id: "large", label: "大" },
+];
+
+const CARD_GAPS: { id: CardGap; label: string }[] = [
+  { id: "compact", label: "狭い" },
+  { id: "normal", label: "普通" },
+  { id: "relaxed", label: "広い" },
+];
 
 export function SettingsOverlay() {
   const closeSettings = useUiStore((s) => s.closeSettings);
-  const { opacity, skinId, setOpacity, setSkin } = useAppearanceStore();
+  const { opacity, skinId, cardSize, cardGap, setOpacity, setSkin, setCardSize, setCardGap } =
+    useAppearanceStore();
   const vibrancy = useVibrancyMode();
   const opacityDisabled = vibrancy === "none";
 
@@ -68,6 +81,42 @@ export function SettingsOverlay() {
               MicaまたはAcrylicが使えない環境のため、不透明度は常に100%になります
             </p>
           )}
+        </div>
+
+        <div>
+          <div className="mb-1.5 text-xs font-medium opacity-70">カードサイズ</div>
+          <div className="flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
+            {CARD_SIZES.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setCardSize(id)}
+                className={`flex-1 rounded px-1.5 py-1 text-xs ${
+                  cardSize === id ? "bg-black/10 dark:bg-white/10" : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-1.5 text-xs font-medium opacity-70">カードの間隔</div>
+          <div className="flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
+            {CARD_GAPS.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setCardGap(id)}
+                className={`flex-1 rounded px-1.5 py-1 text-xs ${
+                  cardGap === id ? "bg-black/10 dark:bg-white/10" : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

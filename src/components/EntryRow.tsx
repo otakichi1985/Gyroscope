@@ -1,17 +1,37 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { entrySnippet, formatPublished } from "../lib/text";
+import type { CardSize } from "../stores/appearanceStore";
 import type { Entry } from "../lib/types";
 
 const HTTP_LINK_RE = /^https?:\/\//i;
+
+// Card mode only, per the request that prompted this ("カードのサイズ") --
+// list/compact stay at their existing fixed sizing.
+const CARD_THUMB_SIZE: Record<CardSize, string> = {
+  small: "h-12 w-12",
+  medium: "h-16 w-16",
+  large: "h-24 w-24",
+};
+const CARD_TITLE_SIZE: Record<CardSize, string> = {
+  small: "text-xs",
+  medium: "text-sm",
+  large: "text-base",
+};
+const CARD_SNIPPET_CLAMP: Record<CardSize, string> = {
+  small: "line-clamp-1",
+  medium: "line-clamp-2",
+  large: "line-clamp-3",
+};
 
 interface EntryRowProps {
   entry: Entry;
   mode: ViewMode;
   feedTitle: string;
+  cardSize: CardSize;
 }
 
-export function EntryRow({ entry, mode, feedTitle }: EntryRowProps) {
+export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
   const markRead = useEntriesStore((s) => s.markRead);
   const toggleStar = useEntriesStore((s) => s.toggleStar);
 
@@ -118,12 +138,12 @@ export function EntryRow({ entry, mode, feedTitle }: EntryRowProps) {
         <img
           src={entry.thumbnail_url}
           alt=""
-          className="h-16 w-16 shrink-0 rounded object-cover"
+          className={`${CARD_THUMB_SIZE[cardSize]} shrink-0 rounded object-cover`}
         />
       )}
       <div className="min-w-0 flex-1">
-        <div className={`truncate text-sm ${entry.is_read ? "" : "font-medium"}`}>{title}</div>
-        <p className="mt-0.5 line-clamp-2 text-xs opacity-70">{entrySnippet(entry)}</p>
+        <div className={`truncate ${CARD_TITLE_SIZE[cardSize]} ${entry.is_read ? "" : "font-medium"}`}>{title}</div>
+        <p className={`mt-0.5 ${CARD_SNIPPET_CLAMP[cardSize]} text-xs opacity-70`}>{entrySnippet(entry)}</p>
         {meta && <div className="mt-0.5 truncate text-xs opacity-60">{meta}</div>}
       </div>
       {readCheck}

@@ -40,6 +40,8 @@ pub fn run() {
             let client = fetch::client::build_client().expect("failed to build HTTP client");
             app.manage(HttpClient(client));
 
+            app.manage(opacity::LastOpacity::default());
+
             // KNOWN ISSUE (tracked, not yet resolved): the tray icon does not
             // reliably appear in this dev environment even after this fix.
             // tray-icon-0.24.2's register_tray_icon() silently swallows a
@@ -62,12 +64,25 @@ pub fn run() {
             // Once a tray exists, closing the main window should hide it
             // rather than quit the whole process -- true quit only happens
             // via the tray menu's "終了" item (`app.exit(0)`).
+            //
+            // Windows can drop a layered window's alpha on certain size
+            // transitions (observed: maximizing resets it to fully opaque),
+            // so re-apply the last value the user asked for on every resize
+            // (covers maximize/restore/manual drag-resize alike).
             let close_window = window.clone();
-            window.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            let resize_window = window.clone();
+            let resize_app = app.handle().clone();
+            window.on_window_event(move |event| match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
                     let _ = close_window.hide();
                 }
+                tauri::WindowEvent::Resized(_) => {
+                    let state = resize_app.state::<opacity::LastOpacity>();
+                    let alpha_byte = *state.0.lock().unwrap();
+                    let _ = opacity::apply(&resize_window, alpha_byte);
+                }
+                _ => {}
             });
 
             Ok(())
@@ -90,6 +105,7 @@ pub fn run() {
             commands::entries::mark_entry_read,
             commands::entries::toggle_star,
             commands::entries::mark_all_read,
+            commands::entries::mark_all_unread,
             commands::entries::list_read_history,
             commands::entries::clear_read_history,
             commands::opml::import_opml,
