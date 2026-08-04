@@ -117,8 +117,13 @@ export function SettingsOverlay() {
                 }`}
               >
                 <span
-                  className="h-4 w-4 shrink-0 rounded-full border border-black/10 dark:border-white/20"
-                  style={{ backgroundColor: `rgb(${skin.light})` }}
+                  className="skin-swatch h-4 w-4 shrink-0 rounded-full border border-black/10 dark:border-white/20"
+                  style={
+                    {
+                      "--swatch-rgb-light": skin.accentLight,
+                      "--swatch-rgb-dark": skin.accentDark,
+                    } as React.CSSProperties
+                  }
                 />
                 {skin.label}
               </button>
