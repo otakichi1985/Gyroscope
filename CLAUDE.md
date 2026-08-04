@@ -209,6 +209,39 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
   - `FeedManager.tsx`の削除ボタンは`CloseIcon`（×）の流用をやめ専用の`TrashIcon`
     （ゴミ箱）にした。×は「閉じる/取り消し」、ゴミ箱は「（永続的な）削除」という
     役割分担を明確にするため
+- ブックマーク・検索(FTS5)・ジャンル別タイムライン（ユーザー要望）:
+  - 配信元表示はcard/listモードには元々あった（`meta`行）が、compactモードだけ抜けていた
+    バグを修正（`EntryRow.tsx`）。ブックマークは`EntriesFilter`の`starred_only`が
+    バックエンドに元々実装済みだった（フロント未使用）ものをUIに繋いだだけ
+  - 検索はSPEC §2.3どおりSQLite FTS5。`entries`に`body_text`（HTML除去済みプレーンテキスト、
+    `parse::text::strip_html`で`content_html`優先/`summary`フォールバックから計算）を追加し、
+    `entries_fts`をexternal-contentなFTS5仮想テーブル（`content='entries', content_rowid='id'`）
+    として作成、3本のAFTER INSERT/UPDATE/DELETEトリガーで自動同期（SQLite公式推奨パターン）。
+    ユーザー入力は`commands/entries.rs`の`build_fts_query`で空白区切りトークンごとに
+    英数字（Unicode、日本語含む）以外を除去して前方一致(`token*`)化してからMATCHに渡す
+    （生の入力をそのまま渡すとクォート/コロン/ハイフン等でFTS5構文エラーになるため）
+  - **【実機で踏んだ罠】** FTS5の同期トリガーは「これから起きる変更」しか追従しない。
+    v3マイグレーションで`entries_fts`を新設した時点で**既存の記事は空のまま**になり、
+    検索してもヒットしない（実機で「VRChatで検索しても引っかからない」と発覚）。
+    `db::open`に`backfill_body_text`を追加し、起動のたびに`body_text IS NULL`な行を
+    見つけて`UPDATE`する方式で解決（`INSERT INTO entries_fts ...`を直接叩くのではなく
+    `UPDATE entries`を通すことで、既存のAFTER UPDATEトリガーにFTS5同期を任せられる）。
+    2巡目以降は該当行が無いので実質no-op
+  - ジャンル別タイムラインは`feeds.folder`（OPML importでのみ設定可能だった既存カラム）
+    に手動編集UI（`FeedManager.tsx`の入力欄、`set_feed_folder`は既存コマンドを流用）を
+    追加しただけ。`FilterBar.tsx`のフィード選択`<select>`は「ジャンル: {name}」という
+    仮想選択肢＋`<optgroup>`によるジャンル別グルーピングを追加し、`value`を
+    `folder:{name}` / フィードID / 空文字列の3種でエンコードして`onChange`で判別
+  - **【開発中に踏んだ罠・要注意】** `npm run tauri dev`実行中に`src-tauri/`配下のファイルを
+    編集すると、Tauriのファイル監視が実行中のプロセスを強制終了→再ビルド→再起動する。
+    このタイミングでSQLiteが書き込み中だと`database disk image is malformed`で
+    DB破損が実際に発生した（本セッションで1度発生、破損ファイルは
+    `.corrupted-backup-*`にリネームして退避、新規DBで復旧）。GUI操作中（＝DB書き込みの
+    可能性がある間）はRustファイルの編集を避け、編集直後は落ち着くまでGUI操作を控えるのが無難
+  - **【未解決】** `tauri-plugin-window-state`が起動時に前回のウィンドウ位置/サイズを
+    復元するため、`tauri.conf.json`の`width`/`height`のデフォルト値を変更しても、
+    既存ユーザー（`.window-state.json`が既にある環境）の見た目にはすぐ反映されない
+    （新規インストール/状態ファイル削除後の初回起動時のみ効く）
 
 ## 依存関係の選定理由
 

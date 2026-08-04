@@ -16,6 +16,7 @@ export function FeedManager() {
     refreshFeed,
     setFeedNotify,
     setFeedInterval,
+    setFeedFolder,
     importOpml,
     exportOpml,
   } = useFeedsStore();
@@ -118,56 +119,64 @@ export function FeedManager() {
           {feeds.map((feed) => (
             <li
               key={feed.id}
-              className="flex items-center justify-between gap-2 rounded px-2 py-1 transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5"
+              className="flex flex-col gap-1 rounded px-2 py-1.5 transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5"
             >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 truncate">
-                  {feed.last_error && (
-                    <span title={feed.last_error} className="text-red-500">
-                      <WarningIcon className="h-3.5 w-3.5" />
-                    </span>
-                  )}
-                  <span className="truncate font-medium">{feed.custom_title ?? feed.title ?? feed.url}</span>
-                  {feed.unread_count > 0 && (
-                    <span className="shrink-0 text-xs opacity-60">({feed.unread_count})</span>
-                  )}
-                </div>
+              <div className="flex items-center gap-1 truncate">
+                {feed.last_error && (
+                  <span title={feed.last_error} className="text-red-500">
+                    <WarningIcon className="h-3.5 w-3.5" />
+                  </span>
+                )}
+                <span className="truncate font-medium">{feed.custom_title ?? feed.title ?? feed.url}</span>
+                {feed.unread_count > 0 && (
+                  <span className="shrink-0 text-xs opacity-60">({feed.unread_count})</span>
+                )}
               </div>
-              <input
-                type="number"
-                min={1}
-                placeholder="既定(30分)"
-                defaultValue={feed.interval_min ?? ""}
-                onBlur={(e) =>
-                  setFeedInterval(feed.id, e.target.value === "" ? null : Number(e.target.value))
-                }
-                className="w-16 shrink-0 rounded border border-black/10 bg-black/5 px-1 py-0.5 text-xs outline-none dark:border-white/10 dark:bg-white/5"
-                aria-label="更新間隔（分）"
-              />
-              <button
-                type="button"
-                onClick={() => setFeedNotify(feed.id, !feed.notify_enabled)}
-                className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
-                aria-label={feed.notify_enabled ? "通知を無効にする" : "通知を有効にする"}
-              >
-                {feed.notify_enabled ? <BellIcon className="h-3.5 w-3.5" /> : <BellOffIcon className="h-3.5 w-3.5" />}
-              </button>
-              <button
-                type="button"
-                onClick={() => refreshFeed(feed.id)}
-                className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
-                aria-label="更新"
-              >
-                <RefreshIcon className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => deleteFeed(feed.id)}
-                className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
-                aria-label="削除"
-              >
-                <TrashIcon className="h-3.5 w-3.5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  placeholder="ジャンル"
+                  defaultValue={feed.folder ?? ""}
+                  onBlur={(e) => setFeedFolder(feed.id, e.target.value.trim() || null)}
+                  className="min-w-0 flex-1 rounded border border-black/10 bg-black/5 px-1 py-0.5 text-xs outline-none dark:border-white/10 dark:bg-white/5"
+                  aria-label="ジャンル"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="既定(30分)"
+                  defaultValue={feed.interval_min ?? ""}
+                  onBlur={(e) =>
+                    setFeedInterval(feed.id, e.target.value === "" ? null : Number(e.target.value))
+                  }
+                  className="w-16 shrink-0 rounded border border-black/10 bg-black/5 px-1 py-0.5 text-xs outline-none dark:border-white/10 dark:bg-white/5"
+                  aria-label="更新間隔（分）"
+                />
+                <button
+                  type="button"
+                  onClick={() => setFeedNotify(feed.id, !feed.notify_enabled)}
+                  className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
+                  aria-label={feed.notify_enabled ? "通知を無効にする" : "通知を有効にする"}
+                >
+                  {feed.notify_enabled ? <BellIcon className="h-3.5 w-3.5" /> : <BellOffIcon className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => refreshFeed(feed.id)}
+                  className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
+                  aria-label="更新"
+                >
+                  <RefreshIcon className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteFeed(feed.id)}
+                  className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
+                  aria-label="削除"
+                >
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </li>
           ))}
         </ul>

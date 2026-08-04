@@ -12,6 +12,7 @@ interface FeedsState {
   refreshFeed: (id: number) => Promise<void>;
   setFeedNotify: (id: number, notifyEnabled: boolean) => Promise<void>;
   setFeedInterval: (id: number, intervalMin: number | null) => Promise<void>;
+  setFeedFolder: (id: number, folder: string | null) => Promise<void>;
   importOpml: (path: string) => Promise<OpmlImportSummary>;
   exportOpml: (path: string) => Promise<void>;
 }
@@ -54,6 +55,11 @@ export const useFeedsStore = create<FeedsState>((set, get) => ({
 
   setFeedInterval: async (id: number, intervalMin: number | null) => {
     await invoke("set_feed_interval", { id, intervalMin });
+    await get().refresh();
+  },
+
+  setFeedFolder: async (id: number, folder: string | null) => {
+    await invoke("set_feed_folder", { id, folder });
     await get().refresh();
   },
 
