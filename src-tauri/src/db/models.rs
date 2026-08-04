@@ -91,6 +91,32 @@ impl Entry {
     }
 }
 
+/// A read-history row -- a denormalized snapshot taken at the moment an
+/// entry was first marked read, independent of the live `entries`/`feeds`
+/// rows (which may since have been deleted; see migrations.rs v2).
+#[derive(Debug, Clone, Serialize)]
+pub struct ReadHistoryEntry {
+    pub id: i64,
+    pub feed_title: String,
+    pub title: Option<String>,
+    pub link: Option<String>,
+    pub read_at: String,
+}
+
+pub const READ_HISTORY_COLUMNS: &str = "id, feed_title, title, link, read_at";
+
+impl ReadHistoryEntry {
+    pub fn from_row(row: &Row) -> rusqlite::Result<ReadHistoryEntry> {
+        Ok(ReadHistoryEntry {
+            id: row.get(0)?,
+            feed_title: row.get(1)?,
+            title: row.get(2)?,
+            link: row.get(3)?,
+            read_at: row.get(4)?,
+        })
+    }
+}
+
 /// A parsed feed entry, ready to be upserted. Not yet associated with a
 /// feed_id or database-assigned id.
 #[derive(Debug, Clone)]

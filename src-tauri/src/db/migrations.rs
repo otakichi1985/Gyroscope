@@ -60,6 +60,22 @@ const MIGRATIONS: &[&str] = &[
         value TEXT NOT NULL
     );
     "#,
+    // v2: read history -- deliberately not a foreign key to entries/feeds,
+    // since entries get auto-deleted after 30 days (SPEC data model) and
+    // feeds can be deleted outright; this table snapshots what's needed to
+    // still show "what I've read" after the source row is gone.
+    r#"
+    CREATE TABLE read_history (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        feed_title TEXT NOT NULL,
+        entry_guid TEXT NOT NULL,
+        title      TEXT,
+        link       TEXT,
+        read_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        UNIQUE (feed_title, entry_guid)
+    );
+    CREATE INDEX idx_read_history_read_at ON read_history(read_at DESC);
+    "#,
 ];
 
 pub fn run(conn: &Connection) -> rusqlite::Result<()> {

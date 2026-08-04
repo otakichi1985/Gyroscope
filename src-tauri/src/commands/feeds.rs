@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection, OptionalExtension};
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
+use tauri_plugin_notification::NotificationExt;
 use url::Url;
 
 use crate::db::models::{Feed, FEED_COLUMNS};
@@ -54,7 +55,10 @@ pub async fn add_feed(db: State<'_, Db>, client: State<'_, HttpClient>, url: Str
         ],
     )?;
     let feed_id = conn.last_insert_rowid();
-    upsert_entries(&conn, feed_id, &parsed.entries)?;
+    // Discarded: a brand-new feed's entire initial batch is trivially "new"
+    // and notify_enabled defaults to false for feeds that don't exist yet,
+    // so there's nothing to notify about on first import anyway.
+    let _ = upsert_entries(&conn, feed_id, &parsed.entries)?;
 
     fetch_feed_by_id(&conn, feed_id)
 }
@@ -152,31 +156,43 @@ pub fn set_feed_tags(db: State<'_, Db>, id: i64, tags: Vec<String>) -> AppResult
     Ok(())
 }
 
-/// Manual "update" button and (later, Phase 4) the periodic auto-refresh
-/// both go through this: conditional GET, and on failure the error is
-/// stored on the feed row rather than propagated, so the UI can show a
-/// per-feed warning icon instead of losing the rest of the timeline
-/// (SPEC §7 -- errors must be visible, never swallowed).
-#[tauri::command]
-pub async fn refresh_feed(db: State<'_, Db>, client: State<'_, HttpClient>, id: i64) -> AppResult<Feed> {
-    let (url, etag, last_modified) = {
+/// Manual "update" button (`refresh_feed`) and the periodic auto-refresh
+/// (`crate::scheduler`) both go through this: conditional GET, and on
+/// failure the error is stored on the feed row rather than propagated, so
+/// the UI can show a per-feed warning icon instead of losing the rest of
+/// the timeline (SPEC §7 -- errors must be visible, never swallowed).
+///
+/// Emitting "feeds-updated" is left to the callers rather than done here,
+/// so a batch refresh (`scheduler::refresh_many`) can emit once for the
+/// whole batch instead of once per feed.
+pub(crate) async fn refresh_feed_inner(
+    app: &AppHandle,
+    db: &Db,
+    client: &reqwest::Client,
+    id: i64,
+) -> AppResult<Feed> {
+    let (url, etag, last_modified, notify_enabled, custom_title, title) = {
         let conn = db.0.lock().unwrap();
         conn.query_row(
-            "SELECT url, etag, last_modified FROM feeds WHERE id = ?1",
+            "SELECT url, etag, last_modified, notify_enabled, custom_title, title FROM feeds WHERE id = ?1",
             params![id],
             |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, Option<String>>(1)?,
                     row.get::<_, Option<String>>(2)?,
+                    row.get::<_, bool>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
                 ))
             },
         )?
     };
 
-    let outcome = fetch_conditional(&client.0, &url, etag.as_deref(), last_modified.as_deref()).await;
+    let outcome = fetch_conditional(client, &url, etag.as_deref(), last_modified.as_deref()).await;
 
     let conn = db.0.lock().unwrap();
+    let mut new_entries = Vec::new();
     match outcome {
         Ok(FetchOutcome::NotModified) => {
             conn.execute(
@@ -198,7 +214,7 @@ pub async fn refresh_feed(db: State<'_, Db>, client: State<'_, HttpClient>, id: 
                      WHERE id = ?5",
                     params![parsed.title, parsed.site_url, etag, last_modified, id],
                 )?;
-                upsert_entries(&conn, id, &parsed.entries)?;
+                new_entries = upsert_entries(&conn, id, &parsed.entries)?;
             }
             Err(err) => {
                 conn.execute(
@@ -217,7 +233,41 @@ pub async fn refresh_feed(db: State<'_, Db>, client: State<'_, HttpClient>, id: 
         }
     }
 
+    if notify_enabled && !new_entries.is_empty() {
+        let display_name = custom_title.as_deref().or(title.as_deref()).unwrap_or(&url);
+        let body = if new_entries.len() == 1 {
+            new_entries[0].title.clone().unwrap_or_else(|| "(無題)".to_string())
+        } else {
+            format!("{}件の新着記事", new_entries.len())
+        };
+        // Best-effort: a notification failure (e.g. OS permission denied)
+        // must not fail the refresh itself.
+        let _ = app.notification().builder().title(display_name).body(body).show();
+    }
+
     fetch_feed_by_id(&conn, id)
+}
+
+#[tauri::command]
+pub async fn refresh_feed(app: AppHandle, db: State<'_, Db>, client: State<'_, HttpClient>, id: i64) -> AppResult<Feed> {
+    let feed = refresh_feed_inner(&app, &db, &client.0, id).await?;
+    let _ = app.emit("feeds-updated", ());
+    Ok(feed)
+}
+
+/// Backs the tray's "更新" item and (later) any "refresh all" UI. The
+/// scheduler's periodic tick reuses `crate::scheduler::refresh_many`
+/// directly rather than this command, since it already runs inside the
+/// app process and doesn't need to round-trip through IPC.
+#[tauri::command]
+pub async fn refresh_all_feeds(app: AppHandle, db: State<'_, Db>) -> AppResult<()> {
+    let ids: Vec<i64> = {
+        let conn = db.0.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id FROM feeds")?;
+        let ids: Result<Vec<i64>, _> = stmt.query_map([], |r| r.get(0))?.collect();
+        ids?
+    };
+    crate::scheduler::refresh_many(&app, ids).await
 }
 
 fn fetch_feed_by_id(conn: &Connection, id: i64) -> AppResult<Feed> {

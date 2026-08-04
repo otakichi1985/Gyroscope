@@ -1,11 +1,11 @@
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use tauri::State;
 
 use crate::db::models::{Feed, FEED_COLUMNS};
 use crate::db::Db;
-use crate::error::AppResult;
-use crate::opml::{build_opml, parse_opml};
+use crate::error::{AppError, AppResult};
+use crate::opml::{build_opml, parse_opml, OpmlFeed};
 
 #[derive(Debug, Serialize)]
 pub struct OpmlImportSummary {
@@ -16,12 +16,9 @@ pub struct OpmlImportSummary {
 /// Registers feeds found in the OPML file but doesn't fetch them yet --
 /// an import can list hundreds of feeds, and fetching them all inline would
 /// block the command for a long time. They pick up entries on the next
-/// manual or scheduled refresh.
-#[tauri::command]
-pub fn import_opml(db: State<'_, Db>, content: String) -> AppResult<OpmlImportSummary> {
-    let feeds = parse_opml(&content)?;
-    let conn = db.0.lock().unwrap();
-
+/// manual or scheduled refresh. Shared by both the content-based and
+/// path-based import commands below.
+fn import_feeds(conn: &Connection, feeds: Vec<OpmlFeed>) -> AppResult<OpmlImportSummary> {
     let mut added = 0u32;
     let mut skipped = 0u32;
 
@@ -44,10 +41,43 @@ pub fn import_opml(db: State<'_, Db>, content: String) -> AppResult<OpmlImportSu
     Ok(OpmlImportSummary { added, skipped })
 }
 
-#[tauri::command]
-pub fn export_opml(db: State<'_, Db>) -> AppResult<String> {
+fn export_opml_string(db: &Db) -> AppResult<String> {
     let conn = db.0.lock().unwrap();
     let mut stmt = conn.prepare(&format!("SELECT {FEED_COLUMNS} FROM feeds f ORDER BY f.sort_order, f.id"))?;
     let feeds = stmt.query_map([], Feed::from_row)?.collect::<Result<Vec<_>, _>>()?;
     Ok(build_opml(&feeds))
+}
+
+#[tauri::command]
+pub fn import_opml(db: State<'_, Db>, content: String) -> AppResult<OpmlImportSummary> {
+    let feeds = parse_opml(&content)?;
+    let conn = db.0.lock().unwrap();
+    import_feeds(&conn, feeds)
+}
+
+#[tauri::command]
+pub fn export_opml(db: State<'_, Db>) -> AppResult<String> {
+    export_opml_string(&db)
+}
+
+/// Path-based counterparts used by the frontend's native Open/Save dialog
+/// flow (`@tauri-apps/plugin-dialog` returns a path, not file content). Plain
+/// `std::fs` here needs no ACL scope -- Tauri's fs permissions only gate the
+/// fs *plugin's* own JS-invokable commands, not arbitrary code inside our
+/// own command handlers (this is why tauri-plugin-fs was deliberately not
+/// added as a dependency).
+#[tauri::command]
+pub fn import_opml_from_path(db: State<'_, Db>, path: String) -> AppResult<OpmlImportSummary> {
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| AppError::Other(format!("ファイルを読み込めませんでした: {e}")))?;
+    let feeds = parse_opml(&content)?;
+    let conn = db.0.lock().unwrap();
+    import_feeds(&conn, feeds)
+}
+
+#[tauri::command]
+pub fn export_opml_to_path(db: State<'_, Db>, path: String) -> AppResult<()> {
+    let xml = export_opml_string(&db)?;
+    std::fs::write(&path, xml).map_err(|e| AppError::Other(format!("ファイルを書き込めませんでした: {e}")))?;
+    Ok(())
 }

@@ -33,3 +33,18 @@ export interface Entry {
   is_read: boolean;
   is_starred: boolean;
 }
+
+// Mirrors src-tauri/src/commands/opml.rs::OpmlImportSummary.
+export interface OpmlImportSummary {
+  added: number;
+  skipped: number;
+}
+
+// Mirrors src-tauri/src/db/models.rs::ReadHistoryEntry.
+export interface ReadHistoryEntry {
+  id: number;
+  feed_title: string;
+  title: string | null;
+  link: string | null;
+  read_at: string;
+}
