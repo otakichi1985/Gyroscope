@@ -28,7 +28,17 @@ export function FilterBar() {
       <select
         value={filterFeedId ?? ""}
         onChange={(e) => setFilterFeedId(e.target.value === "" ? null : Number(e.target.value))}
-        className="min-w-0 max-w-[45%] flex-1 rounded border border-black/10 bg-black/5 px-1 py-1 text-xs outline-none dark:border-white/10 dark:bg-white/5"
+        // The dropdown *popup* (options list) is rendered natively by the OS/
+        // browser, largely ignoring our Tailwind classes -- only `color`
+        // cascades into it. `color-scheme:light dark` alone still left
+        // unselected options showing our inherited dark-mode text color
+        // (near-white) on the browser's light popup background, unreadable
+        // except on hover (where Chromium forces its own contrast). Pinning
+        // this control to `color-scheme:light` + a fixed dark text color
+        // (not `dark:`-swapped) keeps the popup always light-with-dark-text,
+        // matching what's actually achievable for a native <select>, instead
+        // of trying to make it follow the app's own dark theme.
+        className="min-w-0 max-w-[45%] flex-1 rounded border border-black/10 bg-black/5 px-1 py-1 text-xs text-neutral-900 outline-none [color-scheme:light] dark:border-white/10 dark:bg-white/5"
       >
         <option value="">全フィード</option>
         {feeds.map((feed) => (
