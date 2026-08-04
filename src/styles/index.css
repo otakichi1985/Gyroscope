@@ -72,3 +72,18 @@ html {
     background-color: rgb(var(--accent-rgb-dark) / 0.18);
   }
 }
+
+/* Per-skin swatch dot in SettingsOverlay's skin picker. Unlike .accent-*
+   above (which reads the *currently active* skin's CSS variables from the
+   App root), this needs to show each of the 4 skins' own colors side by
+   side regardless of which one is selected -- so the light/dark RGB pair
+   is set inline per swatch element (--swatch-rgb-*) rather than inherited
+   from the root. Same light/dark-via-media-query mechanism otherwise. */
+.skin-swatch {
+  background-color: rgb(var(--swatch-rgb-light));
+}
+@media (prefers-color-scheme: dark) {
+  .skin-swatch {
+    background-color: rgb(var(--swatch-rgb-dark));
+  }
+}
