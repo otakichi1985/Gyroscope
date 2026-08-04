@@ -1,6 +1,9 @@
-import { FeedManager } from "./components/FeedManager";
+import { EntryList } from "./components/EntryList";
+import { FeedManagerOverlay } from "./components/FeedManagerOverlay";
+import { FilterBar } from "./components/FilterBar";
 import { TitleBar } from "./components/TitleBar";
 import { useVibrancyMode } from "./hooks/useVibrancyMode";
+import { useUiStore } from "./stores/uiStore";
 
 const PANEL_BG: Record<ReturnType<typeof useVibrancyMode>, string> = {
   mica: "bg-white/55 dark:bg-neutral-900/45",
@@ -10,13 +13,18 @@ const PANEL_BG: Record<ReturnType<typeof useVibrancyMode>, string> = {
 
 function App() {
   const vibrancy = useVibrancyMode();
+  const feedManagerOpen = useUiStore((s) => s.feedManagerOpen);
 
   return (
     <div
       className={`flex h-screen w-screen flex-col overflow-hidden rounded-2xl text-neutral-900 dark:text-neutral-100 ${PANEL_BG[vibrancy]}`}
     >
       <TitleBar />
-      <FeedManager />
+      <FilterBar />
+      <div className="relative min-h-0 flex-1">
+        <EntryList />
+        {feedManagerOpen && <FeedManagerOverlay />}
+      </div>
     </div>
   );
 }
