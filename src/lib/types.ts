@@ -16,3 +16,20 @@ export interface Feed {
   tags: string[];
   unread_count: number;
 }
+
+// Mirrors src-tauri/src/db/models.rs::Entry.
+export interface Entry {
+  id: number;
+  feed_id: number;
+  guid: string;
+  title: string | null;
+  link: string | null;
+  author: string | null;
+  summary: string | null;
+  content_html: string | null;
+  thumbnail_url: string | null;
+  published_at: string | null;
+  fetched_at: string;
+  is_read: boolean;
+  is_starred: boolean;
+}

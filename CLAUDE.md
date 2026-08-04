@@ -48,6 +48,14 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
 - 自作コマンドのエラーは `error::AppError`（thiserror）を文字列にシリアライズしてフロントに渡す。
   `refresh_feed` はエラー時もコマンド自体は失敗させず、`feeds.last_error` に格納して返す
   （SPEC §7: フィード横の警告アイコン表示に使うため、エラーを握りつぶさない）
+- 記事一覧（Phase 3）: `FilterBar`（フィード選択+表示モード切替+全既読+フィード管理ボタン）→
+  `EntryList`（`@tanstack/react-virtual` で仮想スクロール、`entriesStore` の無限スクロール取得、
+  `offset = entries.length` で次ページ取得）→ `EntryRow`（card/list/compactの3モードを1コンポーネントで
+  出し分け）。フィード管理（`FeedManager`）は `uiStore` の `feedManagerOpen` で開閉するオーバーレイに格納し、
+  オーバーレイを閉じるタイミングで `entriesStore.refresh()` を呼んで記事一覧を再同期する
+  （フィード追加/削除がオーバーレイ内で起きるため）。既読/スターは楽観的ローカル更新
+  （`feedsStore` の「操作後に毎回`refresh()`」規約とは意図的に異なる。行クリックのたびに
+  無限スクロールで積み上げたページを`refresh()`で破棄するとスクロール位置が乱れるため）
 
 ## 依存関係の選定理由
 
@@ -60,9 +68,26 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
 - フレームレス窓は Windows 11 でも自動的に角丸にならない（システム標準タイトルバー窓のみ自動）。
   CSS の `border-radius` だけでは Mica/Acrylic の描画（DWM がHWND全体に敷く）が四隅で角ばって見えるため、
   `DwmSetWindowAttribute(DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND)` の明示呼び出しが必須
-- CSP は `style-src` に `unsafe-inline` を含めていない。Phase 3 で `@tanstack/react-virtual` を組み込む際、
-  同ライブラリは要素位置決めに inline `style` 属性を使うため、ブラウザに inline style attribute がブロックされないか
-  要検証（ブロックされる場合は仮想リスト行の位置指定方法を見直すか、CSPのその部分だけ緩和して理由を明記する）
+- CSP の `style-src 'self'`（`unsafe-inline` なし）は `@tanstack/react-virtual` の行位置決めをブロックしない
+  ことを実機（`npm run tauri dev` + WebView2）で確認済み。React は `style` prop を CSSOM プロパティ代入
+  （`el.style.transform = ...`）で適用しており、`setAttribute("style", ...)` や HTML内の `style=""` 属性
+  とは扱いが異なるため、CSPの`style-src`制限の対象外（ブラウザ実装・CSP仕様ともに一貫した挙動）。よって
+  変更不要
+- Tauriのコマンド引数名は「トップレベルの引数名」と「構造体としてまとめて渡す引数の中身」で
+  camelCase変換の扱いが違う。`#[tauri::command] fn f(id: i64, is_read: bool)` のように**個別の
+  スカラー引数**として並んでいる場合、JS側は自動camelCase変換に従い `invoke("f", { id, isRead })`
+  （snake_caseで渡すと `missing required key` エラーになる）。一方 `fn f(filter: EntriesFilter)` の
+  ように**単一の構造体引数**として渡す場合、その中身（`feed_id`, `unread_only` 等）は
+  `EntriesFilter` に `#[serde(rename_all = "camelCase")]` が無い限り、Rust側フィールド名そのまま
+  （snake_case）で渡す必要がある（camelCaseで送るとエラーにならず黙って`None`になるだけなので気づきにくい）。
+  `mark_entry_read`/`toggle_star`/`mark_all_read` は前者、`list_entries`の`filter`は後者
+- 仮想リスト（`EntryList.tsx`）の行はカード/リスト/コンパクトいずれも `<div role="button" tabIndex={0}>`
+  にしている（`<button>` にしない）。スター切替ボタンを内側に置くため、外側も`<button>`にすると
+  `<button>`の入れ子という不正なHTMLになり、Reactのhydrationエラー・クリック挙動の不安定化を招く
+  （実機テストで発見）
+- CSP の `img-src` は `'self' data:` だけでは記事サムネイル（ほぼ全て `https://` の外部URL）が
+  読み込めない。SPEC §2.3のサムネイル表示をデフォルトで機能させるため `https: http:` を追加済み
+  （「外部画像を読み込まない」トグルはPhase 5の設定画面でのオプトアウトとして別途実装する）
 - `feed-rs` の既定 `id_generator` は `<guid>`/`<id>` が無い場合に自動でハッシュ値を補完してしまい、
   `Entry::id` が常に非空になる（＝spec通りの「guid→link→title+published」の段階的フォールバックを後段で
   再現できなくなる）。そのため `parse::feed::parse_feed` は `Builder::id_generator` を空文字列を返す関数で
