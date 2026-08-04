@@ -8,6 +8,9 @@ interface UiState {
   historyOpen: boolean;
   toggleHistory: () => void;
   closeHistory: () => void;
+  settingsOpen: boolean;
+  toggleSettings: () => void;
+  closeSettings: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -19,4 +22,8 @@ export const useUiStore = create<UiState>((set) => ({
   historyOpen: false,
   toggleHistory: () => set((state) => ({ historyOpen: !state.historyOpen })),
   closeHistory: () => set({ historyOpen: false }),
+
+  settingsOpen: false,
+  toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
+  closeSettings: () => set({ settingsOpen: false }),
 }));

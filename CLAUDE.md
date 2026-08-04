@@ -34,8 +34,17 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
 - フレームレス窓: `decorations: false` + `transparent: true` + CSS `rounded-2xl overflow-hidden`。
   Windows 11 では Mica、失敗時は Acrylic、それも失敗したら不透明単色（`src-tauri/src/window/vibrancy.rs`）。
   どちらかの適用に成功した場合のみ `DWMWA_WINDOW_CORNER_PREFERENCE` で HWND 自体も丸める
-  （フレームレス窓は自動では丸くならないため）。適用結果はコマンド `get_vibrancy_mode` でフロントに渡し、
-  `App.tsx` がパネル背景の不透明度（mica/acrylic=半透明、none=不透明）を切り替える
+  （フレームレス窓は自動では丸くならないため）。適用結果はコマンド `get_vibrancy_mode` でフロントに渡す
+- 外観設定（不透明度スライダー+スキン）: パネルの配色（`src/lib/skins.ts`のRGB）と「ウィンドウ全体の
+  不透明度」は別レイヤーの別メカニズム。配色は`App.tsx`がCSSカスタムプロパティ（`--panel-rgb-light`/
+  `-dark`）として渡し、`src/styles/index.css`の`.panel-bg`が`prefers-color-scheme`で出し分ける
+  （常に不透明な単色）。不透明度は`src-tauri/src/window/opacity.rs`の`set_window_opacity`コマンドが
+  `WS_EX_LAYERED`+`SetLayeredWindowAttributes`でHWNDそのものに掛ける、正真正銘のウィンドウレベルの
+  透過（`vibrancy.rs`と同じ「生のWin32 APIを直接叩く」流儀）。CSS側の`background-color`にalphaを
+  持たせるだけでは、Mica/Acrylicが敷いている固定のぼかしテクスチャに対して自分の色を混ぜるだけで、
+  ウィンドウの背後にある本当のデスクトップ/他アプリには一切透けない（実機で「色が薄くなるだけで
+  透けない」と指摘されて判明）。`vibrancy==="none"`のときは不透明度を強制的に100%にする
+  （デスクトップ用の質感が無い状態でさらに薄くすると素っ気ない見た目になるため）
 - ウィンドウの閉じる/最小化ボタンは自作タイトルバー（`src/components/TitleBar.tsx`）から
   `@tauri-apps/api/window` の `getCurrentWindow()` を呼ぶ。ドラッグ移動は `data-tauri-drag-region` 属性のみで実現
 - DB: `rusqlite::Connection` 1本を `Mutex` で包んで `app.manage`（`src-tauri/src/db/mod.rs`）。

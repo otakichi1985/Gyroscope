@@ -13,7 +13,7 @@ use tauri_plugin_window_state::StateFlags;
 
 use db::Db;
 use fetch::HttpClient;
-use window::vibrancy;
+use window::{opacity, vibrancy};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -74,6 +74,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             vibrancy::get_vibrancy_mode,
+            opacity::set_window_opacity,
             commands::feeds::add_feed,
             commands::feeds::list_feeds,
             commands::feeds::delete_feed,
