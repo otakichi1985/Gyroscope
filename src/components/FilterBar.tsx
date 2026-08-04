@@ -141,36 +141,38 @@ export function FilterBar() {
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={() => setStarredOnly(!starredOnly)}
-        className={`flex shrink-0 items-center rounded p-1 transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
-          starredOnly ? "accent-text" : "opacity-60 hover:opacity-100"
-        }`}
-        aria-label={starredOnly ? "ブックマークの絞り込みを解除" : "ブックマークのみ表示"}
-        title="ブックマーク"
-      >
-        <StarIcon filled={starredOnly} className="h-4 w-4" />
-      </button>
+      <div className="flex w-full items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setStarredOnly(!starredOnly)}
+          className={`flex shrink-0 items-center rounded p-1 transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
+            starredOnly ? "accent-text" : "opacity-60 hover:opacity-100"
+          }`}
+          aria-label={starredOnly ? "ブックマークの絞り込みを解除" : "ブックマークのみ表示"}
+          title="ブックマークのみ表示"
+        >
+          <StarIcon filled={starredOnly} className="h-4 w-4" />
+        </button>
 
-      <div className="relative w-full">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="記事を検索"
-          className="w-full rounded border border-black/10 bg-black/5 py-1 pl-2 pr-6 text-xs outline-none dark:border-white/10 dark:bg-white/5"
-        />
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery("")}
-            className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center rounded p-0.5 opacity-60 transition-colors duration-150 hover:opacity-100"
-            aria-label="検索をクリア"
-          >
-            <CloseIcon className="h-3 w-3" />
-          </button>
-        )}
+        <div className="relative min-w-0 flex-1">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="記事を検索"
+            className="w-full rounded border border-black/10 bg-black/5 py-1 pl-2 pr-6 text-xs outline-none dark:border-white/10 dark:bg-white/5"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center rounded p-0.5 opacity-60 transition-colors duration-150 hover:opacity-100"
+              aria-label="検索をクリア"
+            >
+              <CloseIcon className="h-3 w-3" />
+            </button>
+          )}
+        </div>
       </div>
 
       <button

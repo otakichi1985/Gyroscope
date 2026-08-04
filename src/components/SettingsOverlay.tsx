@@ -5,6 +5,7 @@ import { useVibrancyMode } from "../hooks/useVibrancyMode";
 import { useAppearanceStore, type CardGap, type CardSize } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
 import { CloseIcon } from "./icons";
+import { FontPicker } from "./FontPicker";
 
 const CARD_SIZES: { id: CardSize; label: string }[] = [
   { id: "small", label: "小" },
@@ -185,22 +186,7 @@ export function SettingsOverlay() {
 
         <div>
           <div className="mb-1.5 text-xs font-medium opacity-70">フォント</div>
-          <select
-            value={fontId}
-            onChange={(e) => setFont(e.target.value)}
-            style={fontId ? { fontFamily: `"${fontId}"` } : undefined}
-            disabled={systemFonts === null}
-            className="w-full rounded border border-black/10 bg-black/5 px-2 py-1.5 text-xs outline-none disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
-          >
-            <option value="" className="text-black">
-              既定
-            </option>
-            {(systemFonts ?? []).map((name) => (
-              <option key={name} value={name} className="text-black" style={{ fontFamily: `"${name}"` }}>
-                {name}
-              </option>
-            ))}
-          </select>
+          <FontPicker value={fontId} options={systemFonts} onChange={setFont} />
         </div>
 
         <div className="flex flex-col gap-2">
