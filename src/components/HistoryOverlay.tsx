@@ -8,7 +8,9 @@ import { CloseIcon } from "./icons";
 const HTTP_LINK_RE = /^https?:\/\//i;
 
 export function HistoryOverlay() {
-  const closeHistory = useUiStore((s) => s.closeHistory);
+  const activeScreen = useUiStore((s) => s.activeScreen);
+  const goHome = useUiStore((s) => s.goHome);
+  const isActive = activeScreen === "history";
   const { entries, loading, error, refresh, clear } = useHistoryStore();
 
   useEffect(() => {
@@ -22,12 +24,17 @@ export function HistoryOverlay() {
   }
 
   return (
-    <div className="panel-bg absolute inset-0 z-10 flex flex-col">
+    <div
+      className={`panel-bg absolute inset-0 z-10 flex flex-col transition-all duration-200 ease-out ${
+        isActive ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0 pointer-events-none"
+      }`}
+      inert={!isActive}
+    >
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-black/10 px-2 text-sm font-medium dark:border-white/10">
         <span>既読履歴</span>
         <button
           type="button"
-          onClick={closeHistory}
+          onClick={goHome}
           className="flex items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
           aria-label="閉じる"
         >

@@ -67,7 +67,9 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
     <button
       type="button"
       onClick={handleToggleStar}
-      className="flex shrink-0 items-center rounded p-0.5 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
+      className={`flex shrink-0 items-center rounded p-0.5 transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
+        entry.is_starred ? "accent-text" : "opacity-60 hover:opacity-100"
+      }`}
       aria-label={entry.is_starred ? "スターを外す" : "スターを付ける"}
     >
       <StarIcon filled={entry.is_starred} className="h-3.5 w-3.5" />

@@ -40,3 +40,35 @@ html {
     background-color: rgb(var(--panel-rgb-dark));
   }
 }
+
+/* Same light/dark-via-media-query mechanism as .panel-bg above, driven by
+   the skin's accent RGB instead of its panel RGB (see App.tsx / lib/skins.ts).
+   Used for "selected/on" affordances (active tab, chosen swatch, toggle-on
+   track) so each skin reads as its own color scheme, not just a background
+   tint over otherwise-identical gray UI chrome. */
+.accent-text {
+  color: rgb(var(--accent-rgb-light));
+}
+.accent-border {
+  border-color: rgb(var(--accent-rgb-light));
+}
+.accent-bg {
+  background-color: rgb(var(--accent-rgb-light));
+}
+.accent-bg-soft {
+  background-color: rgb(var(--accent-rgb-light) / 0.15);
+}
+@media (prefers-color-scheme: dark) {
+  .accent-text {
+    color: rgb(var(--accent-rgb-dark));
+  }
+  .accent-border {
+    border-color: rgb(var(--accent-rgb-dark));
+  }
+  .accent-bg {
+    background-color: rgb(var(--accent-rgb-dark));
+  }
+  .accent-bg-soft {
+    background-color: rgb(var(--accent-rgb-dark) / 0.18);
+  }
+}
