@@ -125,6 +125,23 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
     （既読↔未読を繰り返しても最初に読んだ時刻を上書きしない）
   - 履歴の閲覧は`HistoryOverlay.tsx`（`FeedManagerOverlay`と同じ「絶対配置オーバーレイ」パターン）。
     `uiStore`の`historyOpen`で開閉、`FilterBar`の🕘アイコンから開く
+- デザイン洗練（`.claude/skills/redesign-existing-projects`スキル適用、外観設定完成後の追加要望）:
+  - オーバーレイ3種（`FeedManagerOverlay`/`HistoryOverlay`/`SettingsOverlay`）の外枠は元々
+    `bg-white dark:bg-neutral-900`という固定の不透明背景で、メインパネルの半透明スキン
+    （`.panel-bg`）から浮いて見えていた。CSSカスタムプロパティ（`--panel-rgb-light`/`-dark`）は
+    `App.tsx`ルートdivから子孫へ自然に継承されるため、3つとも`.panel-bg`クラスに差し替えるだけで
+    メインパネルと同じ質感に統一できた（追加の配線不要）
+  - 絵文字アイコン（🕘⚙🎨×🔔🔕⚠⟳☆★）はOS/フォント依存で見た目が揺れ、`TitleBar.tsx`の
+    最小化/閉じるボタンだけが持っていた細いストロークのSVGスタイルと統一感が無かった。
+    `src/components/icons.tsx`に同じ流儀（`viewBox 0 0 16 16`, `strokeWidth 1.25`,
+    `stroke="currentColor"`）のアイコン一式を集約し、チェスや既読チェック（✓）以外の
+    アイコン全てを置き換えた。新しいアイコンを追加する際もこのファイルに追加してスタイルを揃えること
+  - `SettingsOverlay.tsx`の`ToggleRow`は「オン/オフ」のテキストラベルボタンから、トラック+つまみの
+    スイッチ見た目（`translate-x`で位置を切り替え）に変更。クリックハンドラのロジックは変更なし
+  - ホバー/押下のフィードバックが瞬間切り替えだった箇所（行・ボタン全般）に
+    `transition-colors duration-150`と`active:bg-black/10 dark:active:bg-white/10`系のクラスを
+    追加。仮想リスト内の行は`measureElement`の計測に影響するため`scale`変形は使わず、
+    背景色の変化のみで押下フィードバックを表現している
 
 ## 依存関係の選定理由
 

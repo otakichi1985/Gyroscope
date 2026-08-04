@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { useFeedsStore } from "../stores/feedsStore";
+import { BellIcon, BellOffIcon, CloseIcon, RefreshIcon, WarningIcon } from "./icons";
 
 const OPML_FILTER = [{ name: "OPML", extensions: ["opml", "xml"] }];
 
@@ -75,14 +76,14 @@ export function FeedManager() {
         <button
           type="button"
           onClick={handleImport}
-          className="flex-1 rounded bg-black/10 px-2 py-1 text-xs hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20"
+          className="flex-1 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
         >
           インポート
         </button>
         <button
           type="button"
           onClick={handleExport}
-          className="flex-1 rounded bg-black/10 px-2 py-1 text-xs hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20"
+          className="flex-1 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
         >
           エクスポート
         </button>
@@ -100,7 +101,7 @@ export function FeedManager() {
         <button
           type="submit"
           disabled={adding}
-          className="rounded bg-black/10 px-2 py-1 text-xs hover:bg-black/20 disabled:opacity-50 dark:bg-white/10 dark:hover:bg-white/20"
+          className="rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 disabled:opacity-50 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
         >
           {adding ? "..." : "追加"}
         </button>
@@ -117,13 +118,13 @@ export function FeedManager() {
           {feeds.map((feed) => (
             <li
               key={feed.id}
-              className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-black/5 dark:hover:bg-white/5"
+              className="flex items-center justify-between gap-2 rounded px-2 py-1 transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1 truncate">
                   {feed.last_error && (
                     <span title={feed.last_error} className="text-red-500">
-                      ⚠
+                      <WarningIcon className="h-3.5 w-3.5" />
                     </span>
                   )}
                   <span className="truncate font-medium">{feed.custom_title ?? feed.title ?? feed.url}</span>
@@ -146,26 +147,26 @@ export function FeedManager() {
               <button
                 type="button"
                 onClick={() => setFeedNotify(feed.id, !feed.notify_enabled)}
-                className="shrink-0 rounded px-1 text-xs opacity-60 hover:opacity-100"
+                className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
                 aria-label={feed.notify_enabled ? "通知を無効にする" : "通知を有効にする"}
               >
-                {feed.notify_enabled ? "🔔" : "🔕"}
+                {feed.notify_enabled ? <BellIcon className="h-3.5 w-3.5" /> : <BellOffIcon className="h-3.5 w-3.5" />}
               </button>
               <button
                 type="button"
                 onClick={() => refreshFeed(feed.id)}
-                className="shrink-0 rounded px-1 text-xs opacity-60 hover:opacity-100"
+                className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
                 aria-label="更新"
               >
-                ⟳
+                <RefreshIcon className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => deleteFeed(feed.id)}
-                className="shrink-0 rounded px-1 text-xs opacity-60 hover:opacity-100"
+                className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
                 aria-label="削除"
               >
-                ×
+                <CloseIcon className="h-3.5 w-3.5" />
               </button>
             </li>
           ))}

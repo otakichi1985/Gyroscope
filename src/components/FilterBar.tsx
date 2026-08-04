@@ -3,6 +3,7 @@ import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
 import { useAppearanceStore } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
+import { ClockIcon, GearIcon, SlidersIcon } from "./icons";
 
 const VIEW_MODES: { mode: ViewMode; label: string }[] = [
   { mode: "card", label: "カード" },
@@ -84,7 +85,7 @@ export function FilterBar() {
       <button
         type="button"
         onClick={() => markAllRead()}
-        className="shrink-0 rounded px-1.5 py-1 opacity-60 hover:opacity-100"
+        className="shrink-0 rounded px-1.5 py-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
       >
         すべて既読
       </button>
@@ -92,7 +93,7 @@ export function FilterBar() {
       <button
         type="button"
         onClick={() => markAllUnread()}
-        className="shrink-0 rounded px-1.5 py-1 opacity-60 hover:opacity-100"
+        className="shrink-0 rounded px-1.5 py-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
       >
         すべて未読
       </button>
@@ -100,28 +101,28 @@ export function FilterBar() {
       <button
         type="button"
         onClick={toggleHistory}
-        className="shrink-0 rounded px-1.5 py-1 opacity-60 hover:opacity-100"
+        className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
         aria-label="既読履歴を開く"
       >
-        🕘
+        <ClockIcon className="h-4 w-4" />
       </button>
 
       <button
         type="button"
         onClick={toggleFeedManager}
-        className="shrink-0 rounded px-1.5 py-1 opacity-60 hover:opacity-100"
+        className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
         aria-label="フィード管理を開く"
       >
-        ⚙
+        <GearIcon className="h-4 w-4" />
       </button>
 
       <button
         type="button"
         onClick={toggleSettings}
-        className="shrink-0 rounded px-1.5 py-1 opacity-60 hover:opacity-100"
+        className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
         aria-label="外観設定を開く"
       >
-        🎨
+        <SlidersIcon className="h-4 w-4" />
       </button>
     </div>
   );
