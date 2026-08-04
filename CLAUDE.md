@@ -56,10 +56,48 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
   （フィード追加/削除がオーバーレイ内で起きるため）。既読/スターは楽観的ローカル更新
   （`feedsStore` の「操作後に毎回`refresh()`」規約とは意図的に異なる。行クリックのたびに
   無限スクロールで積み上げたページを`refresh()`で破棄するとスクロール位置が乱れるため）
+- 自動更新・トレイ・通知・OPML（Phase 4）:
+  - `refresh_feed_inner`（`commands/feeds.rs`）がフェッチ→パース→upsert→通知判定の唯一の実装で、
+    手動更新コマンド `refresh_feed` とバックグラウンドスケジューラの両方から呼ばれる
+    （`refresh_feed`のdocコメントに元から明記されていた設計）
+  - `scheduler.rs`: 60秒ごとのtickで`interval_min`（未設定ならデフォルト30分）を過ぎたフィードを
+    抽出し、`tokio::sync::Semaphore`で同時実行数を6に制限しつつ一括更新。手動更新は更新のたびに
+    `"feeds-updated"`イベントを1回発火、バッチ更新（スケジューラ/トレイの「更新」/`refresh_all_feeds`）は
+    バッチ全体の完了後に1回だけ発火（N件更新でN回イベントが飛ぶのを防ぐため）
+  - `db::upsert_entries`は新規挿入されたエントリのみを`Vec<NewEntry>`で返すよう変更
+    （`ON CONFLICT DO UPDATE`は常に1件変更と報告するため`changes()`では新規/更新を区別できず、
+    upsert前に既存guid集合をSELECTしてから差分を取る方式にした）。これを使って
+    `notify_enabled`なフィードに新着があった場合だけ`tauri_plugin_notification`で通知する
+  - トレイ（`tray.rs`）: メニューは「表示/非表示」「更新」「終了」の3項目。「終了」は
+    `MenuBuilder::quit_with_text`（muda組み込み項目）ではなく素の`text()`+`app.exit(0)`にしている
+    （組み込みitemがネイティブ側で何をするか不明瞭で、閉じる=非表示化と衝突する可能性を避けるため）
+  - 閉じるボタン→トレイに格納: `TitleBar.tsx`側は無改造。`lib.rs`の`.setup()`でメインウィンドウに
+    `on_window_event`を登録し`WindowEvent::CloseRequested`を`api.prevent_close()`+`window.hide()`で
+    横取りしている（×ボタンの`appWindow.close()`もこのイベント経路を通るため、フロント側の変更は不要）
+  - OPMLインポート/エクスポートはファイルパスを扱う新コマンド`import_opml_from_path`/
+    `export_opml_to_path`を追加（既存の文字列ベース`import_opml`/`export_opml`はそのまま）。
+    ファイルピッカーは`tauri-plugin-dialog`のみ追加し、`tauri-plugin-fs`は追加していない
+    （自作コマンド内の`std::fs`はTauriのACL対象外なので、パスさえダイアログで取得できれば
+    スコープ付きのfsプラグイン権限は不要という判断）
+- 既読表示と既読履歴（Phase 4後の追加要望）:
+  - 記事一覧の既読状態は行全体のopacity減光ではなく、行末の✓チェックマーク（クリックで既読/未読の
+    手動トグルも可能）で表現する（`EntryRow.tsx`）。ユーザーからの「減光は見づらい」というフィードバックで
+    途中から変更した経緯があるため、既読/未読の見た目を再度変える際はこの理由を踏まえること
+  - `read_history`テーブル（`db/migrations.rs` v2）は`entries`/`feeds`への外部キーを持たない
+    非正規化スナップショット（`feed_title`, `entry_guid`, `title`, `link`, `read_at`）。
+    SPEC通り既読記事は30日で自動削除される・フィードごと削除されることもあるため、「読んだという
+    事実」だけは記事本体と切り離して残す設計。`mark_entry_read`（true化時）と`mark_all_read`から
+    `(feed_title, entry_guid)`をユニークキーに`ON CONFLICT DO NOTHING`で書き込む
+    （既読↔未読を繰り返しても最初に読んだ時刻を上書きしない）
+  - 履歴の閲覧は`HistoryOverlay.tsx`（`FeedManagerOverlay`と同じ「絶対配置オーバーレイ」パターン）。
+    `uiStore`の`historyOpen`で開閉、`FilterBar`の🕘アイコンから開く
 
 ## 依存関係の選定理由
 
 - `tauri-plugin-tray` は Tauri v2 では存在せず、トレイ機能はコア (`tauri::tray`) に統合済みのため追加パッケージなしでコアAPIを使用
+  （ただし`tauri`の`tray-icon` Cargo featureは既定で無効なので`features = ["tray-icon"]`を明示する必要がある）
+- OPMLインポート/エクスポート用に`tauri-plugin-dialog`（ネイティブOpen/Saveダイアログ）を追加。
+  `tauri-plugin-fs`は追加しない理由は上記アーキテクチャ概要を参照
 - デスクトップ貼り付け（最背面）モードは Tauri コアの `set_always_on_bottom` + `set_skip_taskbar` を使用。Windows には真の「壁紙レイヤー」概念がなく、Progman/WorkerW ハックは非公式かつ脆いため不採用（ベストエフォートのz-order最背面化に留める）
 - ウィンドウ位置・サイズの保存/復元は `tauri-plugin-window-state`（マルチモニタ補正込みで実装済みのため自前実装しない）
 
@@ -97,6 +135,21 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
 - サムネイル抽出は `media:thumbnail` → 画像タイプの enclosure(`media:content`) → 本文内最初の `<img>` まで。
   `og:image`（追加リクエストが要る任意タイア）は未実装（設定画面ができるPhase 5以降でON/OFFトグルと合わせて追加）
 - favicon（`feeds.icon_path`）はまだ未取得。列だけ用意してあり、値は常にNULL
+- `TrayIconBuilder::build()`の戻り値（`TrayIcon`）を変数で受けずに`;`で捨てると、Windows版
+  `tray-icon`crateの`Drop`実装が即座に`Shell_NotifyIcon(NIM_DELETE)`を呼んでしまい、アイコンが
+  生成直後に消える。`app.manage(tray)`でアプリと同じ寿命を持たせる必要がある（実機で発見・修正済み）
+- **【未解決の既知の問題】** 上記を修正した上でも、この開発環境ではトレイアイコンが常時表示・
+  オーバーフローどちらにも視覚的に現れないことがある。`tray-icon`crateの`register_tray_icon`は
+  `Shell_NotifyIcon(NIM_ADD)`が失敗しても`Explorer/taskbar may not be ready yet`という理由で
+  静かに握りつぶす実装になっており（crateのソースコメントに明記）、こちらのコードにはエラーが
+  一切出ない。`.setup()`内でのトレイ構築を`tauri::async_runtime::spawn`+500ms遅延に変更し
+  レースコンディションの緩和を試みたが、再現性のある形で直ったかは確認できていない
+  （デバッグセッション中の何十回ものプロセス強制終了・Explorer再起動でデスクトップの状態が
+  荒れていた影響と、その後発生したこの端末上でのマウス/ウィンドウ入力全般の不安定化の影響が
+  絡み合っており、切り分けきれなかった）。次回はクリーンな再起動後の環境で再検証すること
+- Rustのコマンド引数として`AppHandle`を追加すると（例: `refresh_feed(app: AppHandle, ...)`）、
+  Tauriが自動で注入してくれるため、フロント側のinvoke呼び出しに新しい引数は不要
+  （既存の`{ id }`等の呼び出しはそのまま変更なしで動く）
 
 ## バージョン固定方針
 

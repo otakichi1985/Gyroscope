@@ -1,7 +1,9 @@
 import { EntryList } from "./components/EntryList";
 import { FeedManagerOverlay } from "./components/FeedManagerOverlay";
 import { FilterBar } from "./components/FilterBar";
+import { HistoryOverlay } from "./components/HistoryOverlay";
 import { TitleBar } from "./components/TitleBar";
+import { useFeedsUpdatedListener } from "./hooks/useFeedsUpdatedListener";
 import { useVibrancyMode } from "./hooks/useVibrancyMode";
 import { useUiStore } from "./stores/uiStore";
 
@@ -14,6 +16,8 @@ const PANEL_BG: Record<ReturnType<typeof useVibrancyMode>, string> = {
 function App() {
   const vibrancy = useVibrancyMode();
   const feedManagerOpen = useUiStore((s) => s.feedManagerOpen);
+  const historyOpen = useUiStore((s) => s.historyOpen);
+  useFeedsUpdatedListener();
 
   return (
     <div
@@ -24,6 +28,7 @@ function App() {
       <div className="relative min-h-0 flex-1">
         <EntryList />
         {feedManagerOpen && <FeedManagerOverlay />}
+        {historyOpen && <HistoryOverlay />}
       </div>
     </div>
   );

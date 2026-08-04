@@ -1,6 +1,7 @@
 pub mod migrations;
 pub mod models;
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -24,7 +25,24 @@ pub fn open(data_dir: &Path) -> rusqlite::Result<Connection> {
 /// Inserts new entries, or refreshes an existing one's content while
 /// preserving its `is_read`/`is_starred` state -- the dedup key
 /// (`feed_id`, `guid`) is what makes this idempotent across re-fetches.
-pub fn upsert_entries(conn: &Connection, feed_id: i64, entries: &[NewEntry]) -> rusqlite::Result<()> {
+///
+/// Returns the subset of `entries` that were genuinely new (not already
+/// present for this feed), for callers that need to know (Phase 4:
+/// notifications should only fire for real new arrivals, not updates to
+/// existing rows). `ON CONFLICT ... DO UPDATE` always reports 1 row changed
+/// either way, so `changes()` can't distinguish insert from update -- the
+/// existing-guid set has to be snapshotted before the upsert instead.
+pub fn upsert_entries(
+    conn: &Connection,
+    feed_id: i64,
+    entries: &[NewEntry],
+) -> rusqlite::Result<Vec<NewEntry>> {
+    let existing_guids: HashSet<String> = {
+        let mut stmt = conn.prepare("SELECT guid FROM entries WHERE feed_id = ?1")?;
+        let guids: Result<HashSet<String>, _> = stmt.query_map(params![feed_id], |row| row.get(0))?.collect();
+        guids?
+    };
+
     let mut stmt = conn.prepare(
         "INSERT INTO entries \
             (feed_id, guid, title, link, author, summary, content_html, thumbnail_url, published_at) \
@@ -38,6 +56,7 @@ pub fn upsert_entries(conn: &Connection, feed_id: i64, entries: &[NewEntry]) -> 
             thumbnail_url = excluded.thumbnail_url, \
             published_at = excluded.published_at",
     )?;
+    let mut new_entries = Vec::new();
     for entry in entries {
         stmt.execute(params![
             feed_id,
@@ -50,6 +69,9 @@ pub fn upsert_entries(conn: &Connection, feed_id: i64, entries: &[NewEntry]) -> 
             entry.thumbnail_url,
             entry.published_at,
         ])?;
+        if !existing_guids.contains(&entry.guid) {
+            new_entries.push(entry.clone());
+        }
     }
-    Ok(())
+    Ok(new_entries)
 }

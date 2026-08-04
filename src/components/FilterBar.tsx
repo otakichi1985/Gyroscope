@@ -14,6 +14,7 @@ export function FilterBar() {
   const refreshFeeds = useFeedsStore((s) => s.refresh);
   const { filterFeedId, setFilterFeedId, viewMode, setViewMode, markAllRead } = useEntriesStore();
   const toggleFeedManager = useUiStore((s) => s.toggleFeedManager);
+  const toggleHistory = useUiStore((s) => s.toggleHistory);
 
   useEffect(() => {
     refreshFeeds();
@@ -58,6 +59,15 @@ export function FilterBar() {
         className="shrink-0 rounded px-1.5 py-1 opacity-60 hover:opacity-100"
       >
         すべて既読
+      </button>
+
+      <button
+        type="button"
+        onClick={toggleHistory}
+        className="shrink-0 rounded px-1.5 py-1 opacity-60 hover:opacity-100"
+        aria-label="既読履歴を開く"
+      >
+        🕘
       </button>
 
       <button

@@ -34,6 +34,11 @@ export function EntryRow({ entry, mode, feedTitle }: EntryRowProps) {
     toggleStar(entry.id, !entry.is_starred);
   }
 
+  function handleToggleRead(e: React.MouseEvent) {
+    e.stopPropagation();
+    markRead(entry.id, !entry.is_read);
+  }
+
   const title = entry.title ?? entry.link ?? "(無題)";
   const meta = [feedTitle, formatPublished(entry.published_at)].filter(Boolean).join(" · ");
 
@@ -48,7 +53,21 @@ export function EntryRow({ entry, mode, feedTitle }: EntryRowProps) {
     </button>
   );
 
-  const dimmed = entry.is_read ? "opacity-60" : "";
+  // Read state is shown as an explicit checkmark rather than dimming the
+  // whole row (dimming made read rows hard to read at a glance).
+  const readCheck = (
+    <button
+      type="button"
+      onClick={handleToggleRead}
+      className={`shrink-0 rounded px-1 text-xs ${
+        entry.is_read ? "text-emerald-600 dark:text-emerald-400" : "opacity-30 hover:opacity-70"
+      }`}
+      aria-label={entry.is_read ? "未読にする" : "既読にする"}
+      title={entry.is_read ? "既読" : "未読"}
+    >
+      ✓
+    </button>
+  );
 
   // A single outer <button> would nest the star <button> inside it, which is
   // invalid HTML (interactive content inside interactive content) and makes
@@ -64,9 +83,10 @@ export function EntryRow({ entry, mode, feedTitle }: EntryRowProps) {
     return (
       <div
         {...rowProps}
-        className={`flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/5 ${dimmed}`}
+        className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/5"
       >
         <span className={`min-w-0 flex-1 truncate ${entry.is_read ? "" : "font-medium"}`}>{title}</span>
+        {readCheck}
         {starButton}
       </div>
     );
@@ -76,12 +96,13 @@ export function EntryRow({ entry, mode, feedTitle }: EntryRowProps) {
     return (
       <div
         {...rowProps}
-        className={`flex w-full cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 ${dimmed}`}
+        className="flex w-full cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5"
       >
         <div className="min-w-0 flex-1">
           <div className={`truncate text-sm ${entry.is_read ? "" : "font-medium"}`}>{title}</div>
           {meta && <div className="truncate text-xs opacity-60">{meta}</div>}
         </div>
+        {readCheck}
         {starButton}
       </div>
     );
@@ -91,7 +112,7 @@ export function EntryRow({ entry, mode, feedTitle }: EntryRowProps) {
   return (
     <div
       {...rowProps}
-      className={`flex w-full cursor-pointer gap-2 rounded px-2 py-2 hover:bg-black/5 dark:hover:bg-white/5 ${dimmed}`}
+      className="flex w-full cursor-pointer gap-2 rounded px-2 py-2 hover:bg-black/5 dark:hover:bg-white/5"
     >
       {entry.thumbnail_url && (
         <img
@@ -105,6 +126,7 @@ export function EntryRow({ entry, mode, feedTitle }: EntryRowProps) {
         <p className="mt-0.5 line-clamp-2 text-xs opacity-70">{entrySnippet(entry)}</p>
         {meta && <div className="mt-0.5 truncate text-xs opacity-60">{meta}</div>}
       </div>
+      {readCheck}
       {starButton}
     </div>
   );

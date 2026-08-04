@@ -18,10 +18,15 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
-tauri = { version = "2.11.5", features = [] }
+tauri = { version = "2.11.5", features = ["tray-icon"] }
 tauri-plugin-opener = "2.5.4"
 tauri-plugin-notification = "2.3.3"
 tauri-plugin-window-state = "2.4.1"
+# Native Open/Save dialogs for OPML import/export -- we deliberately do NOT
+# add tauri-plugin-fs alongside it: reading/writing the user-picked path is
+# done with plain std::fs inside our own commands, which needs no ACL scope
+# (Tauri's fs ACL only gates the fs *plugin's* own JS-invokable commands).
+tauri-plugin-dialog = "2.7.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "sync", "time"] }

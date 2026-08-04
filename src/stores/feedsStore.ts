@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import type { Feed } from "../lib/types";
+import type { Feed, OpmlImportSummary } from "../lib/types";
 
 interface FeedsState {
   feeds: Feed[];
@@ -10,6 +10,10 @@ interface FeedsState {
   addFeed: (url: string) => Promise<void>;
   deleteFeed: (id: number) => Promise<void>;
   refreshFeed: (id: number) => Promise<void>;
+  setFeedNotify: (id: number, notifyEnabled: boolean) => Promise<void>;
+  setFeedInterval: (id: number, intervalMin: number | null) => Promise<void>;
+  importOpml: (path: string) => Promise<OpmlImportSummary>;
+  exportOpml: (path: string) => Promise<void>;
 }
 
 export const useFeedsStore = create<FeedsState>((set, get) => ({
@@ -41,5 +45,25 @@ export const useFeedsStore = create<FeedsState>((set, get) => ({
   refreshFeed: async (id: number) => {
     await invoke<Feed>("refresh_feed", { id });
     await get().refresh();
+  },
+
+  setFeedNotify: async (id: number, notifyEnabled: boolean) => {
+    await invoke("set_feed_notify", { id, notifyEnabled });
+    await get().refresh();
+  },
+
+  setFeedInterval: async (id: number, intervalMin: number | null) => {
+    await invoke("set_feed_interval", { id, intervalMin });
+    await get().refresh();
+  },
+
+  importOpml: async (path: string) => {
+    const summary = await invoke<OpmlImportSummary>("import_opml_from_path", { path });
+    await get().refresh();
+    return summary;
+  },
+
+  exportOpml: async (path: string) => {
+    await invoke("export_opml_to_path", { path });
   },
 }));
