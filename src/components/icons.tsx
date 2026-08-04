@@ -122,6 +122,14 @@ export function WarningIcon(props: IconProps) {
   );
 }
 
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 6.5 8 10.5 12 6.5" />
+    </Icon>
+  );
+}
+
 export function StarIcon({ filled, ...props }: IconProps & { filled?: boolean }) {
   return (
     <Icon {...props} fill={filled ? "currentColor" : "none"}>
