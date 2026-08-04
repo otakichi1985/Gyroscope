@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { DEFAULT_FONT_ID, FONTS } from "../lib/fonts";
 import { DEFAULT_SKIN_ID, SKINS } from "../lib/skins";
 
 export type CardSize = "small" | "medium" | "large";
@@ -16,6 +17,10 @@ interface StoredAppearance {
   skinId: string;
   cardSize: CardSize;
   cardGap: CardGap;
+  fontId: string;
+  alwaysOnTop: boolean;
+  positionLocked: boolean;
+  titleBarVisible: boolean;
 }
 
 function loadAppearance(): StoredAppearance {
@@ -27,6 +32,10 @@ function loadAppearance(): StoredAppearance {
     skinId: DEFAULT_SKIN_ID,
     cardSize: "medium",
     cardGap: "normal",
+    fontId: DEFAULT_FONT_ID,
+    alwaysOnTop: false,
+    positionLocked: false,
+    titleBarVisible: true,
   };
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return fallback;
@@ -39,7 +48,12 @@ function loadAppearance(): StoredAppearance {
     const skinId = SKINS.some((s) => s.id === parsed.skinId) ? (parsed.skinId as string) : fallback.skinId;
     const cardSize = CARD_SIZES.includes(parsed.cardSize as CardSize) ? (parsed.cardSize as CardSize) : fallback.cardSize;
     const cardGap = CARD_GAPS.includes(parsed.cardGap as CardGap) ? (parsed.cardGap as CardGap) : fallback.cardGap;
-    return { opacity, skinId, cardSize, cardGap };
+    const fontId = FONTS.some((f) => f.id === parsed.fontId) ? (parsed.fontId as string) : fallback.fontId;
+    const alwaysOnTop = typeof parsed.alwaysOnTop === "boolean" ? parsed.alwaysOnTop : fallback.alwaysOnTop;
+    const positionLocked = typeof parsed.positionLocked === "boolean" ? parsed.positionLocked : fallback.positionLocked;
+    const titleBarVisible =
+      typeof parsed.titleBarVisible === "boolean" ? parsed.titleBarVisible : fallback.titleBarVisible;
+    return { opacity, skinId, cardSize, cardGap, fontId, alwaysOnTop, positionLocked, titleBarVisible };
   } catch {
     return fallback;
   }
@@ -54,6 +68,10 @@ interface AppearanceState extends StoredAppearance {
   setSkin: (id: string) => void;
   setCardSize: (size: CardSize) => void;
   setCardGap: (gap: CardGap) => void;
+  setFont: (id: string) => void;
+  setAlwaysOnTop: (value: boolean) => void;
+  setPositionLocked: (value: boolean) => void;
+  setTitleBarVisible: (value: boolean) => void;
 }
 
 export const useAppearanceStore = create<AppearanceState>((set, get) => ({
@@ -78,5 +96,25 @@ export const useAppearanceStore = create<AppearanceState>((set, get) => ({
   setCardGap: (gap: CardGap) => {
     set({ cardGap: gap });
     save({ ...get(), cardGap: gap });
+  },
+
+  setFont: (id: string) => {
+    set({ fontId: id });
+    save({ ...get(), fontId: id });
+  },
+
+  setAlwaysOnTop: (value: boolean) => {
+    set({ alwaysOnTop: value });
+    save({ ...get(), alwaysOnTop: value });
+  },
+
+  setPositionLocked: (value: boolean) => {
+    set({ positionLocked: value });
+    save({ ...get(), positionLocked: value });
+  },
+
+  setTitleBarVisible: (value: boolean) => {
+    set({ titleBarVisible: value });
+    save({ ...get(), titleBarVisible: value });
   },
 }));

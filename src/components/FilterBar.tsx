@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
+import { useAppearanceStore } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
 
 const VIEW_MODES: { mode: ViewMode; label: string }[] = [
@@ -17,14 +18,26 @@ export function FilterBar() {
   const toggleFeedManager = useUiStore((s) => s.toggleFeedManager);
   const toggleHistory = useUiStore((s) => s.toggleHistory);
   const toggleSettings = useUiStore((s) => s.toggleSettings);
+  const positionLocked = useAppearanceStore((s) => s.positionLocked);
+  const titleBarVisible = useAppearanceStore((s) => s.titleBarVisible);
 
   useEffect(() => {
     refreshFeeds();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // When the title bar is hidden there'd otherwise be no way to drag the
+  // window at all -- let this bar's own (mostly-empty, since it wraps)
+  // background act as a fallback drag handle too. Skipped when the title
+  // bar is showing so we don't have two overlapping drag regions doing the
+  // same thing for no reason, and always skipped when locked.
+  const dragRegion = !positionLocked && !titleBarVisible ? true : undefined;
+
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10">
+    <div
+      data-tauri-drag-region={dragRegion}
+      className="flex shrink-0 flex-wrap items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10"
+    >
       <select
         value={filterFeedId ?? ""}
         onChange={(e) => setFilterFeedId(e.target.value === "" ? null : Number(e.target.value))}

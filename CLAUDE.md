@@ -57,7 +57,19 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
   （ライト）でレンダリングされるが、文字色だけはページから継承されるため、ダークモード時に
   「白背景+白文字」で読めなくなっていた（実機で指摘されて発覚）。`src/styles/index.css`の
   `html`に`color-scheme: light dark;`を付けるだけで解決する（ネイティブフォームコントロール全般に
-  `prefers-color-scheme`を追従させる標準的な仕組み。option個別のスタイリングやJS判定は不要）
+  `prefers-color-scheme`を追従させる標準的な仕組み。option個別のスタイリングやJS判定は不要）。
+  ただし`<select>`要素自体に`color-scheme`や固定の文字色を付けると、今度は閉じた状態の表示（選択中の値）
+  がその固定色を使ってしまい、パネル背景に対して読めなくなる（実機で指摘され二度目の修正で判明）。
+  閉じた状態の表示は`<select>`自身の`color`（テーマ追従のまま）、ポップアップ一覧の文字色は
+  各`<option>`に直接`color`を指定する方式で分離する（Chromiumのネイティブポップアップは
+  option単位のcolor/background-colorを尊重し、それは開いた一覧にしか影響せず閉じた表示には及ばない）
+- ウィンドウの位置固定（`appearanceStore`の`positionLocked`）は、`data-tauri-drag-region`属性の
+  有無を切り替えるだけ（Tauriにドラッグを個別に無効化するAPIは無い）。タイトルバーを隠した場合
+  （`titleBarVisible=false`）のフォールバックとして`FilterBar.tsx`自体にも同じ属性を条件付きで
+  付与し、位置固定オフかつタイトルバー非表示のときだけドラッグの入口を残す
+- 常に最前面（`appearanceStore`の`alwaysOnTop`）は独自コマンド不要。Tauriコア標準の
+  `getCurrentWindow().setAlwaysOnTop()`（`@tauri-apps/api/window`）をJS側から直接呼ぶだけで、
+  `core:window:allow-set-always-on-top`のcapability追加のみで完結する
 - ウィンドウの閉じる/最小化ボタンは自作タイトルバー（`src/components/TitleBar.tsx`）から
   `@tauri-apps/api/window` の `getCurrentWindow()` を呼ぶ。ドラッグ移動は `data-tauri-drag-region` 属性のみで実現
 - DB: `rusqlite::Connection` 1本を `Mutex` で包んで `app.manage`（`src-tauri/src/db/mod.rs`）。

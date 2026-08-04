@@ -1,14 +1,22 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useAppearanceStore } from "../stores/appearanceStore";
 
 const appWindow = getCurrentWindow();
 
 export function TitleBar() {
+  const positionLocked = useAppearanceStore((s) => s.positionLocked);
+  // `data-tauri-drag-region` is what makes mousedown-and-drag move the
+  // window; omitting it (rather than e.g. disabling via CSS) is the actual
+  // mechanism behind "位置を固定" -- there's no separate Tauri API to turn
+  // window dragging off.
+  const dragRegion = positionLocked ? undefined : true;
+
   return (
     <div
-      data-tauri-drag-region
+      data-tauri-drag-region={dragRegion}
       className="flex h-8 shrink-0 items-center justify-between pl-3 pr-1 select-none"
     >
-      <span data-tauri-drag-region className="text-xs font-medium opacity-70">
+      <span data-tauri-drag-region={dragRegion} className="text-xs font-medium opacity-70">
         RSS Widget
       </span>
       <div className="flex items-center gap-1">
