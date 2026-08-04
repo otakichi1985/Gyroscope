@@ -44,7 +44,7 @@ window-vibrancy = "0.8.0"
 raw-window-handle = "0.6"
 # Pinned to match the version already resolved transitively via wry/webview2-com-sys,
 # to avoid compiling a second copy of windows-sys.
-windows-sys = { version = "0.60.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }
+windows-sys = { version = "0.60.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_WindowsAndMessaging"] }
 
 [dev-dependencies]
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros"] }

@@ -1,0 +1,75 @@
+import { SKINS } from "../lib/skins";
+import { useVibrancyMode } from "../hooks/useVibrancyMode";
+import { useAppearanceStore } from "../stores/appearanceStore";
+import { useUiStore } from "../stores/uiStore";
+
+export function SettingsOverlay() {
+  const closeSettings = useUiStore((s) => s.closeSettings);
+  const { opacity, skinId, setOpacity, setSkin } = useAppearanceStore();
+  const vibrancy = useVibrancyMode();
+  const opacityDisabled = vibrancy === "none";
+
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col bg-white dark:bg-neutral-900">
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-black/10 px-2 text-sm font-medium dark:border-white/10">
+        <span>設定</span>
+        <button
+          type="button"
+          onClick={closeSettings}
+          className="rounded px-1 text-xs opacity-60 hover:opacity-100"
+          aria-label="閉じる"
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-4 overflow-y-auto p-3 text-sm">
+        <div>
+          <div className="mb-1.5 text-xs font-medium opacity-70">スキン</div>
+          <div className="grid grid-cols-2 gap-2">
+            {SKINS.map((skin) => (
+              <button
+                key={skin.id}
+                type="button"
+                onClick={() => setSkin(skin.id)}
+                className={`flex items-center gap-2 rounded border px-2 py-1.5 text-left text-xs ${
+                  skinId === skin.id
+                    ? "border-black/40 dark:border-white/40"
+                    : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+                }`}
+              >
+                <span
+                  className="h-4 w-4 shrink-0 rounded-full border border-black/10 dark:border-white/20"
+                  style={{ backgroundColor: `rgb(${skin.light})` }}
+                />
+                {skin.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-xs font-medium opacity-70">
+            <span>不透明度</span>
+            <span>{Math.round(opacity * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min={0.5}
+            max={1}
+            step={0.05}
+            value={opacity}
+            disabled={opacityDisabled}
+            onChange={(e) => setOpacity(Number(e.target.value))}
+            className="w-full disabled:opacity-40"
+          />
+          {opacityDisabled && (
+            <p className="mt-1 text-xs opacity-60">
+              MicaまたはAcrylicが使えない環境のため、不透明度は常に100%になります
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

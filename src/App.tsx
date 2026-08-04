@@ -2,26 +2,39 @@ import { EntryList } from "./components/EntryList";
 import { FeedManagerOverlay } from "./components/FeedManagerOverlay";
 import { FilterBar } from "./components/FilterBar";
 import { HistoryOverlay } from "./components/HistoryOverlay";
+import { SettingsOverlay } from "./components/SettingsOverlay";
 import { TitleBar } from "./components/TitleBar";
 import { useFeedsUpdatedListener } from "./hooks/useFeedsUpdatedListener";
+import { useSyncWindowOpacity } from "./hooks/useSyncWindowOpacity";
 import { useVibrancyMode } from "./hooks/useVibrancyMode";
+import { getSkin } from "./lib/skins";
+import { useAppearanceStore } from "./stores/appearanceStore";
 import { useUiStore } from "./stores/uiStore";
-
-const PANEL_BG: Record<ReturnType<typeof useVibrancyMode>, string> = {
-  mica: "bg-white/55 dark:bg-neutral-900/45",
-  acrylic: "bg-white/65 dark:bg-neutral-900/55",
-  none: "bg-white dark:bg-neutral-900",
-};
 
 function App() {
   const vibrancy = useVibrancyMode();
   const feedManagerOpen = useUiStore((s) => s.feedManagerOpen);
   const historyOpen = useUiStore((s) => s.historyOpen);
+  const settingsOpen = useUiStore((s) => s.settingsOpen);
+  const { opacity, skinId } = useAppearanceStore();
   useFeedsUpdatedListener();
+
+  const skin = getSkin(skinId);
+  // No vibrancy backdrop means nothing but the raw desktop sits behind this
+  // window -- forcing full opacity here keeps that case looking solid
+  // instead of a very plain flat-colored window with no blur to soften it.
+  const alpha = vibrancy === "none" ? 1 : opacity;
+  useSyncWindowOpacity(alpha);
+
+  const panelStyle = {
+    "--panel-rgb-light": skin.light,
+    "--panel-rgb-dark": skin.dark,
+  } as React.CSSProperties;
 
   return (
     <div
-      className={`flex h-screen w-screen flex-col overflow-hidden rounded-2xl text-neutral-900 dark:text-neutral-100 ${PANEL_BG[vibrancy]}`}
+      style={panelStyle}
+      className="panel-bg flex h-screen w-screen flex-col overflow-hidden rounded-2xl text-neutral-900 dark:text-neutral-100"
     >
       <TitleBar />
       <FilterBar />
@@ -29,6 +42,7 @@ function App() {
         <EntryList />
         {feedManagerOpen && <FeedManagerOverlay />}
         {historyOpen && <HistoryOverlay />}
+        {settingsOpen && <SettingsOverlay />}
       </div>
     </div>
   );

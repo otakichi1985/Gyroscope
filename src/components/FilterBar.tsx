@@ -15,6 +15,7 @@ export function FilterBar() {
   const { filterFeedId, setFilterFeedId, viewMode, setViewMode, markAllRead } = useEntriesStore();
   const toggleFeedManager = useUiStore((s) => s.toggleFeedManager);
   const toggleHistory = useUiStore((s) => s.toggleHistory);
+  const toggleSettings = useUiStore((s) => s.toggleSettings);
 
   useEffect(() => {
     refreshFeeds();
@@ -77,6 +78,15 @@ export function FilterBar() {
         aria-label="フィード管理を開く"
       >
         ⚙
+      </button>
+
+      <button
+        type="button"
+        onClick={toggleSettings}
+        className="shrink-0 rounded px-1.5 py-1 opacity-60 hover:opacity-100"
+        aria-label="外観設定を開く"
+      >
+        🎨
       </button>
     </div>
   );

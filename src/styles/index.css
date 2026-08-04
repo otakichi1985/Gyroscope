@@ -7,3 +7,25 @@ body,
   height: 100%;
   margin: 0;
 }
+
+/* Panel background color driven by a CSS custom property set from React
+   (the selected skin's RGB, see App.tsx / lib/skins.ts) -- Tailwind's
+   dark: variant can't respond to arbitrary computed inline styles, so
+   light/dark switching for this rule is done directly via the OS media
+   query, same signal Tailwind itself uses by default.
+
+   This is always fully opaque: overall "how see-through the window is"
+   is a genuinely different mechanism (native window-level alpha via
+   Win32 SetLayeredWindowAttributes, see src-tauri/src/window/opacity.rs)
+   -- Tauri/tao expose no window-opacity API, so blending this div's own
+   color toward transparent would only ever reveal Mica/Acrylic's own
+   fixed blur, not the real desktop behind the window. Compositing both
+   at once would also double up in a way that's hard to reason about. */
+.panel-bg {
+  background-color: rgb(var(--panel-rgb-light));
+}
+@media (prefers-color-scheme: dark) {
+  .panel-bg {
+    background-color: rgb(var(--panel-rgb-dark));
+  }
+}
