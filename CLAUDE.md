@@ -44,7 +44,20 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
   持たせるだけでは、Mica/Acrylicが敷いている固定のぼかしテクスチャに対して自分の色を混ぜるだけで、
   ウィンドウの背後にある本当のデスクトップ/他アプリには一切透けない（実機で「色が薄くなるだけで
   透けない」と指摘されて判明）。`vibrancy==="none"`のときは不透明度を強制的に100%にする
-  （デスクトップ用の質感が無い状態でさらに薄くすると素っ気ない見た目になるため）
+  （デスクトップ用の質感が無い状態でさらに薄くすると素っ気ない見た目になるため）。
+  Windowsはウィンドウ最大化などのサイズ変更でレイヤードウィンドウのアルファを勝手にリセットすることが
+  あるため、`opacity::LastOpacity`（`app.manage`）に最後に設定したバイト値を保持し、
+  `lib.rs`の`window.on_window_event`で`WindowEvent::Resized`を受けるたびに`opacity::apply`で
+  再適用している（実機で「最大化すると不透明度が100%に戻る」と指摘されて発覚）
+- カードサイズ/間隔（`appearanceStore`の`cardSize`/`cardGap`）: サイズはcardモードのみ対象
+  （`EntryRow.tsx`のサムネイル寸法・文字サイズ・行クランプ数を切替）。間隔は表示モード共通で
+  `EntryList.tsx`の仮想化された行ラッパーに`paddingBottom`として付与する方式（`margin`だと
+  `virtualizer.measureElement`の計測に含まれず行の位置がズレるため、必ず`padding`側に乗せる）
+- ネイティブ`<select>`のドロップダウン一覧はページのTailwindクラスをほとんど無視してブラウザ既定
+  （ライト）でレンダリングされるが、文字色だけはページから継承されるため、ダークモード時に
+  「白背景+白文字」で読めなくなっていた（実機で指摘されて発覚）。`src/styles/index.css`の
+  `html`に`color-scheme: light dark;`を付けるだけで解決する（ネイティブフォームコントロール全般に
+  `prefers-color-scheme`を追従させる標準的な仕組み。option個別のスタイリングやJS判定は不要）
 - ウィンドウの閉じる/最小化ボタンは自作タイトルバー（`src/components/TitleBar.tsx`）から
   `@tauri-apps/api/window` の `getCurrentWindow()` を呼ぶ。ドラッグ移動は `data-tauri-drag-region` 属性のみで実現
 - DB: `rusqlite::Connection` 1本を `Mutex` で包んで `app.manage`（`src-tauri/src/db/mod.rs`）。

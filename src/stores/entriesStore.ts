@@ -28,6 +28,7 @@ interface EntriesState {
   markRead: (id: number, isRead: boolean) => Promise<void>;
   toggleStar: (id: number, isStarred: boolean) => Promise<void>;
   markAllRead: () => Promise<void>;
+  markAllUnread: () => Promise<void>;
 }
 
 export const useEntriesStore = create<EntriesState>((set, get) => ({
@@ -119,6 +120,15 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   markAllRead: async () => {
     try {
       await invoke("mark_all_read", { feedId: get().filterFeedId });
+      await get().refresh();
+    } catch (error) {
+      set({ error: String(error) });
+    }
+  },
+
+  markAllUnread: async () => {
+    try {
+      await invoke("mark_all_unread", { feedId: get().filterFeedId });
       await get().refresh();
     } catch (error) {
       set({ error: String(error) });

@@ -117,6 +117,18 @@ pub fn mark_all_read(db: State<'_, Db>, feed_id: Option<i64>) -> AppResult<()> {
 }
 
 #[tauri::command]
+pub fn mark_all_unread(db: State<'_, Db>, feed_id: Option<i64>) -> AppResult<()> {
+    let conn = db.0.lock().unwrap();
+    // No read_history write here -- unmarking is not "unreading": the fact
+    // an entry was read stays recorded (see record_read_history's doc).
+    match feed_id {
+        Some(id) => conn.execute("UPDATE entries SET is_read = 0 WHERE feed_id = ?1", params![id])?,
+        None => conn.execute("UPDATE entries SET is_read = 0", [])?,
+    };
+    Ok(())
+}
+
+#[tauri::command]
 pub fn list_read_history(db: State<'_, Db>, limit: Option<i64>, offset: Option<i64>) -> AppResult<Vec<ReadHistoryEntry>> {
     let conn = db.0.lock().unwrap();
     let mut stmt = conn.prepare(&format!(

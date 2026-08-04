@@ -2,18 +2,25 @@ import { useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
+import { useAppearanceStore, type CardSize } from "../stores/appearanceStore";
 import { EntryRow } from "./EntryRow";
 
-const ESTIMATED_SIZE: Record<ViewMode, number> = {
-  card: 120,
-  list: 56,
-  compact: 32,
+const CARD_BASE_SIZE: Record<CardSize, number> = { small: 88, medium: 120, large: 168 };
+const OTHER_BASE_SIZE: Record<Exclude<ViewMode, "card">, number> = { list: 56, compact: 32 };
+
+const GAP_PX: Record<string, number> = {
+  compact: 0,
+  normal: 8,
+  relaxed: 16,
 };
 
 export function EntryList() {
   const { entries, loading, loadingMore, hasMore, error, viewMode, refresh, fetchMore } =
     useEntriesStore();
   const feeds = useFeedsStore((s) => s.feeds);
+  const cardSize = useAppearanceStore((s) => s.cardSize);
+  const cardGap = useAppearanceStore((s) => s.cardGap);
+  const gap = GAP_PX[cardGap];
 
   const feedTitleById = useMemo(() => {
     const map = new Map<number, string>();
@@ -30,10 +37,12 @@ export function EntryList() {
 
   const parentRef = useRef<HTMLDivElement>(null);
 
+  const baseSize = viewMode === "card" ? CARD_BASE_SIZE[cardSize] : OTHER_BASE_SIZE[viewMode];
+
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ESTIMATED_SIZE[viewMode],
+    estimateSize: () => baseSize + gap,
     overscan: 8,
   });
 
@@ -76,6 +85,7 @@ export function EntryList() {
                 top: 0,
                 left: 0,
                 width: "100%",
+                paddingBottom: gap,
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
@@ -83,6 +93,7 @@ export function EntryList() {
                 entry={entry}
                 mode={viewMode}
                 feedTitle={feedTitleById.get(entry.feed_id) ?? ""}
+                cardSize={cardSize}
               />
             </div>
           );
