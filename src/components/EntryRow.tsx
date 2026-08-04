@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { entrySnippet, formatPublished } from "../lib/text";
@@ -29,12 +30,18 @@ interface EntryRowProps {
   entry: Entry;
   mode: ViewMode;
   feedTitle: string;
+  feedIconUrl: string | null;
   cardSize: CardSize;
 }
 
-export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
+export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize }: EntryRowProps) {
   const markRead = useEntriesStore((s) => s.markRead);
   const toggleStar = useEntriesStore((s) => s.toggleStar);
+  // Covers both "no thumbnail_url at all" and "had one but it failed to
+  // load" (broken link, hotlink protection, etc.) -- both count as "can't
+  // show an image for this article" per the request that prompted the
+  // feed-icon fallback below.
+  const [thumbFailed, setThumbFailed] = useState(false);
 
   async function handleOpen() {
     if (!entry.is_read) markRead(entry.id, true);
@@ -61,7 +68,18 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
   }
 
   const title = entry.title ?? entry.link ?? "(無題)";
-  const meta = [feedTitle, formatPublished(entry.published_at)].filter(Boolean).join(" · ");
+  const published = formatPublished(entry.published_at);
+  // feedTitle gets its own accent-colored, undimmed span (rather than
+  // folding it into one plain opacity-60 "meta" string) so the source
+  // stands out from the date next to it, per the request to emphasize
+  // where each article came from.
+  const meta = (feedTitle || published) && (
+    <>
+      {feedTitle && <span className="accent-text">{feedTitle}</span>}
+      {feedTitle && published && <span className="opacity-60"> · </span>}
+      {published && <span className="opacity-60">{published}</span>}
+    </>
+  );
 
   const starButton = (
     <button
@@ -110,7 +128,7 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
       >
         <span className={`min-w-0 flex-1 truncate ${entry.is_read ? "" : "font-medium"}`}>{title}</span>
         {feedTitle && (
-          <span className="max-w-[30%] shrink-0 truncate text-[10px] opacity-50">{feedTitle}</span>
+          <span className="accent-text max-w-[30%] shrink-0 truncate text-[10px]">{feedTitle}</span>
         )}
         {readCheck}
         {starButton}
@@ -126,7 +144,7 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
       >
         <div className="min-w-0 flex-1">
           <div className={`truncate text-sm ${entry.is_read ? "" : "font-medium"}`}>{title}</div>
-          {meta && <div className="truncate text-xs opacity-60">{meta}</div>}
+          {meta && <div className="truncate text-xs">{meta}</div>}
         </div>
         {readCheck}
         {starButton}
@@ -140,17 +158,30 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
       {...rowProps}
       className="flex w-full cursor-pointer gap-2 rounded px-2 py-2 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
     >
-      {entry.thumbnail_url && (
+      {entry.thumbnail_url && !thumbFailed ? (
         <img
           src={entry.thumbnail_url}
           alt=""
+          onError={() => setThumbFailed(true)}
           className={`${CARD_THUMB_SIZE[cardSize]} shrink-0 rounded object-cover`}
         />
+      ) : (
+        feedIconUrl && (
+          // A favicon-ish image is small/square and looks stretched and
+          // blurry filling the same box object-cover does for a real
+          // thumbnail -- contain it with padding on a neutral fill instead,
+          // so it reads as a deliberate icon badge rather than a bad photo.
+          <div
+            className={`${CARD_THUMB_SIZE[cardSize]} flex shrink-0 items-center justify-center rounded bg-black/5 p-2 dark:bg-white/5`}
+          >
+            <img src={feedIconUrl} alt="" className="max-h-full max-w-full object-contain" />
+          </div>
+        )
       )}
       <div className="min-w-0 flex-1">
         <div className={`truncate ${CARD_TITLE_SIZE[cardSize]} ${entry.is_read ? "" : "font-medium"}`}>{title}</div>
         <p className={`mt-0.5 ${CARD_SNIPPET_CLAMP[cardSize]} text-xs opacity-70`}>{entrySnippet(entry)}</p>
-        {meta && <div className="mt-0.5 truncate text-xs opacity-60">{meta}</div>}
+        {meta && <div className="mt-0.5 truncate text-xs">{meta}</div>}
       </div>
       {readCheck}
       {starButton}

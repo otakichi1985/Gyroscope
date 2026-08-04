@@ -30,6 +30,17 @@ export function EntryList() {
     return map;
   }, [feeds]);
 
+  // Feed icon (favicon-ish) used as a thumbnail substitute in EntryRow's
+  // card mode when an entry has no thumbnail of its own -- see
+  // src-tauri/src/fetch/favicon.rs.
+  const feedIconById = useMemo(() => {
+    const map = new Map<number, string | null>();
+    for (const feed of feeds) {
+      map.set(feed.id, feed.icon_path);
+    }
+    return map;
+  }, [feeds]);
+
   useEffect(() => {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,6 +104,7 @@ export function EntryList() {
                 entry={entry}
                 mode={viewMode}
                 feedTitle={feedTitleById.get(entry.feed_id) ?? ""}
+                feedIconUrl={feedIconById.get(entry.feed_id) ?? null}
                 cardSize={cardSize}
               />
             </div>

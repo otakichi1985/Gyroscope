@@ -322,7 +322,21 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
   最も内側のフォルダ名だけを採用する（`opml::parse_opml` 参照）
 - サムネイル抽出は `media:thumbnail` → 画像タイプの enclosure(`media:content`) → 本文内最初の `<img>` まで。
   `og:image`（追加リクエストが要る任意タイア）は未実装（設定画面ができるPhase 5以降でON/OFFトグルと合わせて追加）
-- favicon（`feeds.icon_path`）はまだ未取得。列だけ用意してあり、値は常にNULL
+- favicon（`feeds.icon_path`）取得を実装（サムネイル無し記事の代替表示用、ユーザー要望）。
+  `src-tauri/src/fetch/favicon.rs`の`discover_favicon`が2段構えで解決する:
+  1) `{site_url}/favicon.ico`へのHEADで2xxなら採用、2) ダメならサイトのトップページHTMLを
+  取得し`<link rel=icon>`系タグを`fetch::discovery::find_feed_link`と同じscraperセレクタ
+  パターンで探す。ダウンロードして保存はせず、解決できたURL文字列をそのまま`icon_path`に
+  保存する方式（`entries.thumbnail_url`が既にリモートURLをDB保存+`<img src>`直読みという
+  同じパターンなので、それに倣った。ローカルキャッシュ管理・フィード削除時の掃除を増やさずに
+  済む）。新規フィード追加時（`add_feed`）は追加のたびに解決するが、それ以前に追加済みの
+  既存フィードは`icon_path`がNULLのままなので、`commands::feeds::backfill_favicons`
+  （`scheduler::refresh_many`と同じSemaphore同時実行数制限パターン）を`lib.rs`の`.setup()`
+  からspawnして起動後にバックグラウンドで埋める（同期的にやるとSPEC§7の起動2秒以内要件に
+  抵触するネットワーク処理のため）。フロント側は`EntryRow.tsx`のcardモードで
+  `entry.thumbnail_url`が無い、または`<img onError>`で読み込み失敗した場合にこのfeedの
+  アイコンを代わりに表示する。ファビコンは低解像度な正方形が多く`object-cover`で引き伸ばすと
+  荒れるため、代替表示時だけ`object-contain`+パディング+薄い背景色で「バッジ」風に見せている
 - `TrayIconBuilder::build()`の戻り値（`TrayIcon`）を変数で受けずに`;`で捨てると、Windows版
   `tray-icon`crateの`Drop`実装が即座に`Shell_NotifyIcon(NIM_DELETE)`を呼んでしまい、アイコンが
   生成直後に消える。`app.manage(tray)`でアプリと同じ寿命を持たせる必要がある（実機で発見・修正済み）
