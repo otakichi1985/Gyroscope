@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
+import type { Feed } from "../lib/types";
 import { useAppearanceStore } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
-import { ClockIcon, PaletteIcon, RssIcon } from "./icons";
+import { ClockIcon, CloseIcon, PaletteIcon, RssIcon, StarIcon } from "./icons";
 
 const VIEW_MODES: { mode: ViewMode; label: string }[] = [
   { mode: "card", label: "カード" },
@@ -14,8 +15,20 @@ const VIEW_MODES: { mode: ViewMode; label: string }[] = [
 export function FilterBar() {
   const feeds = useFeedsStore((s) => s.feeds);
   const refreshFeeds = useFeedsStore((s) => s.refresh);
-  const { filterFeedId, setFilterFeedId, viewMode, setViewMode, markAllRead, markAllUnread } =
-    useEntriesStore();
+  const {
+    filterFeedId,
+    setFilterFeedId,
+    filterFolder,
+    setFilterFolder,
+    starredOnly,
+    setStarredOnly,
+    searchQuery,
+    setSearchQuery,
+    viewMode,
+    setViewMode,
+    markAllRead,
+    markAllUnread,
+  } = useEntriesStore();
   const toggleScreen = useUiStore((s) => s.toggleScreen);
   const positionLocked = useAppearanceStore((s) => s.positionLocked);
   const titleBarVisible = useAppearanceStore((s) => s.titleBarVisible);
@@ -32,14 +45,48 @@ export function FilterBar() {
   // same thing for no reason, and always skipped when locked.
   const dragRegion = !positionLocked && !titleBarVisible ? true : undefined;
 
+  // Groups feeds by their (optional) genre/folder so the timeline picker can
+  // offer "this whole genre" as well as individual feeds -- feeds.folder is
+  // set per-feed in FeedManager.tsx or via OPML import.
+  const { folders, feedsByFolder, unfiledFeeds } = useMemo(() => {
+    const byFolder = new Map<string, Feed[]>();
+    const unfiled: Feed[] = [];
+    for (const feed of feeds) {
+      if (feed.folder) {
+        const list = byFolder.get(feed.folder) ?? [];
+        list.push(feed);
+        byFolder.set(feed.folder, list);
+      } else {
+        unfiled.push(feed);
+      }
+    }
+    return {
+      folders: [...byFolder.keys()].sort(),
+      feedsByFolder: byFolder,
+      unfiledFeeds: unfiled,
+    };
+  }, [feeds]);
+
+  const selectValue = filterFolder ? `folder:${filterFolder}` : (filterFeedId ?? "");
+
+  function handleFilterChange(value: string) {
+    if (value === "") {
+      setFilterFeedId(null);
+    } else if (value.startsWith("folder:")) {
+      setFilterFolder(value.slice("folder:".length));
+    } else {
+      setFilterFeedId(Number(value));
+    }
+  }
+
   return (
     <div
       data-tauri-drag-region={dragRegion}
       className="flex shrink-0 flex-wrap items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10"
     >
       <select
-        value={filterFeedId ?? ""}
-        onChange={(e) => setFilterFeedId(e.target.value === "" ? null : Number(e.target.value))}
+        value={selectValue}
+        onChange={(e) => handleFilterChange(e.target.value)}
         // The closed box's displayed text uses the <select>'s own `color`
         // (so it must stay dark:-aware to read against the panel), but that
         // same `color` also cascades into the dropdown *popup*'s <option>
@@ -56,10 +103,24 @@ export function FilterBar() {
         <option value="" className="text-black">
           全フィード
         </option>
-        {feeds.map((feed) => (
+        {folders.map((folder) => (
+          <option key={folder} value={`folder:${folder}`} className="text-black">
+            ジャンル: {folder}
+          </option>
+        ))}
+        {unfiledFeeds.map((feed) => (
           <option key={feed.id} value={feed.id} className="text-black">
             {feed.custom_title ?? feed.title ?? feed.url}
           </option>
+        ))}
+        {folders.map((folder) => (
+          <optgroup key={folder} label={folder} className="text-black">
+            {feedsByFolder.get(folder)!.map((feed) => (
+              <option key={feed.id} value={feed.id} className="text-black">
+                {feed.custom_title ?? feed.title ?? feed.url}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
 
@@ -78,6 +139,38 @@ export function FilterBar() {
             {label}
           </button>
         ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setStarredOnly(!starredOnly)}
+        className={`flex shrink-0 items-center rounded p-1 transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
+          starredOnly ? "accent-text" : "opacity-60 hover:opacity-100"
+        }`}
+        aria-label={starredOnly ? "ブックマークの絞り込みを解除" : "ブックマークのみ表示"}
+        title="ブックマーク"
+      >
+        <StarIcon filled={starredOnly} className="h-4 w-4" />
+      </button>
+
+      <div className="relative w-full">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="記事を検索"
+          className="w-full rounded border border-black/10 bg-black/5 py-1 pl-2 pr-6 text-xs outline-none dark:border-white/10 dark:bg-white/5"
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery("")}
+            className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center rounded p-0.5 opacity-60 transition-colors duration-150 hover:opacity-100"
+            aria-label="検索をクリア"
+          >
+            <CloseIcon className="h-3 w-3" />
+          </button>
+        )}
       </div>
 
       <button

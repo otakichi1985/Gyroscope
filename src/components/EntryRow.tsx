@@ -106,9 +106,12 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
     return (
       <div
         {...rowProps}
-        className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+        className="flex w-full cursor-pointer items-baseline gap-2 rounded px-2 py-1 text-sm transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
       >
         <span className={`min-w-0 flex-1 truncate ${entry.is_read ? "" : "font-medium"}`}>{title}</span>
+        {feedTitle && (
+          <span className="max-w-[30%] shrink-0 truncate text-[10px] opacity-50">{feedTitle}</span>
+        )}
         {readCheck}
         {starButton}
       </div>

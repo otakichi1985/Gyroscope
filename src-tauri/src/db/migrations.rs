@@ -76,6 +76,34 @@ const MIGRATIONS: &[&str] = &[
     );
     CREATE INDEX idx_read_history_read_at ON read_history(read_at DESC);
     "#,
+    // v3: full-text search (SPEC §2.3). `body_text` is HTML-stripped plain
+    // text computed in Rust at upsert time (see parse::text::strip_html /
+    // db::upsert_entries) -- SQLite itself has no HTML-stripping function,
+    // so it can't be derived purely in SQL/triggers. `entries_fts` is an
+    // external-content FTS5 table (indexes entries.title/body_text without
+    // duplicating them into the FTS table's own storage); the three
+    // triggers keep it in sync automatically on every insert/update/delete
+    // so callers never have to remember to touch the index themselves --
+    // this is SQLite's own recommended pattern for external-content tables.
+    r#"
+    ALTER TABLE entries ADD COLUMN body_text TEXT;
+
+    CREATE VIRTUAL TABLE entries_fts USING fts5(
+        title, body_text,
+        content='entries', content_rowid='id'
+    );
+
+    CREATE TRIGGER entries_fts_ai AFTER INSERT ON entries BEGIN
+        INSERT INTO entries_fts(rowid, title, body_text) VALUES (new.id, new.title, new.body_text);
+    END;
+    CREATE TRIGGER entries_fts_ad AFTER DELETE ON entries BEGIN
+        INSERT INTO entries_fts(entries_fts, rowid, title, body_text) VALUES ('delete', old.id, old.title, old.body_text);
+    END;
+    CREATE TRIGGER entries_fts_au AFTER UPDATE ON entries BEGIN
+        INSERT INTO entries_fts(entries_fts, rowid, title, body_text) VALUES ('delete', old.id, old.title, old.body_text);
+        INSERT INTO entries_fts(rowid, title, body_text) VALUES (new.id, new.title, new.body_text);
+    END;
+    "#,
 ];
 
 pub fn run(conn: &Connection) -> rusqlite::Result<()> {
