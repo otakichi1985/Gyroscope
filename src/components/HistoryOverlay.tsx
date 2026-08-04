@@ -3,6 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { formatPublished } from "../lib/text";
 import { useHistoryStore } from "../stores/historyStore";
 import { useUiStore } from "../stores/uiStore";
+import { CloseIcon } from "./icons";
 
 const HTTP_LINK_RE = /^https?:\/\//i;
 
@@ -21,16 +22,16 @@ export function HistoryOverlay() {
   }
 
   return (
-    <div className="absolute inset-0 z-10 flex flex-col bg-white dark:bg-neutral-900">
+    <div className="panel-bg absolute inset-0 z-10 flex flex-col">
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-black/10 px-2 text-sm font-medium dark:border-white/10">
         <span>既読履歴</span>
         <button
           type="button"
           onClick={closeHistory}
-          className="rounded px-1 text-xs opacity-60 hover:opacity-100"
+          className="flex items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
           aria-label="閉じる"
         >
-          ×
+          <CloseIcon className="h-3.5 w-3.5" />
         </button>
       </div>
 
@@ -39,7 +40,7 @@ export function HistoryOverlay() {
         <button
           type="button"
           onClick={() => clear()}
-          className="shrink-0 rounded px-1.5 py-0.5 opacity-60 hover:opacity-100"
+          className="shrink-0 rounded px-1.5 py-0.5 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
           disabled={entries.length === 0}
         >
           履歴を削除
@@ -66,7 +67,7 @@ export function HistoryOverlay() {
                       handleOpen(entry.link);
                     }
                   }}
-                  className="flex w-full cursor-pointer flex-col gap-0.5 rounded px-2 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5"
+                  className="flex w-full cursor-pointer flex-col gap-0.5 rounded px-2 py-1.5 text-left transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
                 >
                   <span className="truncate text-sm">{entry.title ?? entry.link ?? "(無題)"}</span>
                   <span className="truncate text-xs opacity-60">

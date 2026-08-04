@@ -3,6 +3,7 @@ import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { entrySnippet, formatPublished } from "../lib/text";
 import type { CardSize } from "../stores/appearanceStore";
 import type { Entry } from "../lib/types";
+import { StarIcon } from "./icons";
 
 const HTTP_LINK_RE = /^https?:\/\//i;
 
@@ -66,10 +67,10 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
     <button
       type="button"
       onClick={handleToggleStar}
-      className="shrink-0 rounded px-1 text-xs opacity-60 hover:opacity-100"
+      className="flex shrink-0 items-center rounded p-0.5 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
       aria-label={entry.is_starred ? "スターを外す" : "スターを付ける"}
     >
-      {entry.is_starred ? "★" : "☆"}
+      <StarIcon filled={entry.is_starred} className="h-3.5 w-3.5" />
     </button>
   );
 
@@ -79,7 +80,7 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
     <button
       type="button"
       onClick={handleToggleRead}
-      className={`shrink-0 rounded px-1 text-xs ${
+      className={`shrink-0 rounded px-1 text-xs transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
         entry.is_read ? "text-emerald-600 dark:text-emerald-400" : "opacity-30 hover:opacity-70"
       }`}
       aria-label={entry.is_read ? "未読にする" : "既読にする"}
@@ -103,7 +104,7 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
     return (
       <div
         {...rowProps}
-        className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/5"
+        className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
       >
         <span className={`min-w-0 flex-1 truncate ${entry.is_read ? "" : "font-medium"}`}>{title}</span>
         {readCheck}
@@ -116,7 +117,7 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
     return (
       <div
         {...rowProps}
-        className="flex w-full cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5"
+        className="flex w-full cursor-pointer items-start gap-2 rounded px-2 py-1.5 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
       >
         <div className="min-w-0 flex-1">
           <div className={`truncate text-sm ${entry.is_read ? "" : "font-medium"}`}>{title}</div>
@@ -132,7 +133,7 @@ export function EntryRow({ entry, mode, feedTitle, cardSize }: EntryRowProps) {
   return (
     <div
       {...rowProps}
-      className="flex w-full cursor-pointer gap-2 rounded px-2 py-2 hover:bg-black/5 dark:hover:bg-white/5"
+      className="flex w-full cursor-pointer gap-2 rounded px-2 py-2 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
     >
       {entry.thumbnail_url && (
         <img

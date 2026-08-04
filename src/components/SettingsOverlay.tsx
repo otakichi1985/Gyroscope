@@ -3,6 +3,7 @@ import { SKINS } from "../lib/skins";
 import { useVibrancyMode } from "../hooks/useVibrancyMode";
 import { useAppearanceStore, type CardGap, type CardSize } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
+import { CloseIcon } from "./icons";
 
 const CARD_SIZES: { id: CardSize; label: string }[] = [
   { id: "small", label: "小" },
@@ -30,12 +31,18 @@ function ToggleRow({
       <span>{label}</span>
       <button
         type="button"
+        role="switch"
+        aria-checked={value}
         onClick={() => onChange(!value)}
-        className={`rounded px-2 py-0.5 text-xs ${
-          value ? "bg-black/10 dark:bg-white/10" : "opacity-60 hover:opacity-100"
+        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150 ${
+          value ? "bg-black/40 dark:bg-white/40" : "bg-black/15 dark:bg-white/15"
         }`}
       >
-        {value ? "オン" : "オフ"}
+        <span
+          className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-150 dark:bg-neutral-200 ${
+            value ? "translate-x-4" : "translate-x-0"
+          }`}
+        />
       </button>
     </div>
   );
@@ -65,16 +72,16 @@ export function SettingsOverlay() {
   const opacityDisabled = vibrancy === "none";
 
   return (
-    <div className="absolute inset-0 z-10 flex flex-col bg-white dark:bg-neutral-900">
+    <div className="panel-bg absolute inset-0 z-10 flex flex-col">
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-black/10 px-2 text-sm font-medium dark:border-white/10">
         <span>設定</span>
         <button
           type="button"
           onClick={closeSettings}
-          className="rounded px-1 text-xs opacity-60 hover:opacity-100"
+          className="flex items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
           aria-label="閉じる"
         >
-          ×
+          <CloseIcon className="h-3.5 w-3.5" />
         </button>
       </div>
 
@@ -87,7 +94,7 @@ export function SettingsOverlay() {
                 key={skin.id}
                 type="button"
                 onClick={() => setSkin(skin.id)}
-                className={`flex items-center gap-2 rounded border px-2 py-1.5 text-left text-xs ${
+                className={`flex items-center gap-2 rounded border px-2 py-1.5 text-left text-xs transition-colors duration-150 ${
                   skinId === skin.id
                     ? "border-black/40 dark:border-white/40"
                     : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
@@ -133,7 +140,7 @@ export function SettingsOverlay() {
                 key={id}
                 type="button"
                 onClick={() => setCardSize(id)}
-                className={`flex-1 rounded px-1.5 py-1 text-xs ${
+                className={`flex-1 rounded px-1.5 py-1 text-xs transition-colors duration-150 ${
                   cardSize === id ? "bg-black/10 dark:bg-white/10" : "opacity-60 hover:opacity-100"
                 }`}
               >
@@ -151,7 +158,7 @@ export function SettingsOverlay() {
                 key={id}
                 type="button"
                 onClick={() => setCardGap(id)}
-                className={`flex-1 rounded px-1.5 py-1 text-xs ${
+                className={`flex-1 rounded px-1.5 py-1 text-xs transition-colors duration-150 ${
                   cardGap === id ? "bg-black/10 dark:bg-white/10" : "opacity-60 hover:opacity-100"
                 }`}
               >
@@ -170,7 +177,7 @@ export function SettingsOverlay() {
                 type="button"
                 onClick={() => setFont(font.id)}
                 style={font.cssValue ? { fontFamily: font.cssValue } : undefined}
-                className={`rounded border px-2 py-1.5 text-left text-xs ${
+                className={`rounded border px-2 py-1.5 text-left text-xs transition-colors duration-150 ${
                   fontId === font.id
                     ? "border-black/40 dark:border-white/40"
                     : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
@@ -189,7 +196,7 @@ export function SettingsOverlay() {
           <ToggleRow label="タイトルバーを表示" value={titleBarVisible} onChange={setTitleBarVisible} />
           {!titleBarVisible && (
             <p className="text-xs opacity-60">
-              タイトルバーを隠すと閉じる/最小化ボタンも消えます。トレイメニューか、この設定パネル（🎨アイコン）から再表示できます
+              タイトルバーを隠すと閉じる/最小化ボタンも消えます。トレイメニューか、この設定パネル（外観設定アイコン）から再表示できます
             </p>
           )}
         </div>
