@@ -1,3 +1,4 @@
+import { FONTS } from "../lib/fonts";
 import { SKINS } from "../lib/skins";
 import { useVibrancyMode } from "../hooks/useVibrancyMode";
 import { useAppearanceStore, type CardGap, type CardSize } from "../stores/appearanceStore";
@@ -15,10 +16,51 @@ const CARD_GAPS: { id: CardGap; label: string }[] = [
   { id: "relaxed", label: "広い" },
 ];
 
+function ToggleRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span>{label}</span>
+      <button
+        type="button"
+        onClick={() => onChange(!value)}
+        className={`rounded px-2 py-0.5 text-xs ${
+          value ? "bg-black/10 dark:bg-white/10" : "opacity-60 hover:opacity-100"
+        }`}
+      >
+        {value ? "オン" : "オフ"}
+      </button>
+    </div>
+  );
+}
+
 export function SettingsOverlay() {
   const closeSettings = useUiStore((s) => s.closeSettings);
-  const { opacity, skinId, cardSize, cardGap, setOpacity, setSkin, setCardSize, setCardGap } =
-    useAppearanceStore();
+  const {
+    opacity,
+    skinId,
+    cardSize,
+    cardGap,
+    fontId,
+    alwaysOnTop,
+    positionLocked,
+    titleBarVisible,
+    setOpacity,
+    setSkin,
+    setCardSize,
+    setCardGap,
+    setFont,
+    setAlwaysOnTop,
+    setPositionLocked,
+    setTitleBarVisible,
+  } = useAppearanceStore();
   const vibrancy = useVibrancyMode();
   const opacityDisabled = vibrancy === "none";
 
@@ -117,6 +159,39 @@ export function SettingsOverlay() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <div className="mb-1.5 text-xs font-medium opacity-70">フォント</div>
+          <div className="grid grid-cols-2 gap-2">
+            {FONTS.map((font) => (
+              <button
+                key={font.id}
+                type="button"
+                onClick={() => setFont(font.id)}
+                style={font.cssValue ? { fontFamily: font.cssValue } : undefined}
+                className={`rounded border px-2 py-1.5 text-left text-xs ${
+                  fontId === font.id
+                    ? "border-black/40 dark:border-white/40"
+                    : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+                }`}
+              >
+                {font.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="text-xs font-medium opacity-70">ウィンドウ</div>
+          <ToggleRow label="常に最前面に表示" value={alwaysOnTop} onChange={setAlwaysOnTop} />
+          <ToggleRow label="位置を固定（ドラッグで動かさない）" value={positionLocked} onChange={setPositionLocked} />
+          <ToggleRow label="タイトルバーを表示" value={titleBarVisible} onChange={setTitleBarVisible} />
+          {!titleBarVisible && (
+            <p className="text-xs opacity-60">
+              タイトルバーを隠すと閉じる/最小化ボタンも消えます。トレイメニューか、この設定パネル（🎨アイコン）から再表示できます
+            </p>
+          )}
         </div>
       </div>
     </div>
