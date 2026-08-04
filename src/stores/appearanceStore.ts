@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { DEFAULT_FONT_ID, FONTS } from "../lib/fonts";
 import { DEFAULT_SKIN_ID, SKINS } from "../lib/skins";
 
 export type CardSize = "small" | "medium" | "large";
@@ -32,7 +31,7 @@ function loadAppearance(): StoredAppearance {
     skinId: DEFAULT_SKIN_ID,
     cardSize: "medium",
     cardGap: "normal",
-    fontId: DEFAULT_FONT_ID,
+    fontId: "",
     alwaysOnTop: false,
     positionLocked: false,
     titleBarVisible: true,
@@ -48,7 +47,11 @@ function loadAppearance(): StoredAppearance {
     const skinId = SKINS.some((s) => s.id === parsed.skinId) ? (parsed.skinId as string) : fallback.skinId;
     const cardSize = CARD_SIZES.includes(parsed.cardSize as CardSize) ? (parsed.cardSize as CardSize) : fallback.cardSize;
     const cardGap = CARD_GAPS.includes(parsed.cardGap as CardGap) ? (parsed.cardGap as CardGap) : fallback.cardGap;
-    const fontId = FONTS.some((f) => f.id === parsed.fontId) ? (parsed.fontId as string) : fallback.fontId;
+    // fontId is now the actual system font family name (empty string =
+    // default/no override) rather than one of a fixed curated set, so there
+    // is no static list to validate membership against -- just require it
+    // to be a string.
+    const fontId = typeof parsed.fontId === "string" ? parsed.fontId : fallback.fontId;
     const alwaysOnTop = typeof parsed.alwaysOnTop === "boolean" ? parsed.alwaysOnTop : fallback.alwaysOnTop;
     const positionLocked = typeof parsed.positionLocked === "boolean" ? parsed.positionLocked : fallback.positionLocked;
     const titleBarVisible =

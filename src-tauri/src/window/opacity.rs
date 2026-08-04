@@ -69,3 +69,22 @@ pub fn set_window_opacity(window: WebviewWindow, state: State<'_, LastOpacity>, 
     *state.0.lock().unwrap() = alpha_byte;
     Ok(())
 }
+
+/// Wraps Tauri's own `set_always_on_top` and immediately re-applies the last
+/// opacity afterwards. The always-on-top toggle goes through Win32
+/// `SetWindowPos(HWND_TOPMOST/NOTOPMOST)` under the hood, which -- like
+/// resizing -- can reset a layered window's alpha; unlike resizing, it
+/// doesn't fire `WindowEvent::Resized`, so the existing reapply-on-resize
+/// hook in lib.rs never catches it (found via user report: opacity snapped
+/// back to 100% specifically when toggling this, fixed by a resize).
+#[tauri::command]
+pub fn set_always_on_top(window: WebviewWindow, state: State<'_, LastOpacity>, value: bool) -> AppResult<()> {
+    use crate::error::AppError;
+
+    window
+        .set_always_on_top(value)
+        .map_err(|e| AppError::Other(e.to_string()))?;
+    let alpha_byte = *state.0.lock().unwrap();
+    apply(&window, alpha_byte)?;
+    Ok(())
+}

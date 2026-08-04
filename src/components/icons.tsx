@@ -31,33 +31,55 @@ export function CloseIcon(props: IconProps) {
   );
 }
 
+// A plain clock reads as "time/schedule", not "history" -- adding a
+// counter-clockwise sweep with an arrowhead (the same device browsers use
+// for their history icon) is what actually signals "past activity".
 export function ClockIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      <circle cx="8" cy="8" r="6" />
-      <path d="M8 4.5V8l2.5 1.5" />
+      <path d="M8 2.5a5.5 5.5 0 1 1 -4.53 8.62" />
+      <path d="M2.2 6.2 3.4 8.4 5.6 7.2" />
+      <path d="M8 5v3.2l2.2 1.3" />
     </Icon>
   );
 }
 
-export function GearIcon(props: IconProps) {
+// The classic RSS/feed glyph (bottom-left dot + two concentric quarter
+// arcs) -- used for the feed-management button instead of a generic gear,
+// which reads as "settings" and collides with the appearance-settings icon.
+export function RssIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      <circle cx="8" cy="8" r="2.25" />
-      <path d="M8 1.75v1.5M8 12.75v1.5M14.25 8h-1.5M3.25 8h-1.5M12.36 3.64l-1.06 1.06M4.7 11.3l-1.06 1.06M12.36 12.36l-1.06-1.06M4.7 4.7 3.64 3.64" />
+      <circle cx="4" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <path d="M3 7a6 6 0 0 1 6 6" />
+      <path d="M3 3a10 10 0 0 1 10 10" />
     </Icon>
   );
 }
 
-export function SlidersIcon(props: IconProps) {
+// A paint palette (outline + a few color dots) reads more directly as
+// "appearance/look" than a generic sliders icon, which is easily mistaken
+// for an equalizer or unrelated preferences.
+export function PaletteIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      <line x1="3" y1="4.5" x2="13" y2="4.5" />
-      <line x1="3" y1="8" x2="13" y2="8" />
-      <line x1="3" y1="11.5" x2="13" y2="11.5" />
-      <circle cx="6" cy="4.5" r="1.25" fill="currentColor" stroke="none" />
-      <circle cx="10.5" cy="8" r="1.25" fill="currentColor" stroke="none" />
-      <circle cx="7" cy="11.5" r="1.25" fill="currentColor" stroke="none" />
+      <path d="M2 8.2c0-3.1 2.7-5.7 6.2-5.7 3.3 0 5.8 2.3 5.8 4.9 0 2.1-1.5 3.1-3 2.9-.8-.1-1.4.5-1.1 1.2.3.8-.3 1.5-1.1 1.5-3.8 0-6.8-2.1-6.8-4.8Z" />
+      <circle cx="4.8" cy="7.6" r="0.85" fill="currentColor" stroke="none" />
+      <circle cx="6.6" cy="5.4" r="0.85" fill="currentColor" stroke="none" />
+      <circle cx="9.3" cy="5" r="0.85" fill="currentColor" stroke="none" />
+      <circle cx="11.4" cy="6.8" r="0.85" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 4.5h10" />
+      <path d="M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5" />
+      <path d="M4.5 4.5 5 13a1 1 0 0 0 1 .9h4a1 1 0 0 0 1-.9l.5-8.5" />
+      <path d="M6.5 7v4" />
+      <path d="M9.5 7v4" />
     </Icon>
   );
 }

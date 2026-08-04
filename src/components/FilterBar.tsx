@@ -3,7 +3,7 @@ import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
 import { useAppearanceStore } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
-import { ClockIcon, GearIcon, SlidersIcon } from "./icons";
+import { ClockIcon, PaletteIcon, RssIcon } from "./icons";
 
 const VIEW_MODES: { mode: ViewMode; label: string }[] = [
   { mode: "card", label: "カード" },
@@ -16,9 +16,7 @@ export function FilterBar() {
   const refreshFeeds = useFeedsStore((s) => s.refresh);
   const { filterFeedId, setFilterFeedId, viewMode, setViewMode, markAllRead, markAllUnread } =
     useEntriesStore();
-  const toggleFeedManager = useUiStore((s) => s.toggleFeedManager);
-  const toggleHistory = useUiStore((s) => s.toggleHistory);
-  const toggleSettings = useUiStore((s) => s.toggleSettings);
+  const toggleScreen = useUiStore((s) => s.toggleScreen);
   const positionLocked = useAppearanceStore((s) => s.positionLocked);
   const titleBarVisible = useAppearanceStore((s) => s.titleBarVisible);
 
@@ -71,9 +69,9 @@ export function FilterBar() {
             key={mode}
             type="button"
             onClick={() => setViewMode(mode)}
-            className={`rounded px-1.5 py-0.5 ${
+            className={`rounded px-1.5 py-0.5 transition-colors duration-150 ${
               viewMode === mode
-                ? "bg-black/10 dark:bg-white/10"
+                ? "accent-bg-soft accent-text font-medium"
                 : "opacity-60 hover:opacity-100"
             }`}
           >
@@ -100,7 +98,7 @@ export function FilterBar() {
 
       <button
         type="button"
-        onClick={toggleHistory}
+        onClick={() => toggleScreen("history")}
         className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
         aria-label="既読履歴を開く"
       >
@@ -109,20 +107,20 @@ export function FilterBar() {
 
       <button
         type="button"
-        onClick={toggleFeedManager}
+        onClick={() => toggleScreen("feedManager")}
         className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
         aria-label="フィード管理を開く"
       >
-        <GearIcon className="h-4 w-4" />
+        <RssIcon className="h-4 w-4" />
       </button>
 
       <button
         type="button"
-        onClick={toggleSettings}
+        onClick={() => toggleScreen("settings")}
         className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
         aria-label="外観設定を開く"
       >
-        <SlidersIcon className="h-4 w-4" />
+        <PaletteIcon className="h-4 w-4" />
       </button>
     </div>
   );

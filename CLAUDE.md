@@ -124,7 +124,7 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
     `(feed_title, entry_guid)`をユニークキーに`ON CONFLICT DO NOTHING`で書き込む
     （既読↔未読を繰り返しても最初に読んだ時刻を上書きしない）
   - 履歴の閲覧は`HistoryOverlay.tsx`（`FeedManagerOverlay`と同じ「絶対配置オーバーレイ」パターン）。
-    `uiStore`の`historyOpen`で開閉、`FilterBar`の🕘アイコンから開く
+    `FilterBar`の履歴アイコンから開く（画面遷移の仕組みは後述の「画面遷移モデル」参照）
 - デザイン洗練（`.claude/skills/redesign-existing-projects`スキル適用、外観設定完成後の追加要望）:
   - オーバーレイ3種（`FeedManagerOverlay`/`HistoryOverlay`/`SettingsOverlay`）の外枠は元々
     `bg-white dark:bg-neutral-900`という固定の不透明背景で、メインパネルの半透明スキン
@@ -142,6 +142,73 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
     `transition-colors duration-150`と`active:bg-black/10 dark:active:bg-white/10`系のクラスを
     追加。仮想リスト内の行は`measureElement`の計測に影響するため`scale`変形は使わず、
     背景色の変化のみで押下フィードバックを表現している
+- 常に最前面トグルで不透明度が100%に戻るバグの修正（実機報告）:
+  - `getCurrentWindow().setAlwaysOnTop()`（Tauriコア標準）は内部でWin32の`SetWindowPos`
+    (`HWND_TOPMOST`/`HWND_NOTOPMOST`)を叩いており、これが`WindowEvent::Resized`とは別種の
+    DWM再合成を起こしてレイヤードウィンドウのアルファをリセットしてしまう
+    （既存の「`WindowEvent::Resized`のたびに`opacity::apply`で再適用」ロジックはResizedしか
+    見ていないため、このケースを取りこぼしていた）。`opacity.rs`に自作コマンド
+    `set_always_on_top`を追加し、「Tauri標準のalways-on-top設定→直後に`LastOpacity`を
+    再適用」を1コマンドにまとめて解決。もう`getCurrentWindow().setAlwaysOnTop()`をJSから
+    直接呼ばないため、`core:window:allow-set-always-on-top`は`capabilities/default.json`
+    から削除した
+- フォント全種対応（`src-tauri/src/window/fonts.rs`の`list_system_fonts`コマンド）:
+  - Win32 GDIの`EnumFontFamiliesExW`でインストール済みフォントファミリー名を列挙
+    （`vibrancy.rs`/`opacity.rs`と同じ「生のWin32 APIを直接叩く」流儀）。縦書きバリアント
+    （`@`始まりの名前、CJKフォントに付随することが多い）は除外。`windows-sys`のこのAPI周りの
+    型（`LPARAM`は tupleではなく`isize`のtype alias、`DEFAULT_CHARSET`は既に`u8`など）は
+    実際に`cargo build`のエラーを見ながら確定させた
+  - これに伴い`appearanceStore`の`fontId`の意味が変わった: 5種類の固定IDの1つではなく、
+    実際のシステムフォントのファミリー名そのもの（空文字列 = 既定/上書きなし）。
+    マシンごとに変わる動的リストなので読み込み時のバリデーションは「文字列であること」のみ。
+    固定リストだった`src/lib/fonts.ts`は削除済み。`SettingsOverlay.tsx`のフォント欄は
+    数百件規模になり得るためボタングリッドではなく`<select>`（`FilterBar`のフィード選択と
+    同じ「popup側は`text-black`固定、closed box側はテーマ追従の`color`のまま」という
+    コントラスト対策を踏襲）
+- 画面遷移モデルの刷新（バグ報告「設定パネルが画面に写っていなくてもクリックで展開できる」+
+  要望「画面が切り替わるような動作にしたい」）:
+  - 原因は`uiStore`が`feedManagerOpen`/`historyOpen`/`settingsOpen`という3つの独立した
+    booleanを持っていたこと。3つとも独立にtrueにできるため、後から開いた方が`z-10`で上に
+    重なるだけで先に開いた方は非表示のままDOM上に存在し続けていた。`uiStore`を
+    `activeScreen: "timeline" | "feedManager" | "history" | "settings"`という単一state +
+    `toggleScreen`/`goHome`に置き換えて構造的に解消（同じアイコンを押すと`"timeline"`
+    （ホーム）に戻る、別のアイコンを押すと重ねずに直接差し替わる）
+  - 3つのオーバーレイ（`FeedManagerOverlay`/`HistoryOverlay`/`SettingsOverlay`）は
+    `App.tsx`で条件付きレンダリングするのをやめ、常時マウントしたまま自分自身で
+    `activeScreen`を購読し、非アクティブなら`opacity-0 translate-x-3 pointer-events-none`
+    + `inert`属性を付ける方式にした。これにより「アンマウント時の退出アニメーション」を
+    別途組まずにCSS transitionだけでスライド+フェードの画面遷移が実現できる。`inert`は
+    `pointer-events-none`が防げないキーボードtabフォーカス/スクリーンリーダーからの
+    到達もまとめて防ぐ
+  - `FeedManagerOverlay`が持っていた「閉じたら`entriesStore.refresh()`」の副作用は、
+    ×ボタン以外の離脱経路（同アイコン再クリック、別画面への直接切り替え）でも起こる
+    必要があるため、`useRef`で直前の`activeScreen === "feedManager"`を保持し
+    `useEffect`で「アクティブ→非アクティブに変わった瞬間」を検出して発火する方式に変更
+- スキンのアクセント色（所感「味気ない」「各スキンにコントラストを意識した配色を」への対応）:
+  - `Skin`型（`lib/skins.ts`）に`accentLight`/`accentDark`を追加。`App.tsx`が
+    `--panel-rgb-*`と同じ配線パターンで`--accent-rgb-light`/`-dark`をCSSカスタム
+    プロパティとして渡し、`index.css`に`.panel-bg`と同じ`prefers-color-scheme`切り替え
+    パターンで`.accent-text`/`.accent-border`/`.accent-bg`（ベタ塗り、トグルON用）/
+    `.accent-bg-soft`（15%不透明度、選択中タブ用）を追加した。表示モードタブ・カード
+    サイズ/間隔の選択中セグメント・スキン選択枠・トグルON状態・スター済みアイコンの色を
+    グレー一辺倒からこのアクセント色に置き換え、スキンを変えるとこれらの「選択中」表現の
+    色も連動して変わるようにした。モノクロスキンだけは意図的に無彩色のアクセント
+    （色相を持たせない）。既読チェック（✓）の緑色は「既読=緑」という意味的な固定色として
+    アクセント化の対象外にした（選択中を示すアクセントと役割が違うため）
+- アイコンの再選定（「機能に対して連想しづらい」というフィードバック、`icons.tsx`）:
+  - フィード管理用に使っていた`GearIcon`（汎用の歯車）は「設定全般」を指す記号として
+    外観設定と意味が衝突し、「フィード管理」を連想させなかったため削除し、RSSの定番グリフ
+    （左下起点の同心円弧2本+ドット）の`RssIcon`に差し替え
+  - 外観設定用の`SlidersIcon`（汎用の環境設定っぽい3本スライダー）も同様の理由で削除し、
+    パレット（輪郭+塗り分けの丸）を模した`PaletteIcon`に差し替え。ただし最初の実装は
+    輪郭が丸すぎて顔（目+口）に見えてしまったため、輪郭を扁平にし親指穴を非対称の位置に
+    ずらし、ドットを目のような対になる配置ではなく弧に沿って並べる形に修正した
+    （16pxという小さいキャンバスでは対称な2点+曲線がすぐ「顔」に見えてしまう点に注意）
+  - 履歴用の`ClockIcon`は単なる時計文字盤だと「スケジュール/時刻」と誤読されやすいため、
+    反時計回りの矢印（多くのブラウザの履歴アイコンと同じ意匠）を追加した
+  - `FeedManager.tsx`の削除ボタンは`CloseIcon`（×）の流用をやめ専用の`TrashIcon`
+    （ゴミ箱）にした。×は「閉じる/取り消し」、ゴミ箱は「（永続的な）削除」という
+    役割分担を明確にするため
 
 ## 依存関係の選定理由
 

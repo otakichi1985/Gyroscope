@@ -1,4 +1,5 @@
-import { FONTS } from "../lib/fonts";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { SKINS } from "../lib/skins";
 import { useVibrancyMode } from "../hooks/useVibrancyMode";
 import { useAppearanceStore, type CardGap, type CardSize } from "../stores/appearanceStore";
@@ -35,7 +36,7 @@ function ToggleRow({
         aria-checked={value}
         onClick={() => onChange(!value)}
         className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150 ${
-          value ? "bg-black/40 dark:bg-white/40" : "bg-black/15 dark:bg-white/15"
+          value ? "accent-bg" : "bg-black/15 dark:bg-white/15"
         }`}
       >
         <span
@@ -49,7 +50,9 @@ function ToggleRow({
 }
 
 export function SettingsOverlay() {
-  const closeSettings = useUiStore((s) => s.closeSettings);
+  const activeScreen = useUiStore((s) => s.activeScreen);
+  const goHome = useUiStore((s) => s.goHome);
+  const isActive = activeScreen === "settings";
   const {
     opacity,
     skinId,
@@ -71,13 +74,25 @@ export function SettingsOverlay() {
   const vibrancy = useVibrancyMode();
   const opacityDisabled = vibrancy === "none";
 
+  const [systemFonts, setSystemFonts] = useState<string[] | null>(null);
+  useEffect(() => {
+    invoke<string[]>("list_system_fonts")
+      .then(setSystemFonts)
+      .catch(() => setSystemFonts([]));
+  }, []);
+
   return (
-    <div className="panel-bg absolute inset-0 z-10 flex flex-col">
+    <div
+      className={`panel-bg absolute inset-0 z-10 flex flex-col transition-all duration-200 ease-out ${
+        isActive ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0 pointer-events-none"
+      }`}
+      inert={!isActive}
+    >
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-black/10 px-2 text-sm font-medium dark:border-white/10">
         <span>設定</span>
         <button
           type="button"
-          onClick={closeSettings}
+          onClick={goHome}
           className="flex items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
           aria-label="閉じる"
         >
@@ -96,7 +111,7 @@ export function SettingsOverlay() {
                 onClick={() => setSkin(skin.id)}
                 className={`flex items-center gap-2 rounded border px-2 py-1.5 text-left text-xs transition-colors duration-150 ${
                   skinId === skin.id
-                    ? "border-black/40 dark:border-white/40"
+                    ? "accent-border"
                     : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
                 }`}
               >
@@ -141,7 +156,7 @@ export function SettingsOverlay() {
                 type="button"
                 onClick={() => setCardSize(id)}
                 className={`flex-1 rounded px-1.5 py-1 text-xs transition-colors duration-150 ${
-                  cardSize === id ? "bg-black/10 dark:bg-white/10" : "opacity-60 hover:opacity-100"
+                  cardSize === id ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
                 }`}
               >
                 {label}
@@ -159,7 +174,7 @@ export function SettingsOverlay() {
                 type="button"
                 onClick={() => setCardGap(id)}
                 className={`flex-1 rounded px-1.5 py-1 text-xs transition-colors duration-150 ${
-                  cardGap === id ? "bg-black/10 dark:bg-white/10" : "opacity-60 hover:opacity-100"
+                  cardGap === id ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
                 }`}
               >
                 {label}
@@ -170,23 +185,22 @@ export function SettingsOverlay() {
 
         <div>
           <div className="mb-1.5 text-xs font-medium opacity-70">フォント</div>
-          <div className="grid grid-cols-2 gap-2">
-            {FONTS.map((font) => (
-              <button
-                key={font.id}
-                type="button"
-                onClick={() => setFont(font.id)}
-                style={font.cssValue ? { fontFamily: font.cssValue } : undefined}
-                className={`rounded border px-2 py-1.5 text-left text-xs transition-colors duration-150 ${
-                  fontId === font.id
-                    ? "border-black/40 dark:border-white/40"
-                    : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
-                }`}
-              >
-                {font.label}
-              </button>
+          <select
+            value={fontId}
+            onChange={(e) => setFont(e.target.value)}
+            style={fontId ? { fontFamily: `"${fontId}"` } : undefined}
+            disabled={systemFonts === null}
+            className="w-full rounded border border-black/10 bg-black/5 px-2 py-1.5 text-xs outline-none disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+          >
+            <option value="" className="text-black">
+              既定
+            </option>
+            {(systemFonts ?? []).map((name) => (
+              <option key={name} value={name} className="text-black" style={{ fontFamily: `"${name}"` }}>
+                {name}
+              </option>
             ))}
-          </div>
+          </select>
         </div>
 
         <div className="flex flex-col gap-2">

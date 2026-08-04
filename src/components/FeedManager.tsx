@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { useFeedsStore } from "../stores/feedsStore";
-import { BellIcon, BellOffIcon, CloseIcon, RefreshIcon, WarningIcon } from "./icons";
+import { BellIcon, BellOffIcon, RefreshIcon, TrashIcon, WarningIcon } from "./icons";
 
 const OPML_FILTER = [{ name: "OPML", extensions: ["opml", "xml"] }];
 
@@ -166,7 +166,7 @@ export function FeedManager() {
                 className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
                 aria-label="削除"
               >
-                <CloseIcon className="h-3.5 w-3.5" />
+                <TrashIcon className="h-3.5 w-3.5" />
               </button>
             </li>
           ))}

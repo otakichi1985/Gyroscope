@@ -8,16 +8,11 @@ import { useFeedsUpdatedListener } from "./hooks/useFeedsUpdatedListener";
 import { useSyncAlwaysOnTop } from "./hooks/useSyncAlwaysOnTop";
 import { useSyncWindowOpacity } from "./hooks/useSyncWindowOpacity";
 import { useVibrancyMode } from "./hooks/useVibrancyMode";
-import { getFont } from "./lib/fonts";
 import { getSkin } from "./lib/skins";
 import { useAppearanceStore } from "./stores/appearanceStore";
-import { useUiStore } from "./stores/uiStore";
 
 function App() {
   const vibrancy = useVibrancyMode();
-  const feedManagerOpen = useUiStore((s) => s.feedManagerOpen);
-  const historyOpen = useUiStore((s) => s.historyOpen);
-  const settingsOpen = useUiStore((s) => s.settingsOpen);
   const { opacity, skinId, fontId, alwaysOnTop, titleBarVisible } = useAppearanceStore();
   useFeedsUpdatedListener();
 
@@ -29,11 +24,12 @@ function App() {
   useSyncWindowOpacity(alpha);
   useSyncAlwaysOnTop(alwaysOnTop);
 
-  const font = getFont(fontId);
   const panelStyle = {
     "--panel-rgb-light": skin.light,
     "--panel-rgb-dark": skin.dark,
-    ...(font.cssValue ? { fontFamily: font.cssValue } : {}),
+    "--accent-rgb-light": skin.accentLight,
+    "--accent-rgb-dark": skin.accentDark,
+    ...(fontId ? { fontFamily: `"${fontId}", sans-serif` } : {}),
   } as React.CSSProperties;
 
   return (
@@ -45,9 +41,14 @@ function App() {
       <FilterBar />
       <div className="relative min-h-0 flex-1">
         <EntryList />
-        {feedManagerOpen && <FeedManagerOverlay />}
-        {historyOpen && <HistoryOverlay />}
-        {settingsOpen && <SettingsOverlay />}
+        {/* Always mounted (not conditionally rendered): each overlay reads
+            uiStore's activeScreen itself and animates in/out via CSS, which
+            is what makes screen switches slide/fade instead of instantly
+            replacing each other, and guarantees only one screen is ever
+            interactive at a time -- see each overlay's own isActive logic. */}
+        <FeedManagerOverlay />
+        <HistoryOverlay />
+        <SettingsOverlay />
       </div>
     </div>
   );
