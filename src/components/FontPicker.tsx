@@ -99,11 +99,14 @@ export function FontPicker({ value, options, onChange }: FontPickerProps) {
           // surface (same as this app's overlays looked like before the
           // skin-tinting pass) is the correct choice for a popup like this
           // anyway, the same way a native <select> popup doesn't try to
-          // match the page's theme either.
+          // match the page's theme either. Translucent + blurred (not
+          // fully opaque) and `.dropdown-enter`-animated to match
+          // FeedPicker.tsx's later, identical treatment -- kept consistent
+          // between the app's two custom dropdowns.
           <div
             ref={listRef}
             style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
-            className="z-50 flex flex-col overflow-hidden rounded border border-black/10 bg-white shadow-lg dark:border-white/20 dark:bg-neutral-900"
+            className="dropdown-enter z-50 flex flex-col overflow-hidden rounded-lg border border-black/10 bg-white/85 shadow-lg backdrop-blur-md dark:border-white/15 dark:bg-neutral-900/85"
           >
             <input
               autoFocus

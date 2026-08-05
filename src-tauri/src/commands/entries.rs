@@ -50,7 +50,10 @@ pub fn list_entries(db: State<'_, Db>, filter: EntriesFilter) -> AppResult<Vec<E
 
     let fts_query = filter.query.as_deref().and_then(build_fts_query);
 
-    let mut sql = format!("SELECT {ENTRY_COLUMNS} FROM entries e WHERE 1 = 1");
+    // Soft-deleted (bookmark trash, see delete_entry) entries never show up
+    // in any filter of the normal timeline -- only list_deleted_entries
+    // reaches them.
+    let mut sql = format!("SELECT {ENTRY_COLUMNS} FROM entries e WHERE e.deleted_at IS NULL");
     let mut bindings: Vec<Box<dyn ToSql>> = Vec::new();
 
     if let Some(fts) = &fts_query {
@@ -119,6 +122,38 @@ pub fn toggle_star(db: State<'_, Db>, id: i64, is_starred: bool) -> AppResult<()
         params![is_starred, id],
     )?;
     Ok(())
+}
+
+/// Soft-deletes an entry (sets `deleted_at`) rather than removing the row --
+/// this is what backs the bookmark "ゴミ箱" (recoverable for
+/// `scheduler::BOOKMARK_TRASH_RETENTION_DAYS` days via `restore_entry`
+/// before `scheduler::cleanup_deleted_entries` purges it for good). The
+/// command itself is generic (not restricted to starred entries); the UI
+/// only exposes it from the bookmark-filtered view.
+#[tauri::command]
+pub fn delete_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
+    let conn = db.0.lock().unwrap();
+    conn.execute(
+        "UPDATE entries SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?1",
+        params![id],
+    )?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn restore_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
+    let conn = db.0.lock().unwrap();
+    conn.execute("UPDATE entries SET deleted_at = NULL WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_deleted_entries(db: State<'_, Db>) -> AppResult<Vec<Entry>> {
+    let conn = db.0.lock().unwrap();
+    let sql = format!("SELECT {ENTRY_COLUMNS} FROM entries WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC");
+    let mut stmt = conn.prepare(&sql)?;
+    let entries: Result<Vec<_>, _> = stmt.query_map([], Entry::from_row)?.collect();
+    Ok(entries?)
 }
 
 #[tauri::command]

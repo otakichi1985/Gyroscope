@@ -2,9 +2,11 @@ import { useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { entrySnippet, formatPublished } from "../lib/text";
-import type { CardSize } from "../stores/appearanceStore";
+import { useAppearanceStore, type CardSize } from "../stores/appearanceStore";
+import { useUiStore } from "../stores/uiStore";
 import type { Entry } from "../lib/types";
-import { StarIcon } from "./icons";
+import { ImageOffIcon, StarIcon, TrashIcon } from "./icons";
+import { MarqueeTitle } from "./MarqueeTitle";
 
 const HTTP_LINK_RE = /^https?:\/\//i;
 
@@ -32,11 +34,18 @@ interface EntryRowProps {
   feedTitle: string;
   feedIconUrl: string | null;
   cardSize: CardSize;
+  // Only true in the bookmark-filtered view (see EntryList.tsx) -- deleting
+  // is scoped to "curating my bookmarks", not a general per-entry action, so
+  // the button doesn't show up in the regular timeline.
+  showDelete: boolean;
 }
 
-export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize }: EntryRowProps) {
+export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDelete }: EntryRowProps) {
   const markRead = useEntriesStore((s) => s.markRead);
   const toggleStar = useEntriesStore((s) => s.toggleStar);
+  const deleteEntry = useEntriesStore((s) => s.deleteEntry);
+  const blockImages = useAppearanceStore((s) => s.blockImages);
+  const clickBehavior = useAppearanceStore((s) => s.clickBehavior);
   // Covers both "no thumbnail_url at all" and "had one but it failed to
   // load" (broken link, hotlink protection, etc.) -- both count as "can't
   // show an image for this article" per the request that prompted the
@@ -45,6 +54,10 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize }: Entr
 
   async function handleOpen() {
     if (!entry.is_read) markRead(entry.id, true);
+    if (clickBehavior === "reader") {
+      useUiStore.getState().openReader(entry.id);
+      return;
+    }
     if (entry.link && HTTP_LINK_RE.test(entry.link)) {
       await openUrl(entry.link);
     }
@@ -65,6 +78,11 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize }: Entr
   function handleToggleRead(e: React.MouseEvent) {
     e.stopPropagation();
     markRead(entry.id, !entry.is_read);
+  }
+
+  function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    deleteEntry(entry.id);
   }
 
   const title = entry.title ?? entry.link ?? "(無題)";
@@ -91,6 +109,18 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize }: Entr
       aria-label={entry.is_starred ? "スターを外す" : "スターを付ける"}
     >
       <StarIcon filled={entry.is_starred} className="h-3.5 w-3.5" />
+    </button>
+  );
+
+  const deleteButton = showDelete && (
+    <button
+      type="button"
+      onClick={handleDelete}
+      className="flex shrink-0 items-center rounded p-0.5 opacity-60 transition-colors duration-150 hover:opacity-100 hover:text-red-500 active:bg-black/10 dark:active:bg-white/10"
+      aria-label="ゴミ箱に移動"
+      title="ゴミ箱に移動"
+    >
+      <TrashIcon className="h-3.5 w-3.5" />
     </button>
   );
 
@@ -124,14 +154,21 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize }: Entr
     return (
       <div
         {...rowProps}
-        className="flex w-full cursor-pointer items-baseline gap-2 rounded px-2 py-1 text-sm transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+        // Compact mode stays deliberately light on chrome (that's the
+        // whole point of this density level) -- a hairline bottom border is
+        // enough separation without turning it into a full card like the
+        // other two modes below (user feedback: entries were hard to tell
+        // apart; a full glass-card treatment here would fight the "as many
+        // rows as possible" intent).
+        className="flex w-full cursor-pointer items-baseline gap-2 rounded border-b border-black/5 px-2 py-1 text-sm transition duration-150 hover:bg-black/5 active:scale-[0.98] active:bg-black/10 dark:border-white/5 dark:hover:bg-white/5 dark:active:bg-white/10"
       >
-        <span className={`min-w-0 flex-1 truncate ${entry.is_read ? "" : "font-medium"}`}>{title}</span>
+        <MarqueeTitle text={title} className="flex-1" textClassName={entry.is_read ? "" : "font-medium"} />
         {feedTitle && (
           <span className="accent-text max-w-[30%] shrink-0 truncate text-[10px]">{feedTitle}</span>
         )}
         {readCheck}
         {starButton}
+        {deleteButton}
       </div>
     );
   }
@@ -140,14 +177,43 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize }: Entr
     return (
       <div
         {...rowProps}
-        className="flex w-full cursor-pointer items-start gap-2 rounded px-2 py-1.5 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+        // Translucent-tinted background + border + blur (rather than just a
+        // hover-only highlight) so each entry reads as its own frosted-glass
+        // card at rest, not just plain text that happens to sit in a row
+        // (user feedback: entries were hard to tell apart; also part of a
+        // broader push for this app's inner chrome to echo its own
+        // Mica/Acrylic-glass window backdrop instead of looking like flat
+        // rectangles floating on top of it).
+        // Deliberately NO `backdrop-blur` here, despite the frosted-glass
+        // look: what sits behind a card is `.panel-bg`, a fully opaque
+        // solid colour (see index.css). Blurring a uniform colour returns
+        // that same colour, so the filter was a guaranteed visual no-op --
+        // while still forcing a render surface per row on a virtualised
+        // list, and making descendants (MarqueeTitle's animated track)
+        // liable to repaint on the main thread every frame. The glass
+        // reading comes from the translucent tint + hairline border, which
+        // are doing all the actual work. Only the portalled popups
+        // (FeedPicker/FontPicker) keep a backdrop-blur, because those
+        // genuinely sit over non-uniform content.
+        //
+        // `entry-card`: marker for the idle-sway animation (index.css,
+        // toggled by App.tsx's `.idle-mode` ancestor). This element owns the
+        // only `transition` shorthand that applies to it -- index.css
+        // deliberately does not declare one, see the note there.
+        // `active:scale-[0.98]` is the click/press feedback (user feedback:
+        // wanted motion on interaction, not just a flat color change), which
+        // needs a transition covering `transform`; plain `transition` does
+        // (unlike `transition-colors`) without `transition-all`'s blanket
+        // "animate literally every property".
+        className="entry-card flex w-full cursor-pointer items-start gap-2 rounded-lg border border-black/5 bg-black/[0.03] px-2 py-1.5 transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10"
       >
         <div className="min-w-0 flex-1">
-          <div className={`truncate text-sm ${entry.is_read ? "" : "font-medium"}`}>{title}</div>
+          <MarqueeTitle text={title} textClassName={`text-sm ${entry.is_read ? "" : "font-medium"}`} />
           {meta && <div className="truncate text-xs">{meta}</div>}
         </div>
         {readCheck}
         {starButton}
+        {deleteButton}
       </div>
     );
   }
@@ -156,9 +222,22 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize }: Entr
   return (
     <div
       {...rowProps}
-      className="flex w-full cursor-pointer gap-2 rounded px-2 py-2 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+      // Same glass-card language as list mode, just with room for the
+      // thumbnail and a soft shadow since card mode is the most spacious view.
+      // See list mode above for `entry-card`/`transition`/`active:scale`.
+      className="entry-card flex w-full cursor-pointer gap-2 rounded-lg border border-black/5 bg-black/[0.03] px-2 py-2 shadow-sm transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10"
     >
-      {entry.thumbnail_url && !thumbFailed ? (
+      {blockImages ? (
+        // Block at the element level, not just visually -- an <img> that's
+        // merely hidden with CSS still fires the network request (the exact
+        // tracking-pixel behavior this setting exists to prevent), so no
+        // <img> tag is rendered at all here.
+        <div
+          className={`${CARD_THUMB_SIZE[cardSize]} flex shrink-0 items-center justify-center rounded bg-black/5 dark:bg-white/5`}
+        >
+          <ImageOffIcon className="h-1/2 w-1/2 opacity-40" />
+        </div>
+      ) : entry.thumbnail_url && !thumbFailed ? (
         <img
           src={entry.thumbnail_url}
           alt=""
@@ -179,12 +258,13 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize }: Entr
         )
       )}
       <div className="min-w-0 flex-1">
-        <div className={`truncate ${CARD_TITLE_SIZE[cardSize]} ${entry.is_read ? "" : "font-medium"}`}>{title}</div>
+        <MarqueeTitle text={title} textClassName={`${CARD_TITLE_SIZE[cardSize]} ${entry.is_read ? "" : "font-medium"}`} />
         <p className={`mt-0.5 ${CARD_SNIPPET_CLAMP[cardSize]} text-xs opacity-70`}>{entrySnippet(entry)}</p>
         {meta && <div className="mt-0.5 truncate text-xs">{meta}</div>}
       </div>
       {readCheck}
       {starButton}
+      {deleteButton}
     </div>
   );
 }

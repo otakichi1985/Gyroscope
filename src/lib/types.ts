@@ -32,6 +32,7 @@ export interface Entry {
   fetched_at: string;
   is_read: boolean;
   is_starred: boolean;
+  deleted_at: string | null;
 }
 
 // Mirrors src-tauri/src/commands/opml.rs::OpmlImportSummary.

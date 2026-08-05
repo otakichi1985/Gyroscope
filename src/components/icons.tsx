@@ -130,6 +130,42 @@ export function ChevronDownIcon(props: IconProps) {
   );
 }
 
+export function SearchIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="6.8" cy="6.8" r="4.3" />
+      <line x1="10" y1="10" x2="13.5" y2="13.5" />
+    </Icon>
+  );
+}
+
+// Same diagonal-slash device as BellOffIcon, over a simple landscape-photo
+// glyph -- used as the placeholder for thumbnails/favicons when "外部画像を
+// 読み込まない" is on (SettingsOverlay.tsx), so the blocked slot still reads
+// as "an image was here" rather than a blank/broken box.
+export function ImageOffIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <circle cx="6" cy="7" r="1.1" fill="currentColor" stroke="none" />
+      <path d="M3 11.5 7 8l2 1.8L11 7.5l2 2" />
+      <line x1="2.5" y1="2.5" x2="13.5" y2="13.5" />
+    </Icon>
+  );
+}
+
+// A thumbtack -- used for the "位置を固定" quick-access toggle
+// (FilterBar.tsx). Head as a filled circle + a downward tip, tilted
+// slightly so it reads as a pin being pushed in rather than a plain lollipop.
+export function PinIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="7.5" cy="5.5" r="3" />
+      <path d="M6 8.3 3 13.5" />
+    </Icon>
+  );
+}
+
 export function StarIcon({ filled, ...props }: IconProps & { filled?: boolean }) {
   return (
     <Icon {...props} fill={filled ? "currentColor" : "none"}>

@@ -3,19 +3,26 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { formatPublished } from "../lib/text";
 import { useHistoryStore } from "../stores/historyStore";
 import { useUiStore } from "../stores/uiStore";
-import { CloseIcon } from "./icons";
+import { ScreenOverlay } from "./ScreenOverlay";
+import { StatePanel } from "./StatePanel";
+import { ClockIcon } from "./icons";
 
 const HTTP_LINK_RE = /^https?:\/\//i;
 
 export function HistoryOverlay() {
-  const activeScreen = useUiStore((s) => s.activeScreen);
-  const goHome = useUiStore((s) => s.goHome);
-  const isActive = activeScreen === "history";
+  const isActive = useUiStore((s) => s.activeScreen === "history");
   const { entries, loading, error, refresh, clear } = useHistoryStore();
 
+  // Was `useEffect(() => { refresh(); }, [refresh])` -- since `refresh` is a
+  // stable Zustand action reference, that effect only ever ran once, on this
+  // (always-mounted, see App.tsx) component's first mount. Opening History
+  // after that point kept showing whatever snapshot existed at app startup,
+  // never picking up entries read afterward (reported as "履歴が保存できて
+  // いない" -- the writes were fine, the panel just never re-fetched).
+  // Re-fetching on every activation (same pattern as TrashOverlay) fixes it.
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (isActive) refresh();
+  }, [isActive, refresh]);
 
   async function handleOpen(link: string | null) {
     if (link && HTTP_LINK_RE.test(link)) {
@@ -24,24 +31,7 @@ export function HistoryOverlay() {
   }
 
   return (
-    <div
-      className={`panel-bg absolute inset-0 z-10 flex flex-col transition-all duration-200 ease-out ${
-        isActive ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0 pointer-events-none"
-      }`}
-      inert={!isActive}
-    >
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-black/10 px-2 text-sm font-medium dark:border-white/10">
-        <span>既読履歴</span>
-        <button
-          type="button"
-          onClick={goHome}
-          className="flex items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
-          aria-label="閉じる"
-        >
-          <CloseIcon className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
+    <ScreenOverlay screen="history" title="既読履歴">
       <div className="flex shrink-0 items-center justify-between border-b border-black/10 px-2 py-1 text-xs dark:border-white/10">
         <span className="opacity-60">記事が削除された後も読んだ記録は残ります</span>
         <button
@@ -59,7 +49,11 @@ export function HistoryOverlay() {
         {loading && entries.length === 0 ? (
           <p className="p-1 text-xs opacity-60">読み込み中...</p>
         ) : entries.length === 0 ? (
-          <p className="p-1 text-xs opacity-60">まだ履歴がありません</p>
+          <StatePanel
+            icon={<ClockIcon className="h-7 w-7" />}
+            title="まだ履歴がありません"
+            detail="記事を開くと、読んだ記録がここに残ります"
+          />
         ) : (
           <ul className="flex flex-col gap-1">
             {entries.map((entry) => (
@@ -86,6 +80,6 @@ export function HistoryOverlay() {
           </ul>
         )}
       </div>
-    </div>
+    </ScreenOverlay>
   );
 }

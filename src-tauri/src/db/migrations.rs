@@ -104,6 +104,15 @@ const MIGRATIONS: &[&str] = &[
         INSERT INTO entries_fts(rowid, title, body_text) VALUES (new.id, new.title, new.body_text);
     END;
     "#,
+    // v4: soft-delete for bookmarked entries (user-facing "ゴミ箱"). Deleting
+    // a starred entry sets deleted_at instead of removing the row outright,
+    // so it can be restored; scheduler::cleanup_deleted_entries hard-deletes
+    // rows past a fixed 30-day buffer. `list_entries` excludes non-null rows
+    // unconditionally so deleted entries vanish from every filter, not just
+    // the bookmark view.
+    r#"
+    ALTER TABLE entries ADD COLUMN deleted_at TEXT;
+    "#,
 ];
 
 pub fn run(conn: &Connection) -> rusqlite::Result<()> {
