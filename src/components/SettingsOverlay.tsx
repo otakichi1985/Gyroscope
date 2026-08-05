@@ -191,7 +191,7 @@ function HistoryRetentionSection() {
           </option>
         ))}
       </select>
-      <p className="mt-1 text-xs opacity-60">
+      <p className="mt-1 max-w-[72ch] text-xs leading-relaxed opacity-70">
         期限を過ぎた閲覧履歴は自動的に削除されます。記事本体やブックマークには影響しません
       </p>
       {error && <p className="text-xs text-red-500">{error}</p>}
@@ -249,7 +249,7 @@ export function SettingsOverlay() {
             lighter/smaller treatment than each field's own label so the two
             levels of hierarchy don't compete. */}
         <section className="flex flex-col gap-4">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider opacity-40">見た目</h2>
+        <h2 className="text-xs font-semibold tracking-wide opacity-70">見た目</h2>
         <div>
           <div className="mb-1.5 text-xs font-medium opacity-70">スキン</div>
           <div className="grid grid-cols-2 gap-2">
@@ -309,7 +309,7 @@ export function SettingsOverlay() {
             className="w-full disabled:opacity-40"
           />
           {opacityDisabled && (
-            <p className="mt-1 text-xs opacity-60">
+            <p className="mt-1 max-w-[72ch] text-xs leading-relaxed opacity-70">
               MicaまたはAcrylicが使えない環境のため、不透明度は常に100%になります
             </p>
           )}
@@ -361,10 +361,10 @@ export function SettingsOverlay() {
             moved right after 見た目 since it's really about how the rest of
             the appearance-related UI (icon labels) reads (user feedback). */}
         <section className="flex flex-col gap-4 border-t border-black/10 pt-4 dark:border-white/10">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider opacity-40">アクセシビリティ</h2>
+        <h2 className="text-xs font-semibold tracking-wide opacity-70">アクセシビリティ</h2>
         <div className="flex flex-col gap-2">
           <ToggleRow label="アイコンにテキストラベルを表示" value={showIconLabels} onChange={setShowIconLabels} />
-          <p className="text-xs opacity-60">
+          <p className="max-w-[72ch] text-xs leading-relaxed opacity-70">
             記事検索欄の隣やタイムライン上部のアイコン（履歴・ゴミ箱・フィード管理・設定・ブックマーク）に、
             見ただけでは分かりにくい場合のために短いラベルを添えます
           </p>
@@ -373,7 +373,7 @@ export function SettingsOverlay() {
             value={titleMarquee}
             onChange={setTitleMarquee}
           />
-          <p className="text-xs opacity-60">
+          <p className="max-w-[72ch] text-xs leading-relaxed opacity-70">
             見切れたタイトルにマウスを重ねると、電光掲示板のように横スクロールして全文を表示します。
             動く文字が気になる場合はOFFにしてください（OFFでも「…」で省略表示されます）
           </p>
@@ -381,7 +381,7 @@ export function SettingsOverlay() {
         </section>
 
         <section className="flex flex-col gap-4 border-t border-black/10 pt-4 dark:border-white/10">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider opacity-40">動作</h2>
+        <h2 className="text-xs font-semibold tracking-wide opacity-70">動作</h2>
         <div>
           <div className="mb-1.5 text-xs font-medium opacity-70">記事を開く方法</div>
           <div className="flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
@@ -406,7 +406,7 @@ export function SettingsOverlay() {
           <ToggleRow label="位置を固定（ドラッグで動かさない）" value={positionLocked} onChange={setPositionLocked} />
           <ToggleRow label="タイトルバーを表示" value={titleBarVisible} onChange={setTitleBarVisible} />
           {!titleBarVisible && (
-            <p className="text-xs opacity-60">
+            <p className="max-w-[72ch] text-xs leading-relaxed opacity-70">
               タイトルバーを隠すと閉じる/最小化ボタンも消えます。トレイメニューか、この設定パネル（外観設定アイコン）から再表示できます
             </p>
           )}
@@ -415,7 +415,7 @@ export function SettingsOverlay() {
             value={minimizeToTray}
             onChange={setMinimizeToTray}
           />
-          <p className="text-xs opacity-60">
+          <p className="max-w-[72ch] text-xs leading-relaxed opacity-70">
             {minimizeToTray
               ? "×ボタンで閉じてもタスクトレイに常駐します。終了するにはトレイメニューの「終了」を選んでください"
               : "×ボタンで閉じるとアプリを終了します"}
@@ -424,10 +424,10 @@ export function SettingsOverlay() {
         </section>
 
         <section className="flex flex-col gap-4 border-t border-black/10 pt-4 dark:border-white/10">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider opacity-40">プライバシー</h2>
+        <h2 className="text-xs font-semibold tracking-wide opacity-70">プライバシー</h2>
         <div className="flex flex-col gap-2">
           <ToggleRow label="外部画像を読み込まない" value={blockImages} onChange={setBlockImages} />
-          <p className="text-xs opacity-60">
+          <p className="max-w-[72ch] text-xs leading-relaxed opacity-70">
             記事のサムネイルなどの画像を自動で読み込まなくなります。一部のフィードは画像に
             「読者が開いたかどうか」を検知する仕組み（トラッキングピクセル）を仕込んでいることがあり、
             それを避けたい場合にONにしてください
@@ -436,7 +436,7 @@ export function SettingsOverlay() {
         </section>
 
         <section className="flex flex-col gap-4 border-t border-black/10 pt-4 dark:border-white/10">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider opacity-40">データ管理</h2>
+        <h2 className="text-xs font-semibold tracking-wide opacity-70">データ管理</h2>
         <HistoryRetentionSection />
         <DataDirSection />
         </section>
