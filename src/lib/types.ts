@@ -48,3 +48,12 @@ export interface ReadHistoryEntry {
   link: string | null;
   read_at: string;
 }
+
+// Mirrors src-tauri/src/paths.rs::DataDirInfo.
+export interface DataDirInfo {
+  path: string;
+  is_portable: boolean;
+  is_custom: boolean;
+  default_path: string;
+  fallback_reason: string | null;
+}

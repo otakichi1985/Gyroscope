@@ -20,6 +20,7 @@ interface StoredAppearance {
   alwaysOnTop: boolean;
   positionLocked: boolean;
   titleBarVisible: boolean;
+  minimizeToTray: boolean;
 }
 
 function loadAppearance(): StoredAppearance {
@@ -35,6 +36,7 @@ function loadAppearance(): StoredAppearance {
     alwaysOnTop: false,
     positionLocked: false,
     titleBarVisible: true,
+    minimizeToTray: true,
   };
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return fallback;
@@ -56,7 +58,19 @@ function loadAppearance(): StoredAppearance {
     const positionLocked = typeof parsed.positionLocked === "boolean" ? parsed.positionLocked : fallback.positionLocked;
     const titleBarVisible =
       typeof parsed.titleBarVisible === "boolean" ? parsed.titleBarVisible : fallback.titleBarVisible;
-    return { opacity, skinId, cardSize, cardGap, fontId, alwaysOnTop, positionLocked, titleBarVisible };
+    const minimizeToTray =
+      typeof parsed.minimizeToTray === "boolean" ? parsed.minimizeToTray : fallback.minimizeToTray;
+    return {
+      opacity,
+      skinId,
+      cardSize,
+      cardGap,
+      fontId,
+      alwaysOnTop,
+      positionLocked,
+      titleBarVisible,
+      minimizeToTray,
+    };
   } catch {
     return fallback;
   }
@@ -75,6 +89,7 @@ interface AppearanceState extends StoredAppearance {
   setAlwaysOnTop: (value: boolean) => void;
   setPositionLocked: (value: boolean) => void;
   setTitleBarVisible: (value: boolean) => void;
+  setMinimizeToTray: (value: boolean) => void;
 }
 
 export const useAppearanceStore = create<AppearanceState>((set, get) => ({
@@ -119,5 +134,10 @@ export const useAppearanceStore = create<AppearanceState>((set, get) => ({
   setTitleBarVisible: (value: boolean) => {
     set({ titleBarVisible: value });
     save({ ...get(), titleBarVisible: value });
+  },
+
+  setMinimizeToTray: (value: boolean) => {
+    set({ minimizeToTray: value });
+    save({ ...get(), minimizeToTray: value });
   },
 }));

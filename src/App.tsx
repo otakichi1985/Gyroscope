@@ -6,6 +6,7 @@ import { SettingsOverlay } from "./components/SettingsOverlay";
 import { TitleBar } from "./components/TitleBar";
 import { useFeedsUpdatedListener } from "./hooks/useFeedsUpdatedListener";
 import { useSyncAlwaysOnTop } from "./hooks/useSyncAlwaysOnTop";
+import { useSyncMinimizeToTray } from "./hooks/useSyncMinimizeToTray";
 import { useSyncWindowOpacity } from "./hooks/useSyncWindowOpacity";
 import { useVibrancyMode } from "./hooks/useVibrancyMode";
 import { getSkin } from "./lib/skins";
@@ -13,7 +14,7 @@ import { useAppearanceStore } from "./stores/appearanceStore";
 
 function App() {
   const vibrancy = useVibrancyMode();
-  const { opacity, skinId, fontId, alwaysOnTop, titleBarVisible } = useAppearanceStore();
+  const { opacity, skinId, fontId, alwaysOnTop, titleBarVisible, minimizeToTray } = useAppearanceStore();
   useFeedsUpdatedListener();
 
   const skin = getSkin(skinId);
@@ -23,6 +24,7 @@ function App() {
   const alpha = vibrancy === "none" ? 1 : opacity;
   useSyncWindowOpacity(alpha);
   useSyncAlwaysOnTop(alwaysOnTop);
+  useSyncMinimizeToTray(minimizeToTray);
 
   const panelStyle = {
     "--panel-rgb-light": skin.light,
