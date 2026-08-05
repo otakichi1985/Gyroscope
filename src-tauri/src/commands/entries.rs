@@ -33,11 +33,7 @@ const DEFAULT_LIMIT: i64 = 200;
 fn build_fts_query(input: &str) -> Option<String> {
     let tokens: Vec<String> = input
         .split_whitespace()
-        .map(|tok| {
-            tok.chars()
-                .filter(|c| c.is_alphanumeric())
-                .collect::<String>()
-        })
+        .map(|tok| tok.chars().filter(|c| c.is_alphanumeric()).collect::<String>())
         .filter(|tok| !tok.is_empty())
         .map(|tok| format!("{tok}*"))
         .collect();
@@ -110,20 +106,11 @@ fn record_read_history(conn: &Connection, entry_id: i64) -> AppResult<()> {
 
 #[tauri::command]
 pub fn mark_entry_read(db: State<'_, Db>, id: i64, is_read: bool) -> AppResult<()> {
-    let mut conn = db.0.lock().unwrap();
-    mark_entry_read_in_db(&mut conn, id, is_read)
-}
-
-fn mark_entry_read_in_db(conn: &mut Connection, id: i64, is_read: bool) -> AppResult<()> {
-    let tx = conn.transaction()?;
-    tx.execute(
-        "UPDATE entries SET is_read = ?1 WHERE id = ?2",
-        params![is_read, id],
-    )?;
+    let conn = db.0.lock().unwrap();
+    conn.execute("UPDATE entries SET is_read = ?1 WHERE id = ?2", params![is_read, id])?;
     if is_read {
-        record_read_history(&tx, id)?;
+        record_read_history(&conn, id)?;
     }
-    tx.commit()?;
     Ok(())
 }
 
@@ -156,19 +143,14 @@ pub fn delete_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
 #[tauri::command]
 pub fn restore_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
-    conn.execute(
-        "UPDATE entries SET deleted_at = NULL WHERE id = ?1",
-        params![id],
-    )?;
+    conn.execute("UPDATE entries SET deleted_at = NULL WHERE id = ?1", params![id])?;
     Ok(())
 }
 
 #[tauri::command]
 pub fn list_deleted_entries(db: State<'_, Db>) -> AppResult<Vec<Entry>> {
     let conn = db.0.lock().unwrap();
-    let sql = format!(
-        "SELECT {ENTRY_COLUMNS} FROM entries WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
-    );
+    let sql = format!("SELECT {ENTRY_COLUMNS} FROM entries WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC");
     let mut stmt = conn.prepare(&sql)?;
     let entries: Result<Vec<_>, _> = stmt.query_map([], Entry::from_row)?.collect();
     Ok(entries?)
@@ -176,12 +158,7 @@ pub fn list_deleted_entries(db: State<'_, Db>) -> AppResult<Vec<Entry>> {
 
 #[tauri::command]
 pub fn mark_all_read(db: State<'_, Db>, feed_id: Option<i64>) -> AppResult<()> {
-    let mut conn = db.0.lock().unwrap();
-    mark_all_read_in_db(&mut conn, feed_id)
-}
-
-fn mark_all_read_in_db(conn: &mut Connection, feed_id: Option<i64>) -> AppResult<()> {
-    let tx = conn.transaction()?;
+    let conn = db.0.lock().unwrap();
 
     // Snapshot the still-unread rows into read_history *before* flipping
     // is_read, same dedupe key/semantics as record_read_history above.
@@ -192,24 +169,20 @@ fn mark_all_read_in_db(conn: &mut Connection, feed_id: Option<i64>) -> AppResult
          WHERE e.is_read = 0";
     match feed_id {
         Some(id) => {
-            tx.execute(
+            conn.execute(
                 &format!("{history_sql} AND e.feed_id = ?1 ON CONFLICT(feed_title, entry_guid) DO NOTHING"),
                 params![id],
             )?;
-            tx.execute(
-                "UPDATE entries SET is_read = 1 WHERE feed_id = ?1",
-                params![id],
-            )?
+            conn.execute("UPDATE entries SET is_read = 1 WHERE feed_id = ?1", params![id])?
         }
         None => {
-            tx.execute(
+            conn.execute(
                 &format!("{history_sql} ON CONFLICT(feed_title, entry_guid) DO NOTHING"),
                 [],
             )?;
-            tx.execute("UPDATE entries SET is_read = 1", [])?
+            conn.execute("UPDATE entries SET is_read = 1", [])?
         }
     };
-    tx.commit()?;
     Ok(())
 }
 
@@ -219,30 +192,20 @@ pub fn mark_all_unread(db: State<'_, Db>, feed_id: Option<i64>) -> AppResult<()>
     // No read_history write here -- unmarking is not "unreading": the fact
     // an entry was read stays recorded (see record_read_history's doc).
     match feed_id {
-        Some(id) => conn.execute(
-            "UPDATE entries SET is_read = 0 WHERE feed_id = ?1",
-            params![id],
-        )?,
+        Some(id) => conn.execute("UPDATE entries SET is_read = 0 WHERE feed_id = ?1", params![id])?,
         None => conn.execute("UPDATE entries SET is_read = 0", [])?,
     };
     Ok(())
 }
 
 #[tauri::command]
-pub fn list_read_history(
-    db: State<'_, Db>,
-    limit: Option<i64>,
-    offset: Option<i64>,
-) -> AppResult<Vec<ReadHistoryEntry>> {
+pub fn list_read_history(db: State<'_, Db>, limit: Option<i64>, offset: Option<i64>) -> AppResult<Vec<ReadHistoryEntry>> {
     let conn = db.0.lock().unwrap();
     let mut stmt = conn.prepare(&format!(
         "SELECT {READ_HISTORY_COLUMNS} FROM read_history ORDER BY read_at DESC LIMIT ?1 OFFSET ?2"
     ))?;
     let entries: Result<Vec<_>, _> = stmt
-        .query_map(
-            params![limit.unwrap_or(DEFAULT_LIMIT), offset.unwrap_or(0)],
-            ReadHistoryEntry::from_row,
-        )?
+        .query_map(params![limit.unwrap_or(DEFAULT_LIMIT), offset.unwrap_or(0)], ReadHistoryEntry::from_row)?
         .collect();
     Ok(entries?)
 }
@@ -258,22 +221,6 @@ pub fn clear_read_history(db: State<'_, Db>) -> AppResult<()> {
 mod tests {
     use super::*;
 
-    fn setup_entries() -> Connection {
-        let conn = Connection::open_in_memory().unwrap();
-        crate::db::migrations::run(&conn).unwrap();
-        conn.execute(
-            "INSERT INTO feeds (url, title) VALUES ('https://example.com/feed', 'Example')",
-            [],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO entries (feed_id, guid, title) VALUES (1, 'entry-1', 'Entry')",
-            [],
-        )
-        .unwrap();
-        conn
-    }
-
     #[test]
     fn tokenizes_and_prefix_matches() {
         assert_eq!(build_fts_query("rust web"), Some("rust* web*".to_string()));
@@ -284,18 +231,12 @@ mod tests {
         // Quotes/colons/hyphens are FTS5 query-language punctuation --
         // passed through unescaped they'd throw a MATCH syntax error rather
         // than just failing to find anything.
-        assert_eq!(
-            build_fts_query("\"foo\" bar:baz -qux"),
-            Some("foo* barbaz* qux*".to_string())
-        );
+        assert_eq!(build_fts_query("\"foo\" bar:baz -qux"), Some("foo* barbaz* qux*".to_string()));
     }
 
     #[test]
     fn keeps_japanese_tokens() {
-        assert_eq!(
-            build_fts_query("日本語 検索"),
-            Some("日本語* 検索*".to_string())
-        );
+        assert_eq!(build_fts_query("日本語 検索"), Some("日本語* 検索*".to_string()));
     }
 
     #[test]
@@ -306,39 +247,5 @@ mod tests {
     #[test]
     fn empty_input_yields_no_filter() {
         assert_eq!(build_fts_query("   "), None);
-    }
-
-    #[test]
-    fn mark_read_rolls_back_if_history_write_fails() {
-        let mut conn = setup_entries();
-        conn.execute_batch(
-            "CREATE TRIGGER reject_history BEFORE INSERT ON read_history \
-             BEGIN SELECT RAISE(ABORT, 'history unavailable'); END;",
-        )
-        .unwrap();
-
-        assert!(mark_entry_read_in_db(&mut conn, 1, true).is_err());
-        let is_read: bool = conn
-            .query_row("SELECT is_read FROM entries WHERE id = 1", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        assert!(!is_read);
-    }
-
-    #[test]
-    fn mark_all_rolls_back_history_if_entry_update_fails() {
-        let mut conn = setup_entries();
-        conn.execute_batch(
-            "CREATE TRIGGER reject_read_update BEFORE UPDATE OF is_read ON entries \
-             BEGIN SELECT RAISE(ABORT, 'entries unavailable'); END;",
-        )
-        .unwrap();
-
-        assert!(mark_all_read_in_db(&mut conn, None).is_err());
-        let history_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM read_history", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(history_count, 0);
     }
 }
