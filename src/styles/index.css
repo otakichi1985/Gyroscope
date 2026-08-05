@@ -5,8 +5,10 @@ html,
 body,
 #root {
   background: transparent;
+  border-radius: 1rem;
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 /* Without this, native form controls (the <select> dropdown popup,
@@ -318,6 +320,8 @@ html {
    from the root. Same light/dark-via-media-query mechanism otherwise. */
 .skin-swatch {
   background-color: rgb(var(--swatch-rgb-light));
+  filter: saturate(0.82);
+  opacity: 0.82;
 }
 .dark .skin-swatch {
   background-color: rgb(var(--swatch-rgb-dark));
@@ -330,9 +334,29 @@ html {
    for an unambiguous two-color read even at 16px. */
 .skin-swatch-dual {
   background: linear-gradient(90deg, rgb(var(--swatch-a-light)) 50%, rgb(var(--swatch-b-light)) 50%);
+  filter: saturate(0.82);
+  opacity: 0.82;
 }
 .dark .skin-swatch-dual {
   background: linear-gradient(90deg, rgb(var(--swatch-a-dark)) 50%, rgb(var(--swatch-b-dark)) 50%);
+}
+
+/* The swatch color is painted on a child and clipped by this separate
+   frame. Painting the gradient on the bordered circle itself lets Chromium's
+   antialiased edge leak a colored pixel past the border at small sizes. */
+.skin-swatch-frame {
+  background-color: rgb(255 255 255 / 0.72);
+}
+.dark .skin-swatch-frame {
+  background-color: rgb(0 0 0 / 0.24);
+}
+
+/* In the monochrome dark skin the ON track is intentionally light. Give
+   its thumb the panel color so ON remains obvious instead of becoming a
+   nearly uniform pale capsule. */
+.dark .toggle-on .toggle-thumb {
+  background-color: rgb(var(--panel-rgb-dark));
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.28), 0 1px 2px rgb(0 0 0 / 0.35);
 }
 
 /* Minimal readable-article styling for ReaderOverlay's DOMPurify-sanitized
