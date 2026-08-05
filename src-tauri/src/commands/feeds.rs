@@ -26,7 +26,11 @@ fn validate_url(input: &str) -> AppResult<Url> {
 }
 
 #[tauri::command]
-pub async fn add_feed(db: State<'_, Db>, client: State<'_, HttpClient>, url: String) -> AppResult<Feed> {
+pub async fn add_feed(
+    db: State<'_, Db>,
+    client: State<'_, HttpClient>,
+    url: String,
+) -> AppResult<Feed> {
     let parsed_url = validate_url(&url)?;
 
     {
@@ -39,7 +43,9 @@ pub async fn add_feed(db: State<'_, Db>, client: State<'_, HttpClient>, url: Str
             )
             .optional()?;
         if existing.is_some() {
-            return Err(AppError::Other("このフィードは既に登録されています".to_string()));
+            return Err(AppError::Other(
+                "このフィードは既に登録されています".to_string(),
+            ));
         }
     }
 
@@ -80,7 +86,9 @@ pub async fn add_feed(db: State<'_, Db>, client: State<'_, HttpClient>, url: Str
 #[tauri::command]
 pub fn list_feeds(db: State<'_, Db>) -> AppResult<Vec<Feed>> {
     let conn = db.0.lock().unwrap();
-    let mut stmt = conn.prepare(&format!("SELECT {FEED_COLUMNS} FROM feeds f ORDER BY f.sort_order, f.id"))?;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {FEED_COLUMNS} FROM feeds f ORDER BY f.sort_order, f.id"
+    ))?;
     let mut feeds = stmt
         .query_map([], Feed::from_row)?
         .collect::<Result<Vec<_>, _>>()?;
@@ -112,7 +120,10 @@ pub fn rename_feed(db: State<'_, Db>, id: i64, custom_title: Option<String>) -> 
 #[tauri::command]
 pub fn set_feed_folder(db: State<'_, Db>, id: i64, folder: Option<String>) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
-    conn.execute("UPDATE feeds SET folder = ?1 WHERE id = ?2", params![folder, id])?;
+    conn.execute(
+        "UPDATE feeds SET folder = ?1 WHERE id = ?2",
+        params![folder, id],
+    )?;
     Ok(())
 }
 
@@ -145,9 +156,12 @@ fn write_known_genres(conn: &Connection, names: &[String]) -> AppResult<()> {
 #[tauri::command]
 pub fn list_genres(db: State<'_, Db>) -> AppResult<Vec<String>> {
     let conn = db.0.lock().unwrap();
-    let mut set: std::collections::BTreeSet<String> = read_known_genres(&conn)?.into_iter().collect();
+    let mut set: std::collections::BTreeSet<String> =
+        read_known_genres(&conn)?.into_iter().collect();
     let mut stmt = conn.prepare("SELECT DISTINCT folder FROM feeds WHERE folder IS NOT NULL")?;
-    let used: Vec<String> = stmt.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?;
+    let used: Vec<String> = stmt
+        .query_map([], |r| r.get(0))?
+        .collect::<Result<_, _>>()?;
     set.extend(used);
     Ok(set.into_iter().collect())
 }
@@ -176,7 +190,10 @@ pub fn create_genre(db: State<'_, Db>, name: String) -> AppResult<()> {
 #[tauri::command]
 pub fn delete_genre(db: State<'_, Db>, name: String) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
-    conn.execute("UPDATE feeds SET folder = NULL WHERE folder = ?1", params![name])?;
+    conn.execute(
+        "UPDATE feeds SET folder = NULL WHERE folder = ?1",
+        params![name],
+    )?;
     let mut names = read_known_genres(&conn)?;
     names.retain(|n| n != &name);
     write_known_genres(&conn, &names)?;
@@ -228,7 +245,10 @@ pub fn set_feed_tags(db: State<'_, Db>, id: i64, tags: Vec<String>) -> AppResult
             "INSERT INTO tags (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
             params![tag],
         )?;
-        let tag_id: i64 = conn.query_row("SELECT id FROM tags WHERE name = ?1", params![tag], |r| r.get(0))?;
+        let tag_id: i64 =
+            conn.query_row("SELECT id FROM tags WHERE name = ?1", params![tag], |r| {
+                r.get(0)
+            })?;
         conn.execute(
             "INSERT OR IGNORE INTO feed_tags (feed_id, tag_id) VALUES (?1, ?2)",
             params![id, tag_id],
@@ -275,66 +295,110 @@ pub(crate) async fn refresh_feed_inner(
 
     let outcome = fetch_conditional(client, &url, etag.as_deref(), last_modified.as_deref()).await;
 
-    let conn = db.0.lock().unwrap();
-    let mut new_entries = Vec::new();
-    match outcome {
-        Ok(FetchOutcome::NotModified) => {
-            conn.execute(
+    let (new_entries, favicon_site_url) = {
+        let conn = db.0.lock().unwrap();
+        let mut new_entries = Vec::new();
+        let mut feed_content_changed = false;
+        match outcome {
+            Ok(FetchOutcome::NotModified) => {
+                conn.execute(
                 "UPDATE feeds SET last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), last_error = NULL \
                  WHERE id = ?1",
                 params![id],
             )?;
-        }
-        Ok(FetchOutcome::Fetched {
-            body,
-            etag,
-            last_modified,
-        }) => match parse_feed(&body, Some(&url)) {
-            Ok(parsed) => {
-                conn.execute(
+            }
+            Ok(FetchOutcome::Fetched {
+                body,
+                etag,
+                last_modified,
+            }) => match parse_feed(&body, Some(&url)) {
+                Ok(parsed) => {
+                    feed_content_changed = true;
+                    conn.execute(
                     "UPDATE feeds SET title = COALESCE(?1, title), site_url = COALESCE(?2, site_url), \
                          etag = ?3, last_modified = ?4, \
                          last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), last_error = NULL \
                      WHERE id = ?5",
                     params![parsed.title, parsed.site_url, etag, last_modified, id],
                 )?;
-                new_entries = upsert_entries(&conn, id, &parsed.entries)?;
-            }
-            Err(err) => {
-                conn.execute(
+                    new_entries = upsert_entries(&conn, id, &parsed.entries)?;
+                }
+                Err(err) => {
+                    conn.execute(
                     "UPDATE feeds SET last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), last_error = ?1 \
                      WHERE id = ?2",
                     params![err.to_string(), id],
                 )?;
-            }
-        },
-        Err(err) => {
-            conn.execute(
+                }
+            },
+            Err(err) => {
+                conn.execute(
                 "UPDATE feeds SET last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), last_error = ?1 \
                  WHERE id = ?2",
                 params![err.to_string(), id],
             )?;
+            }
+        }
+
+        if notify_enabled && !new_entries.is_empty() {
+            let display_name = custom_title.as_deref().or(title.as_deref()).unwrap_or(&url);
+            let body = if new_entries.len() == 1 {
+                new_entries[0]
+                    .title
+                    .clone()
+                    .unwrap_or_else(|| "(無題)".to_string())
+            } else {
+                format!("{}件の新着記事", new_entries.len())
+            };
+            // Best-effort: a notification failure (e.g. OS permission denied)
+            // must not fail the refresh itself.
+            let _ = app
+                .notification()
+                .builder()
+                .title(display_name)
+                .body(body)
+                .show();
+        }
+
+        let favicon_site_url = if feed_content_changed {
+            conn.query_row(
+                "SELECT site_url FROM feeds WHERE id = ?1 AND icon_path IS NULL",
+                params![id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten()
+        } else {
+            None
+        };
+        (new_entries, favicon_site_url)
+    };
+    let new_count = new_entries.len();
+
+    // OPML imports register feeds without doing network work. Discover the
+    // favicon on their first successful refresh so the card fallback works
+    // immediately, rather than only after the next full app restart.
+    if let Some(site_url) = favicon_site_url {
+        if let Some(icon_path) = favicon::discover_favicon(client, &site_url).await {
+            let conn = db.0.lock().unwrap();
+            conn.execute(
+                "UPDATE feeds SET icon_path = ?1 WHERE id = ?2 AND icon_path IS NULL",
+                params![icon_path, id],
+            )?;
         }
     }
 
-    if notify_enabled && !new_entries.is_empty() {
-        let display_name = custom_title.as_deref().or(title.as_deref()).unwrap_or(&url);
-        let body = if new_entries.len() == 1 {
-            new_entries[0].title.clone().unwrap_or_else(|| "(無題)".to_string())
-        } else {
-            format!("{}件の新着記事", new_entries.len())
-        };
-        // Best-effort: a notification failure (e.g. OS permission denied)
-        // must not fail the refresh itself.
-        let _ = app.notification().builder().title(display_name).body(body).show();
-    }
-
-    let new_count = new_entries.len();
+    let conn = db.0.lock().unwrap();
     Ok((fetch_feed_by_id(&conn, id)?, new_count))
 }
 
 #[tauri::command]
-pub async fn refresh_feed(app: AppHandle, db: State<'_, Db>, client: State<'_, HttpClient>, id: i64) -> AppResult<Feed> {
+pub async fn refresh_feed(
+    app: AppHandle,
+    db: State<'_, Db>,
+    client: State<'_, HttpClient>,
+    id: i64,
+) -> AppResult<Feed> {
     let (feed, _new_count) = refresh_feed_inner(&app, &db, &client.0, id).await?;
     let _ = app.emit("feeds-updated", ());
     Ok(feed)
@@ -369,12 +433,13 @@ pub(crate) async fn backfill_favicons(app: &AppHandle) {
     let targets: Vec<(i64, String)> = {
         let db = app.state::<Db>();
         let conn = db.0.lock().unwrap();
-        let Ok(mut stmt) =
-            conn.prepare("SELECT id, site_url FROM feeds WHERE icon_path IS NULL AND site_url IS NOT NULL")
-        else {
+        let Ok(mut stmt) = conn.prepare(
+            "SELECT id, site_url FROM feeds WHERE icon_path IS NULL AND site_url IS NOT NULL",
+        ) else {
             return;
         };
-        let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))) else {
+        let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
+        else {
             return;
         };
         rows.filter_map(Result::ok).collect()
@@ -396,7 +461,10 @@ pub(crate) async fn backfill_favicons(app: &AppHandle) {
             };
             let db = app.state::<Db>();
             let conn = db.0.lock().unwrap();
-            let _ = conn.execute("UPDATE feeds SET icon_path = ?1 WHERE id = ?2", params![icon_path, id]);
+            let _ = conn.execute(
+                "UPDATE feeds SET icon_path = ?1 WHERE id = ?2",
+                params![icon_path, id],
+            );
         }));
     }
     for handle in handles {
@@ -406,7 +474,11 @@ pub(crate) async fn backfill_favicons(app: &AppHandle) {
 }
 
 fn fetch_feed_by_id(conn: &Connection, id: i64) -> AppResult<Feed> {
-    let mut feed = conn.query_row(&format!("SELECT {FEED_COLUMNS} FROM feeds f WHERE f.id = ?1"), params![id], Feed::from_row)?;
+    let mut feed = conn.query_row(
+        &format!("SELECT {FEED_COLUMNS} FROM feeds f WHERE f.id = ?1"),
+        params![id],
+        Feed::from_row,
+    )?;
     feed.unread_count = unread_count(conn, id)?;
     feed.tags = tags_for_feed(conn, id)?;
     Ok(feed)

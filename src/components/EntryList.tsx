@@ -8,7 +8,9 @@ import { EntryRow } from "./EntryRow";
 import { RssIcon, SearchIcon, StarIcon, WarningIcon } from "./icons";
 import { StatePanel } from "./StatePanel";
 
-const CARD_BASE_SIZE: Record<CardSize, number> = { small: 88, medium: 120, large: 168 };
+// Must match EntryRow's fixed CARD_ROW_HEIGHT. The gap is added separately
+// below, so the initial estimate is already correct before measurement.
+const CARD_BASE_SIZE: Record<CardSize, number> = { small: 72, medium: 96, large: 120 };
 const OTHER_BASE_SIZE: Record<Exclude<ViewMode, "card">, number> = { list: 56, compact: 32 };
 /** Mirrors EntryRow's own card thumbnail sizing, for the skeleton below. */
 const CARD_THUMB_SIZE: Record<CardSize, string> = {

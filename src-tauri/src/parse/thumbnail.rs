@@ -1,15 +1,22 @@
 use feed_rs::model::Entry;
+use url::Url;
 
 /// Thumbnail priority per SPEC §2.3: `media:thumbnail` -> enclosure
 /// (`media:content` with an image type) -> first `<img>` in the body HTML.
 /// `og:image` is a deliberately separate, opt-in tier (it needs an extra
 /// HTTP request per article) and isn't implemented here.
-pub fn extract(entry: &Entry, content_html: Option<&str>) -> Option<String> {
+pub fn extract(
+    entry: &Entry,
+    content_html: Option<&str>,
+    base_url: Option<&str>,
+) -> Option<String> {
     for media in &entry.media {
         if let Some(thumb) = media.thumbnails.first() {
             let uri = thumb.image.uri.trim();
             if !uri.is_empty() {
-                return Some(uri.to_string());
+                if let Some(url) = normalize_url(uri, base_url) {
+                    return Some(url);
+                }
             }
         }
     }
@@ -22,13 +29,24 @@ pub fn extract(entry: &Entry, content_html: Option<&str>) -> Option<String> {
                 .is_some_and(|t| t.as_ref().starts_with("image/"));
             if is_image {
                 if let Some(url) = &content.url {
-                    return Some(url.to_string());
+                    if let Some(url) = normalize_url(url.as_str(), base_url) {
+                        return Some(url);
+                    }
                 }
             }
         }
     }
 
-    content_html.and_then(first_img_src)
+    content_html
+        .and_then(first_img_src)
+        .and_then(|src| normalize_url(&src, base_url))
+}
+
+fn normalize_url(candidate: &str, base_url: Option<&str>) -> Option<String> {
+    let parsed = Url::parse(candidate)
+        .ok()
+        .or_else(|| Url::parse(base_url?).ok()?.join(candidate).ok())?;
+    matches!(parsed.scheme(), "http" | "https").then(|| parsed.to_string())
 }
 
 fn first_img_src(html: &str) -> Option<String> {
@@ -81,7 +99,11 @@ mod tests {
         });
         let entry = entry_with_media(vec![media]);
 
-        let thumb = extract(&entry, Some("<p><img src=\"https://example.com/body.jpg\"></p>"));
+        let thumb = extract(
+            &entry,
+            Some("<p><img src=\"https://example.com/body.jpg\"></p>"),
+            None,
+        );
         assert_eq!(thumb, Some("https://example.com/thumb.jpg".to_string()));
     }
 
@@ -99,7 +121,11 @@ mod tests {
         });
         let entry = entry_with_media(vec![media]);
 
-        let thumb = extract(&entry, Some("<p><img src=\"https://example.com/body.jpg\"></p>"));
+        let thumb = extract(
+            &entry,
+            Some("<p><img src=\"https://example.com/body.jpg\"></p>"),
+            None,
+        );
         assert_eq!(thumb, Some("https://example.com/enclosure.jpg".to_string()));
     }
 
@@ -117,7 +143,11 @@ mod tests {
         });
         let entry = entry_with_media(vec![media]);
 
-        let thumb = extract(&entry, Some("<p><img src=\"https://example.com/body.jpg\"></p>"));
+        let thumb = extract(
+            &entry,
+            Some("<p><img src=\"https://example.com/body.jpg\"></p>"),
+            None,
+        );
         assert_eq!(thumb, Some("https://example.com/body.jpg".to_string()));
     }
 
@@ -127,6 +157,7 @@ mod tests {
         let thumb = extract(
             &entry,
             Some("<p>text</p><img src=\"https://example.com/body.jpg\"><img src=\"https://example.com/second.jpg\">"),
+            None,
         );
         assert_eq!(thumb, Some("https://example.com/body.jpg".to_string()));
     }
@@ -134,7 +165,29 @@ mod tests {
     #[test]
     fn none_when_nothing_found() {
         let entry = entry_with_media(vec![]);
-        assert_eq!(extract(&entry, Some("<p>no images here</p>")), None);
-        assert_eq!(extract(&entry, None), None);
+        assert_eq!(extract(&entry, Some("<p>no images here</p>"), None), None);
+        assert_eq!(extract(&entry, None, None), None);
+    }
+
+    #[test]
+    fn resolves_relative_body_image_against_article_url() {
+        let entry = entry_with_media(vec![]);
+        assert_eq!(
+            extract(
+                &entry,
+                Some("<img src=\"../images/thumb.jpg\">"),
+                Some("https://example.com/posts/one/")
+            ),
+            Some("https://example.com/posts/images/thumb.jpg".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_non_web_image_schemes() {
+        let entry = entry_with_media(vec![]);
+        assert_eq!(
+            extract(&entry, Some("<img src=\"javascript:alert(1)\">"), None),
+            None
+        );
     }
 }

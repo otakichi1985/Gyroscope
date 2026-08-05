@@ -59,7 +59,7 @@ fn convert_entry(entry: feed_rs::model::Entry) -> NewEntry {
         Some(entry.id.as_str())
     };
     let dedupe_key = dedupe::dedupe_key(guid, link.as_deref(), title.as_deref(), published);
-    let thumbnail_url = thumbnail::extract(&entry, content_html.as_deref());
+    let thumbnail_url = thumbnail::extract(&entry, content_html.as_deref(), link.as_deref());
 
     NewEntry {
         guid: dedupe_key,
