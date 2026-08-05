@@ -21,6 +21,11 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
 npm run package:portable  # ポータブル版パッケージ生成（dist-portable/、詳細は後述）
 ```
 
+`package:portable` は実行ファイル、`.portable`、空の `data/` に加え、非技術者向けの
+`README.md` とサンプル購読リスト `sample.opml` も `dist-portable/` へコピーし、同じ内容の
+配布用 `rss-widget-portable.zip` まで生成する。`.portable` をZIPから欠落させないため、tarには
+ワイルドカードではなく `dist-portable/` 内の `.` を渡している。
+
 ## ディレクトリ構成
 
 - `src/` — React フロントエンド

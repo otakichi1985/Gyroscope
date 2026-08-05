@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 dist-portable
+rss-widget-portable.zip
 *.local
 
 # Editor directories and files

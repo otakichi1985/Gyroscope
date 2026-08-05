@@ -13,13 +13,22 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const tauriDir = path.join(root, "src-tauri");
 const exeName = "rss-widget.exe";
 const outDir = path.join(root, "dist-portable");
+const zipPath = path.join(root, "rss-widget-portable.zip");
+const companionFiles = ["README.md", "sample.opml"];
 
 function run(cmd, args, cwd) {
   console.log(`> ${cmd} ${args.join(" ")}`);
-  execFileSync(cmd, args, { cwd, stdio: "inherit", shell: true });
+  execFileSync(cmd, args, { cwd, stdio: "inherit" });
 }
 
-run("npm", ["run", "build"], root);
+if (process.platform === "win32") {
+  // Windows cannot spawn a .cmd file directly through execFileSync. Invoke
+  // this fixed command via cmd.exe instead of enabling `shell: true` for
+  // arbitrary arguments (which Node warns is unsafe and deprecated).
+  run(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", "npm run build"], root);
+} else {
+  run("npm", ["run", "build"], root);
+}
 // --features custom-protocol is required for a standalone build: without
 // it the compiled exe still expects a Vite dev server at localhost:1420
 // (same switch `tauri build` flips automatically; we call cargo directly
@@ -34,8 +43,22 @@ if (!existsSync(releaseExe)) {
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
 copyFileSync(releaseExe, path.join(outDir, exeName));
+for (const file of companionFiles) {
+  const source = path.join(root, file);
+  if (!existsSync(source)) {
+    throw new Error(`portable companion file not found: ${source}`);
+  }
+  copyFileSync(source, path.join(outDir, file));
+}
 writeFileSync(path.join(outDir, ".portable"), "");
 mkdirSync(path.join(outDir, "data"), { recursive: true });
 
+// Windows 11 ships bsdtar as `tar.exe`; `-a` selects ZIP from the output
+// extension. Archiving `.` (rather than `*`) is important because the
+// `.portable` marker must not be skipped as a dotfile.
+rmSync(zipPath, { force: true });
+run("tar", ["-a", "-c", "-f", zipPath, "-C", outDir, "."], root);
+
 console.log(`\nポータブル版を作成しました: ${outDir}`);
-console.log("このフォルダごとコピーすれば、そのまま共有・持ち運びできます。");
+console.log("README.md とサンプルフィード sample.opml も同梱しました。");
+console.log(`配布用ZIPを作成しました: ${zipPath}`);

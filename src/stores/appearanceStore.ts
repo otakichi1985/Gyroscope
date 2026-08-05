@@ -29,22 +29,21 @@ interface StoredAppearance {
 }
 
 function loadAppearance(): StoredAppearance {
-  // 0.6 keeps the same "translucent by default" feel the old hardcoded
-  // mica/acrylic opacity classes had, rather than defaulting to fully
-  // opaque (which would look like a plain regression for existing users).
+  // These values mirror the appearance used while developing and reviewing
+  // the app, so a fresh install starts with the same polished presentation.
   const fallback: StoredAppearance = {
-    opacity: 0.6,
+    opacity: 0.85,
     skinId: DEFAULT_SKIN_ID,
     cardSize: "medium",
     cardGap: "normal",
     fontId: "",
     alwaysOnTop: false,
     positionLocked: false,
-    titleBarVisible: true,
+    titleBarVisible: false,
     minimizeToTray: true,
     blockImages: false,
-    clickBehavior: "browser",
-    showIconLabels: false,
+    clickBehavior: "reader",
+    showIconLabels: true,
     titleMarquee: true,
   };
   const raw = localStorage.getItem(STORAGE_KEY);
