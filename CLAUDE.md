@@ -18,6 +18,7 @@ cargo build              # src-tauri/ で Rust 側のみビルド
 cargo test                # src-tauri/ で Rust 単体テスト
 cargo clippy -- -D warnings  # src-tauri/ で lint
 npm run tauri build      # インストーラ (MSI/NSIS) 生成
+npm run package:portable  # ポータブル版パッケージ生成（dist-portable/、詳細は後述）
 ```
 
 ## ディレクトリ構成
@@ -107,7 +108,15 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
     （組み込みitemがネイティブ側で何をするか不明瞭で、閉じる=非表示化と衝突する可能性を避けるため）
   - 閉じるボタン→トレイに格納: `TitleBar.tsx`側は無改造。`lib.rs`の`.setup()`でメインウィンドウに
     `on_window_event`を登録し`WindowEvent::CloseRequested`を`api.prevent_close()`+`window.hide()`で
-    横取りしている（×ボタンの`appWindow.close()`もこのイベント経路を通るため、フロント側の変更は不要）
+    横取りしている（×ボタンの`appWindow.close()`もこのイベント経路を通るため、フロント側の変更は不要）。
+    この横取り自体をオン/オフする設定「閉じるボタンでタスクトレイに格納」を追加済み
+    （ユーザー要望）: `tray::MinimizeToTray`（`Mutex<bool>`, 既定`true`）を`app.manage`し、
+    `CloseRequested`ハンドラがロックを見てから`prevent_close`するか判断する方式。オフの場合は
+    ハンドラが何もしないため、Tauriの既定動作（最後のウィンドウが閉じるとプロセスも終了）に
+    フォールバックする＝トレイメニューの「終了」と同じ結果にX ボタンから到達できる。値は
+    `appearanceStore`の他のウィンドウ系トグル（`alwaysOnTop`等）と同じパターンで
+    フロントのlocalStorageに永続化し、`useSyncMinimizeToTray`フックが起動時と変更のたびに
+    `set_minimize_to_tray`コマンドで同期する
   - OPMLインポート/エクスポートはファイルパスを扱う新コマンド`import_opml_from_path`/
     `export_opml_to_path`を追加（既存の文字列ベース`import_opml`/`export_opml`はそのまま）。
     ファイルピッカーは`tauri-plugin-dialog`のみ追加し、`tauri-plugin-fs`は追加していない
@@ -152,6 +161,17 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
     再適用」を1コマンドにまとめて解決。もう`getCurrentWindow().setAlwaysOnTop()`をJSから
     直接呼ばないため、`core:window:allow-set-always-on-top`は`capabilities/default.json`
     から削除した
+- タスクトレイの表示/非表示トグルで不透明度が100%に戻るバグの修正（実機報告）:
+  上と同種の「レイヤードウィンドウのアルファがDWM再合成でリセットされる」問題の3件目。
+  `window.hide()`からの`window.show()`（`tray.rs`の`toggle_main_window`）も
+  `WindowEvent::Resized`を発火せず、always-on-topのケースとも別経路なのでどちらの
+  再適用フックにも引っかからずに取りこぼされていた。`toggle_main_window`のshow分岐に
+  `opacity::apply`での`LastOpacity`再適用を直接追加して解決（`set_always_on_top`のように
+  専用コマンド化はしていない。トレイのクリックハンドラは元々Rust側で完結しており、
+  フロントからの新規invokeを増やす必要が無いため）。**この種のアルファリセットは
+  「タイトルバーの見えない窓を表示状態にする/最前面にする」ようなDWM再合成を伴う
+  ウィンドウ状態遷移全般で起こりうるパターンなので、今後同種の操作（新しいウィンドウ
+  状態トグルなど）を追加する際は同じ再適用が要るか都度疑うこと**
 - フォント全種対応（`src-tauri/src/window/fonts.rs`の`list_system_fonts`コマンド）:
   - Win32 GDIの`EnumFontFamiliesExW`でインストール済みフォントファミリー名を列挙
     （`vibrancy.rs`/`opacity.rs`と同じ「生のWin32 APIを直接叩く」流儀）。縦書きバリアント
@@ -279,6 +299,69 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
   Vite側だけが死んでいる分には`rss-widget.exe`（Rust側）・DBには影響しないため、
   `npm run tauri dev`を再起動するだけで復旧できる（Rust側は再ビルド不要なのでほぼ一瞬で
   戻る）
+- **【開発中に踏んだ罠】** `npm run tauri dev`を起動したまま`npm run package:portable`を
+  実行すると、Viteのファイル監視（chokidar）が`dist-portable/rss-widget.exe`をコピー中に
+  掴もうとして`EBUSY: resource busy or locked`を投げ、`beforeDevCommand`（Vite）ごと
+  クラッシュして`tauri dev`全体が落ちる（実機で発生・原因特定）。`vite.config.ts`の
+  `server.watch.ignored`に`**/dist-portable/**`を追加して解決（既存の`**/src-tauri/**`
+  除外と同じ仕組み）。ポータブル版を作る際は、可能なら`tauri dev`を止めてから実行するのが無難
+- **【実機で踏んだ罠】** ポータブル版の初回ビルドで、生成したexeを起動すると
+  「localhost（`http://localhost:1420`）への接続が拒否された」という空白画面になり中身が
+  一切表示されなかった（ユーザー報告）。原因は`src-tauri/Cargo.toml`に本来あるはずの
+  `custom-protocol` featureブロックが無かったこと。Tauriはビルド時にこのfeatureの
+  有無だけで「本番用に埋め込んだ`dist/`アセットを読むか」「`devUrl`（Vite開発サーバー）を
+  読みに行くか」を切り替えており（`tauri`クレート自身の`build.rs`が
+  `cargo:dev=!has_feature("custom-protocol")`を出力）、`npm run tauri dev`ではこの
+  featureを有効化しないのが正しい一方、スタンドアロン実行が前提の`npm run tauri build`や
+  `npm run package:portable`では明示的に有効化しないと、リリースビルドでも「Viteサーバーが
+  無い前提のdevビルド」のまま出来上がってしまう。`create-tauri-app`の既定テンプレートには
+  本来
+  ```toml
+  [features]
+  custom-protocol = ["tauri/custom-protocol"]
+  ```
+  というブロックが入っており（コメントに「DO NOT REMOVE!!」と明記される定番の箇所）、
+  このプロジェクトではなぜか欠落していた。追加した上で、`scripts/make-portable.mjs`の
+  `cargo build --release`に`--features custom-protocol`を追加して解決（`tauri build`
+  コマンド経由なら内部で自動的に付与されるが、`package:portable`はcargoを直接呼んでいるため
+  自前で渡す必要がある）。実機でビルド→起動→画面が正しく表示されることを確認済み
+- データ保存先の可変化とポータブル版（ユーザー要望「共有用にポータブル版パッケージを作りたい」）:
+  - `src-tauri/src/paths.rs`が新設のデータディレクトリ解決の一元窓口。「ポータブル版か否か」と
+    「ユーザーによるカスタムパス指定」は独立した2軸: ポータブル判定は実行ファイルと同じ
+    フォルダにある`.portable`という空のマーカーファイルの有無だけで決まる（ファイル存在ベースで
+    決定的にするため、Program Filesかどうか等のヒューリスティックは使わない）。マーカーが無い
+    限り既定の保存先は`app.path().app_data_dir()`のまま一切変わらないため、既存のインストーラ版
+    ユーザーにも`cargo build`/`npm run tauri dev`で普段動かしている開発環境にも影響が無い
+    （＝「このdev環境もそのままexeとして使える」は元から満たされていて、変えたのはポータブル版
+    ビルドを作った時の挙動だけ）。マーカーがある場合のみ既定値が実行ファイルと同じフォルダの
+    `data/`サブフォルダになる
+  - `npm run package:portable`（`scripts/make-portable.mjs`）が`npm run build`+
+    `cargo build --release`を実行し、`dist-portable/`に`rss-widget.exe`+`.portable`
+    マーカー+空の`data/`フォルダをまとめる。WebView2ローダーはこのプロジェクトでは静的リンク
+    されており（`target/debug`配下に`WebView2Loader.dll`が生成されないことを確認済み）別途
+    dllを同梱する必要が無いため、実質「exeをそのまま置くだけ」で成立する。フォルダごと
+    コピーすれば別PCでもそのまま動く自己完結パッケージになる
+  - ユーザーによるカスタムパス指定（インストーラ版・ポータブル版どちらでも設定画面から変更可能）
+    は、「どこに何を保存したか」を指すポインタファイル（`data-dir-override.txt`、中身は
+    パス文字列そのまま）として持たせる方式。ポインタファイル自身の置き場所もポータブル/
+    インストーラ版で切り替える（ポータブル版はexeと同じフォルダ、インストーラ版は
+    `app_config_dir()`）ことで、ポータブル版でカスタムパスを設定してもフォルダごと移動すれば
+    設定ごと持ち運べる
+  - パスを変更する`set_data_dir`コマンドは、SQLiteの「開いたままの接続に対するオンライン
+    バックアップAPI」（`rusqlite`の`backup`フィーチャ、`Cargo.toml`で有効化）で新しい保存先に
+    DBをコピーしてからポインタファイルを書き換える。生の`std::fs::copy`にしなかったのは、
+    アプリ実行中はDB接続が開いたまま（書き込み中の可能性がある）で、単純なファイルコピーだと
+    不整合なコピーになり得るため（このプロジェクトで過去に実際踏んだ`database disk image is
+    malformed`の教訓、既知の落とし穴を参照）
+  - 開いている`rusqlite::Connection`（および接続に紐づくトレイ/スケジューラ等）はアプリ起動時
+    に一度だけ解決される設計のため、パス変更はその場でホットスワップせず、`restart_app`
+    コマンド（`std::process::Command`で自プロセスと同じexeを再度spawnしてから`app.exit(0)`）
+    で明示的に再起動させて反映する方式にした
+  - `tauri-plugin-window-state`（ウィンドウ位置/サイズの保存）はプラグイン公開APIに保存先
+    ディレクトリを差し替える手段が無く（ファイル名のみ`with_filename`で変更可能、ベース
+    ディレクトリは常に`app_config_dir()`固定）、このデータディレクトリ可変化の対象外。
+    ポータブル版でカスタムパスを設定してフォルダを移動しても、ウィンドウ位置だけは移動先の
+    PCの`app_config_dir()`を見に行く（既知の落とし穴として別途記載）
 
 ## 依存関係の選定理由
 
@@ -340,18 +423,43 @@ npm run tauri build      # インストーラ (MSI/NSIS) 生成
 - `TrayIconBuilder::build()`の戻り値（`TrayIcon`）を変数で受けずに`;`で捨てると、Windows版
   `tray-icon`crateの`Drop`実装が即座に`Shell_NotifyIcon(NIM_DELETE)`を呼んでしまい、アイコンが
   生成直後に消える。`app.manage(tray)`でアプリと同じ寿命を持たせる必要がある（実機で発見・修正済み）
-- **【未解決の既知の問題】** 上記を修正した上でも、この開発環境ではトレイアイコンが常時表示・
-  オーバーフローどちらにも視覚的に現れないことがある。`tray-icon`crateの`register_tray_icon`は
-  `Shell_NotifyIcon(NIM_ADD)`が失敗しても`Explorer/taskbar may not be ready yet`という理由で
-  静かに握りつぶす実装になっており（crateのソースコメントに明記）、こちらのコードにはエラーが
-  一切出ない。`.setup()`内でのトレイ構築を`tauri::async_runtime::spawn`+500ms遅延に変更し
-  レースコンディションの緩和を試みたが、再現性のある形で直ったかは確認できていない
-  （デバッグセッション中の何十回ものプロセス強制終了・Explorer再起動でデスクトップの状態が
-  荒れていた影響と、その後発生したこの端末上でのマウス/ウィンドウ入力全般の不安定化の影響が
-  絡み合っており、切り分けきれなかった）。次回はクリーンな再起動後の環境で再検証すること
+- **【最重要・解決済み】ネイティブUI（トレイ/メニュー）は必ずメインスレッドで生成すること。**
+  上記の「トレイアイコンが現れない」既知の問題と、「ポータブル版を起動した後にエクスプローラーや
+  他のWebView2アプリの挙動がおかしくなり再起動が必要になった」というOS全体を巻き込む障害は、
+  **同一の原因**だった: トレイ構築を`tauri::async_runtime::spawn`（+500ms遅延）に載せていたこと。
+  - `tray-icon`crateの`TrayIcon::new`は**呼び出したスレッド上で**`CreateWindowExW`して独自の
+    WNDPROC付きHWNDを作り、それを`Shell_NotifyIcon(NIM_ADD)`でシェルに登録する（muda のメニューも
+    同様にスレッド親和性を持つ）。ところがtokioワーカースレッドはWin32のメッセージポンプ
+    （`GetMessage`/`DispatchMessage`）を一切回さない。Win32の大原則として、ウィンドウを所有する
+    スレッドはメッセージをポンプし続けなければならない
+  - ポンプされないトップレベルウィンドウが1つでも存在すると、**他プロセスからそのウィンドウへの
+    `SendMessage`が返ってこなくなる**。シェル（explorer.exe）は通知領域のオーナーウィンドウと
+    頻繁に同期通信し、`WM_SETTINGCHANGE`等を`HWND_BROADCAST`で全トップレベルウィンドウに送るため、
+    explorerのUIスレッドごと巻き込まれて固まる。実機のイベントログで裏取り済み:
+    ポータブル版の実行中（17:10〜）に`explorer.exe`が17:12:34、`SystemSettings.exe`が17:17:14に
+    それぞれ**Application Hang（イベントID 1002、ハングの種類`Cross-process;Activation`）**を記録し、
+    17:19:36に再起動。アプリ自体はクラッシュしておらず（WER/Crashpadに記録なし）、
+    「アプリは正常に見えるのに周囲のアプリだけ壊れる」という報告の症状と一致する
+  - さらに「閉じる=トレイに格納」なのでウィンドウを閉じてもプロセスは生き続け、その壊れたトレイからは
+    終了もできない → 再起動以外に復旧手段が無くなる、という悪循環も重なっていた
+  - トレイアイコンが出ない件も同じ理由で説明がつく: crateは`Shell_NotifyIcon(NIM_ADD)`失敗時、
+    シェルの`TaskbarCreated`ブロードキャストを待って再登録する設計（`tray_proc`が
+    `S_U_TASKBAR_RESTART`を処理、`ChangeWindowMessageFilterEx`もそのために呼んでいる）だが、
+    ブロードキャストはメッセージポンプ経由でしか届かないため、この再登録が永遠に発火しなかった。
+    つまり「explorerがまだ準備できていないかも」への対策として入れた遅延+spawnが、
+    crate自身が持つ正しいリトライ経路を殺していた
+  - 修正: `.setup()`内で`tray::setup(app.handle())`を**直接同期呼び出し**に戻した（メインスレッド＝
+    taoのイベントループが回っているスレッド）。遅延は不要
+  - 今後の鉄則: `tauri::async_runtime::spawn`に載せてよいのはネットワーク/DB等の純粋な非同期処理だけ。
+    ウィンドウ・トレイ・メニュー・その他HWNDを作るAPIは絶対にそこへ置かない
 - Rustのコマンド引数として`AppHandle`を追加すると（例: `refresh_feed(app: AppHandle, ...)`）、
   Tauriが自動で注入してくれるため、フロント側のinvoke呼び出しに新しい引数は不要
   （既存の`{ id }`等の呼び出しはそのまま変更なしで動く）
+- `tauri-plugin-window-state`はウィンドウ位置/サイズの保存先ディレクトリを固定
+  （`app_config_dir()`常に固定、`with_filename`でファイル名しか変えられない）のため、
+  データ保存先の可変化（`src-tauri/src/paths.rs`）の対象に含められない。ポータブル版で
+  データディレクトリごとフォルダを移動しても、ウィンドウ位置だけはそのPC固有の
+  `app_config_dir()`に残り続ける（未解決・許容している既知の制約）
 
 ## バージョン固定方針
 

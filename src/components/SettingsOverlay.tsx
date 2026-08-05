@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { SKINS } from "../lib/skins";
 import { useVibrancyMode } from "../hooks/useVibrancyMode";
 import { useAppearanceStore, type CardGap, type CardSize } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
+import type { DataDirInfo } from "../lib/types";
 import { CloseIcon } from "./icons";
 import { FontPicker } from "./FontPicker";
 
@@ -50,6 +52,89 @@ function ToggleRow({
   );
 }
 
+const OUTLINE_BUTTON =
+  "rounded border border-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:border-black/20 " +
+  "active:bg-black/10 disabled:opacity-50 dark:border-white/10 dark:hover:border-white/20 dark:active:bg-white/10";
+
+function DataDirSection() {
+  const [info, setInfo] = useState<DataDirInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingRestart, setPendingRestart] = useState(false);
+
+  useEffect(() => {
+    invoke<DataDirInfo>("get_data_dir_info")
+      .then(setInfo)
+      .catch((e) => setError(String(e)));
+  }, []);
+
+  const applyNewDir = async (path: string | null) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await invoke("set_data_dir", { path });
+      setPendingRestart(true);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleChange = async () => {
+    const selected = await open({ directory: true, multiple: false });
+    if (typeof selected === "string") {
+      await applyNewDir(selected);
+    }
+  };
+
+  const handleRestart = () => {
+    invoke("restart_app").catch((e) => setError(String(e)));
+  };
+
+  if (pendingRestart) {
+    return (
+      <div>
+        <div className="mb-1.5 text-xs font-medium opacity-70">データ保存先</div>
+        <div className="flex flex-col gap-2 rounded border border-black/10 p-2 text-xs dark:border-white/10">
+          <p>変更を反映するには再起動が必要です</p>
+          <button type="button" onClick={handleRestart} className={`${OUTLINE_BUTTON} accent-border self-start`}>
+            今すぐ再起動
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-1.5 text-xs font-medium opacity-70">データ保存先</div>
+      <div className="flex flex-col gap-1.5">
+        {info?.is_portable && (
+          <span className="accent-text w-fit rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-medium dark:bg-white/5">
+            ポータブル版（パッケージ内に保存）
+          </span>
+        )}
+        <p className="break-all rounded bg-black/5 px-2 py-1.5 font-mono text-[11px] dark:bg-white/5">
+          {info?.path ?? "読み込み中..."}
+        </p>
+        {info?.fallback_reason && <p className="text-xs text-red-500">{info.fallback_reason}</p>}
+        <div className="flex gap-2">
+          <button type="button" onClick={handleChange} disabled={busy} className={OUTLINE_BUTTON}>
+            変更...
+          </button>
+          {info?.is_custom && (
+            <button type="button" onClick={() => applyNewDir(null)} disabled={busy} className={OUTLINE_BUTTON}>
+              既定に戻す
+            </button>
+          )}
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 export function SettingsOverlay() {
   const activeScreen = useUiStore((s) => s.activeScreen);
   const goHome = useUiStore((s) => s.goHome);
@@ -63,6 +148,7 @@ export function SettingsOverlay() {
     alwaysOnTop,
     positionLocked,
     titleBarVisible,
+    minimizeToTray,
     setOpacity,
     setSkin,
     setCardSize,
@@ -71,6 +157,7 @@ export function SettingsOverlay() {
     setAlwaysOnTop,
     setPositionLocked,
     setTitleBarVisible,
+    setMinimizeToTray,
   } = useAppearanceStore();
   const vibrancy = useVibrancyMode();
   const opacityDisabled = vibrancy === "none";
@@ -204,7 +291,19 @@ export function SettingsOverlay() {
               タイトルバーを隠すと閉じる/最小化ボタンも消えます。トレイメニューか、この設定パネル（外観設定アイコン）から再表示できます
             </p>
           )}
+          <ToggleRow
+            label="閉じるボタンでタスクトレイに格納"
+            value={minimizeToTray}
+            onChange={setMinimizeToTray}
+          />
+          <p className="text-xs opacity-60">
+            {minimizeToTray
+              ? "×ボタンで閉じてもタスクトレイに常駐します。終了するにはトレイメニューの「終了」を選んでください"
+              : "×ボタンで閉じるとアプリを終了します"}
+          </p>
         </div>
+
+        <DataDirSection />
       </div>
     </div>
   );

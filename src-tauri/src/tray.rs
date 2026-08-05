@@ -1,9 +1,29 @@
+use std::sync::Mutex;
+
 use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, State};
 
 use crate::db::Db;
 use crate::scheduler;
+use crate::window::opacity;
+
+/// Whether the X button hides the window to the tray (default, existing
+/// behaviour) or quits the app like an ordinary window close. Read by the
+/// `CloseRequested` handler in lib.rs. Defaults to `true` so every existing
+/// build/config keeps behaving exactly as before this setting was added.
+pub struct MinimizeToTray(pub Mutex<bool>);
+
+impl Default for MinimizeToTray {
+    fn default() -> Self {
+        Self(Mutex::new(true))
+    }
+}
+
+#[tauri::command]
+pub fn set_minimize_to_tray(state: State<'_, MinimizeToTray>, value: bool) {
+    *state.0.lock().unwrap() = value;
+}
 
 /// Builds the tray icon + menu once. Called from `.setup()`. Quit uses a
 /// plain custom item + `app.exit(0)` rather than `MenuBuilder::quit_with_text`
@@ -57,6 +77,16 @@ fn toggle_main_window(app: &AppHandle) {
     } else {
         let _ = window.show();
         let _ = window.set_focus();
+        // Same DWM-recomposition-resets-layered-alpha issue documented on
+        // set_always_on_top in opacity.rs: unhiding a window is another
+        // transition Windows can use as a cue to drop a layered window back
+        // to fully opaque, and it fires neither WindowEvent::Resized nor the
+        // always-on-top toggle, so neither existing reapply hook catches it
+        // (user report: opacity snapped to 100% after show/hide via tray).
+        if let Some(state) = app.try_state::<opacity::LastOpacity>() {
+            let alpha_byte = *state.0.lock().unwrap();
+            let _ = opacity::apply(&window, alpha_byte);
+        }
     }
 }
 

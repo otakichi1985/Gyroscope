@@ -26,8 +26,12 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 3. tell Vite to ignore watching `src-tauri` and `dist-portable` --
+      // the latter is written by `npm run package:portable`, and watching
+      // it crashed the dev server with EBUSY when that script's file copy
+      // and Vite's watcher raced on the same exe (found running both at
+      // once during this feature's development).
+      ignored: ["**/src-tauri/**", "**/dist-portable/**"],
     },
   },
 }));

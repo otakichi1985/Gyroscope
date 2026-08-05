@@ -18,7 +18,7 @@ pub struct Db(pub Mutex<Connection>);
 
 pub fn open(data_dir: &Path) -> rusqlite::Result<Connection> {
     std::fs::create_dir_all(data_dir).expect("failed to create app data directory");
-    let conn = Connection::open(data_dir.join("rss-widget.sqlite3"))?;
+    let conn = Connection::open(data_dir.join(crate::paths::DB_FILENAME))?;
     migrations::run(&conn)?;
     backfill_body_text(&conn)?;
     Ok(conn)
