@@ -33,15 +33,21 @@ export function TimelineToolbar() {
 
   useEffect(() => {
     refreshFeeds();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => clearTimeout(toastTimer.current);
+  }, [refreshFeeds]);
+
+  function showToast(message: string) {
+    setToast(message);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
+  }
 
   async function handleRefreshClick() {
-    const newCount = await refreshAllFeeds();
-    if (newCount === 0) {
-      setToast("更新はありません");
-      clearTimeout(toastTimer.current);
-      toastTimer.current = setTimeout(() => setToast(null), 2200);
+    try {
+      const newCount = await refreshAllFeeds();
+      if (newCount === 0) showToast("更新はありません");
+    } catch {
+      showToast("更新に失敗しました");
     }
   }
 
