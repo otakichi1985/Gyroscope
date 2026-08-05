@@ -5,7 +5,6 @@ html,
 body,
 #root {
   background: transparent;
-  border-radius: 1rem;
   height: 100%;
   margin: 0;
   overflow: hidden;
@@ -333,12 +332,9 @@ html {
    complementary panel/accent pair (user request). Split down the middle
    for an unambiguous two-color read even at 16px. */
 .skin-swatch-dual {
-  background: linear-gradient(90deg, rgb(var(--swatch-a-light)) 50%, rgb(var(--swatch-b-light)) 50%);
+  background: linear-gradient(90deg, rgb(var(--swatch-primary)) 50%, rgb(var(--swatch-complement)) 50%);
   filter: saturate(0.82);
   opacity: 0.82;
-}
-.dark .skin-swatch-dual {
-  background: linear-gradient(90deg, rgb(var(--swatch-a-dark)) 50%, rgb(var(--swatch-b-dark)) 50%);
 }
 
 /* The swatch color is painted on a child and clipped by this separate

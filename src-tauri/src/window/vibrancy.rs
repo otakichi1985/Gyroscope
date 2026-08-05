@@ -35,10 +35,10 @@ pub fn apply(_window: &WebviewWindow) -> VibrancyMode {
 }
 
 /// Rounds the actual HWND (not just the webview content) via
-/// DWMWA_WINDOW_CORNER_PREFERENCE, so the Mica/Acrylic backdrop itself is
-/// clipped to match the CSS-rounded panel instead of showing square corners
-/// behind it. Frameless windows don't get Windows 11's automatic rounding,
-/// so this has to be requested explicitly. Best-effort: ignored on failure.
+/// DWMWA_WINDOW_CORNER_PREFERENCE. This native outline is the single source
+/// of truth for the corner shape: a second, larger CSS radius exposes a strip
+/// of the Mica/Acrylic surface between the two curves. Frameless windows don't
+/// get Windows 11's automatic rounding, so this is requested explicitly.
 #[cfg(target_os = "windows")]
 fn round_corners(window: &WebviewWindow) {
     use raw_window_handle::HasWindowHandle;

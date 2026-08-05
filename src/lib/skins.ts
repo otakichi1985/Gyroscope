@@ -28,6 +28,11 @@ export interface Skin {
    * deliberately complementary *pair* is the whole point of the skin, so a
    * single-color dot loses that story (user request). */
   dualSwatch?: boolean;
+  /** Dedicated picker colors for contrast skins. The actual light/dark
+   * panel shades are deliberately pale/deep for legibility, so using them
+   * in the swatch would hide the named hue. */
+  swatchPrimary?: string;
+  swatchComplement?: string;
 }
 
 export const SKINS: Skin[] = [
@@ -108,6 +113,8 @@ export const SKINS: Skin[] = [
     accentLight: "154 52 18",
     accentDark: "251 146 60",
     dualSwatch: true,
+    swatchPrimary: "37 99 235",
+    swatchComplement: "234 88 12",
   },
   {
     id: "contrast-purple",
@@ -117,6 +124,8 @@ export const SKINS: Skin[] = [
     accentLight: "120 53 15",
     accentDark: "250 204 21",
     dualSwatch: true,
+    swatchPrimary: "124 58 237",
+    swatchComplement: "234 179 8",
   },
   {
     id: "contrast-green",
@@ -126,6 +135,8 @@ export const SKINS: Skin[] = [
     accentLight: "162 28 113",
     accentDark: "240 90 190",
     dualSwatch: true,
+    swatchPrimary: "22 163 74",
+    swatchComplement: "219 39 119",
   },
 ];
 

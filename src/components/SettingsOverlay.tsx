@@ -303,10 +303,8 @@ export function SettingsOverlay() {
                     className="skin-swatch-frame h-4 w-4 shrink-0 overflow-hidden rounded-full border border-black/15 dark:border-white/25"
                     style={
                       {
-                        "--swatch-a-light": skin.light,
-                        "--swatch-a-dark": skin.dark,
-                        "--swatch-b-light": skin.accentLight,
-                        "--swatch-b-dark": skin.accentDark,
+                        "--swatch-primary": skin.swatchPrimary,
+                        "--swatch-complement": skin.swatchComplement,
                       } as React.CSSProperties
                     }
                   >
