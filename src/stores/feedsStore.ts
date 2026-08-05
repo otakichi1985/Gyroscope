@@ -63,7 +63,7 @@ export const useFeedsStore = create<FeedsState>((set, get) => ({
       return await invoke<number>("refresh_all_feeds");
     } catch (error) {
       set({ error: String(error) });
-      return 0;
+      throw error;
     } finally {
       set({ refreshingAll: false });
     }

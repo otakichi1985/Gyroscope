@@ -14,6 +14,8 @@ function loadViewMode(): ViewMode {
 }
 
 let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+let optimisticMutationId = 0;
+const latestOptimisticMutation = new Map<string, number>();
 // Only the newest list request may update the screen. Rapid search/filter
 // changes can otherwise resolve out of order and show stale results.
 let listRequestId = 0;
@@ -139,28 +141,62 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   },
 
   markRead: async (id: number, isRead: boolean) => {
-    const previous = get().entries;
-    set({
-      entries: previous.map((entry) => (entry.id === id ? { ...entry, is_read: isRead } : entry)),
-    });
+    const mutationKey = `read:${id}`;
+    const mutationId = ++optimisticMutationId;
+    latestOptimisticMutation.set(mutationKey, mutationId);
+    const previousValue = get().entries.find((entry) => entry.id === id)?.is_read;
+    set((state) => ({
+      entries: state.entries.map((entry) =>
+        entry.id === id ? { ...entry, is_read: isRead } : entry,
+      ),
+    }));
     try {
       await invoke("mark_entry_read", { id, isRead });
     } catch (error) {
-      set({ entries: previous, error: String(error) });
+      if (latestOptimisticMutation.get(mutationKey) === mutationId) {
+        set((state) => ({
+          entries: state.entries.map((entry) =>
+            entry.id === id && previousValue !== undefined
+              ? { ...entry, is_read: previousValue }
+              : entry,
+          ),
+          error: String(error),
+        }));
+      }
+    } finally {
+      if (latestOptimisticMutation.get(mutationKey) === mutationId) {
+        latestOptimisticMutation.delete(mutationKey);
+      }
     }
   },
 
   toggleStar: async (id: number, isStarred: boolean) => {
-    const previous = get().entries;
-    set({
-      entries: previous.map((entry) =>
+    const mutationKey = `star:${id}`;
+    const mutationId = ++optimisticMutationId;
+    latestOptimisticMutation.set(mutationKey, mutationId);
+    const previousValue = get().entries.find((entry) => entry.id === id)?.is_starred;
+    set((state) => ({
+      entries: state.entries.map((entry) =>
         entry.id === id ? { ...entry, is_starred: isStarred } : entry,
       ),
-    });
+    }));
     try {
       await invoke("toggle_star", { id, isStarred });
     } catch (error) {
-      set({ entries: previous, error: String(error) });
+      if (latestOptimisticMutation.get(mutationKey) === mutationId) {
+        set((state) => ({
+          entries: state.entries.map((entry) =>
+            entry.id === id && previousValue !== undefined
+              ? { ...entry, is_starred: previousValue }
+              : entry,
+          ),
+          error: String(error),
+        }));
+      }
+    } finally {
+      if (latestOptimisticMutation.get(mutationKey) === mutationId) {
+        latestOptimisticMutation.delete(mutationKey);
+      }
     }
   },
 
@@ -171,11 +207,20 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   // re-fetches from list_entries on its own).
   deleteEntry: async (id: number) => {
     const previous = get().entries;
+    const removedEntry = previous.find((entry) => entry.id === id);
+    const removedIndex = previous.findIndex((entry) => entry.id === id);
     set({ entries: previous.filter((entry) => entry.id !== id) });
     try {
       await invoke("delete_entry", { id });
     } catch (error) {
-      set({ entries: previous, error: String(error) });
+      set((state) => {
+        if (!removedEntry || state.entries.some((entry) => entry.id === id)) {
+          return { error: String(error) };
+        }
+        const entries = [...state.entries];
+        entries.splice(Math.min(removedIndex, entries.length), 0, removedEntry);
+        return { entries, error: String(error) };
+      });
     }
   },
 
