@@ -116,6 +116,73 @@ pub fn set_feed_folder(db: State<'_, Db>, id: i64, folder: Option<String>) -> Ap
     Ok(())
 }
 
+const KNOWN_GENRES_KEY: &str = "known_genres";
+
+fn read_known_genres(conn: &Connection) -> AppResult<Vec<String>> {
+    Ok(crate::db::settings::get(conn, KNOWN_GENRES_KEY)?
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default())
+}
+
+fn write_known_genres(conn: &Connection, names: &[String]) -> AppResult<()> {
+    let json = serde_json::to_string(names).expect("Vec<String> always serializes");
+    crate::db::settings::set(conn, KNOWN_GENRES_KEY, &json)?;
+    Ok(())
+}
+
+/// Genres as a first-class, folder-like list (user request: create a genre
+/// up front and file feeds into it, rather than the old "type the same
+/// string on every feed row" free-text approach). Backed by the existing
+/// key/value `settings` table (a JSON array under `known_genres`) rather
+/// than a new SQL table+migration -- this is genuinely just a list of
+/// names, and reusing `db::settings` (already built for the read-history
+/// retention setting) keeps this a one-file addition.
+///
+/// The returned list is the union of that explicit list and whatever
+/// `feeds.folder` values are actually in use -- a feed's assigned genre
+/// (e.g. set via OPML import, which never calls `create_genre`) must never
+/// disappear from the picker just because it wasn't "officially" created.
+#[tauri::command]
+pub fn list_genres(db: State<'_, Db>) -> AppResult<Vec<String>> {
+    let conn = db.0.lock().unwrap();
+    let mut set: std::collections::BTreeSet<String> = read_known_genres(&conn)?.into_iter().collect();
+    let mut stmt = conn.prepare("SELECT DISTINCT folder FROM feeds WHERE folder IS NOT NULL")?;
+    let used: Vec<String> = stmt.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?;
+    set.extend(used);
+    Ok(set.into_iter().collect())
+}
+
+/// Idempotent (creating an already-known genre is a no-op, not an error) --
+/// mirrors "New Folder" when one of that name already exists.
+#[tauri::command]
+pub fn create_genre(db: State<'_, Db>, name: String) -> AppResult<()> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::Other("ジャンル名を入力してください".to_string()));
+    }
+    let conn = db.0.lock().unwrap();
+    let mut names = read_known_genres(&conn)?;
+    if !names.iter().any(|n| n == &name) {
+        names.push(name);
+        names.sort();
+        write_known_genres(&conn, &names)?;
+    }
+    Ok(())
+}
+
+/// Deleting a genre un-files any feed currently in it (folder -> NULL)
+/// rather than deleting those feeds -- same "contents become unfiled"
+/// semantics as deleting a real folder.
+#[tauri::command]
+pub fn delete_genre(db: State<'_, Db>, name: String) -> AppResult<()> {
+    let conn = db.0.lock().unwrap();
+    conn.execute("UPDATE feeds SET folder = NULL WHERE folder = ?1", params![name])?;
+    let mut names = read_known_genres(&conn)?;
+    names.retain(|n| n != &name);
+    write_known_genres(&conn, &names)?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn set_feed_interval(db: State<'_, Db>, id: i64, interval_min: Option<i64>) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
@@ -176,6 +243,9 @@ pub fn set_feed_tags(db: State<'_, Db>, id: i64, tags: Vec<String>) -> AppResult
 /// the UI can show a per-feed warning icon instead of losing the rest of
 /// the timeline (SPEC §7 -- errors must be visible, never swallowed).
 ///
+/// Also returns how many entries were genuinely new (not just re-fetched),
+/// so batch callers can report a total "N new" (or "no updates") count.
+///
 /// Emitting "feeds-updated" is left to the callers rather than done here,
 /// so a batch refresh (`scheduler::refresh_many`) can emit once for the
 /// whole batch instead of once per feed.
@@ -184,7 +254,7 @@ pub(crate) async fn refresh_feed_inner(
     db: &Db,
     client: &reqwest::Client,
     id: i64,
-) -> AppResult<Feed> {
+) -> AppResult<(Feed, usize)> {
     let (url, etag, last_modified, notify_enabled, custom_title, title) = {
         let conn = db.0.lock().unwrap();
         conn.query_row(
@@ -259,22 +329,26 @@ pub(crate) async fn refresh_feed_inner(
         let _ = app.notification().builder().title(display_name).body(body).show();
     }
 
-    fetch_feed_by_id(&conn, id)
+    let new_count = new_entries.len();
+    Ok((fetch_feed_by_id(&conn, id)?, new_count))
 }
 
 #[tauri::command]
 pub async fn refresh_feed(app: AppHandle, db: State<'_, Db>, client: State<'_, HttpClient>, id: i64) -> AppResult<Feed> {
-    let feed = refresh_feed_inner(&app, &db, &client.0, id).await?;
+    let (feed, _new_count) = refresh_feed_inner(&app, &db, &client.0, id).await?;
     let _ = app.emit("feeds-updated", ());
     Ok(feed)
 }
 
-/// Backs the tray's "更新" item and (later) any "refresh all" UI. The
+/// Backs the tray's "更新" item and FilterBar's "記事を更新" button. The
 /// scheduler's periodic tick reuses `crate::scheduler::refresh_many`
 /// directly rather than this command, since it already runs inside the
-/// app process and doesn't need to round-trip through IPC.
+/// app process and doesn't need to round-trip through IPC. Returns the
+/// total new-entry count across the whole batch so the manual-refresh UI
+/// can tell the user "更新はありません" when nothing changed (user
+/// feedback: a silent no-op refresh was indistinguishable from a broken one).
 #[tauri::command]
-pub async fn refresh_all_feeds(app: AppHandle, db: State<'_, Db>) -> AppResult<()> {
+pub async fn refresh_all_feeds(app: AppHandle, db: State<'_, Db>) -> AppResult<usize> {
     let ids: Vec<i64> = {
         let conn = db.0.lock().unwrap();
         let mut stmt = conn.prepare("SELECT id FROM feeds")?;

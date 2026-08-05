@@ -130,6 +130,9 @@ pub fn run() {
             commands::feeds::delete_feed,
             commands::feeds::rename_feed,
             commands::feeds::set_feed_folder,
+            commands::feeds::list_genres,
+            commands::feeds::create_genre,
+            commands::feeds::delete_genre,
             commands::feeds::set_feed_interval,
             commands::feeds::set_feed_notify,
             commands::feeds::reorder_feeds,
@@ -139,6 +142,9 @@ pub fn run() {
             commands::entries::list_entries,
             commands::entries::mark_entry_read,
             commands::entries::toggle_star,
+            commands::entries::delete_entry,
+            commands::entries::restore_entry,
+            commands::entries::list_deleted_entries,
             commands::entries::mark_all_read,
             commands::entries::mark_all_unread,
             commands::entries::list_read_history,
@@ -150,6 +156,8 @@ pub fn run() {
             commands::settings::get_data_dir_info,
             commands::settings::set_data_dir,
             commands::settings::restart_app,
+            commands::settings::get_read_history_retention,
+            commands::settings::set_read_history_retention,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

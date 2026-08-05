@@ -14,6 +14,9 @@ function loadViewMode(): ViewMode {
 }
 
 let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+// Only the newest list request may update the screen. Rapid search/filter
+// changes can otherwise resolve out of order and show stale results.
+let listRequestId = 0;
 
 interface EntriesState {
   entries: Entry[];
@@ -36,6 +39,7 @@ interface EntriesState {
   setViewMode: (mode: ViewMode) => void;
   markRead: (id: number, isRead: boolean) => Promise<void>;
   toggleStar: (id: number, isStarred: boolean) => Promise<void>;
+  deleteEntry: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
   markAllUnread: () => Promise<void>;
 }
@@ -53,7 +57,8 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   viewMode: loadViewMode(),
 
   refresh: async () => {
-    set({ loading: true, error: null });
+    const requestId = ++listRequestId;
+    set({ loading: true, loadingMore: false, error: null });
     try {
       const entries = await invoke<Entry[]>("list_entries", {
         filter: {
@@ -66,14 +71,17 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
           offset: 0,
         },
       });
+      if (requestId !== listRequestId) return;
       set({ entries, hasMore: entries.length === PAGE_SIZE, loading: false });
     } catch (error) {
+      if (requestId !== listRequestId) return;
       set({ error: String(error), loading: false });
     }
   },
 
   fetchMore: async () => {
     if (get().loadingMore || !get().hasMore) return;
+    const requestId = listRequestId;
     set({ loadingMore: true });
     try {
       const more = await invoke<Entry[]>("list_entries", {
@@ -87,12 +95,14 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
           offset: get().entries.length,
         },
       });
+      if (requestId !== listRequestId) return;
       set((state) => ({
         entries: [...state.entries, ...more],
         hasMore: more.length === PAGE_SIZE,
         loadingMore: false,
       }));
     } catch (error) {
+      if (requestId !== listRequestId) return;
       set({ error: String(error), loadingMore: false });
     }
   },
@@ -149,6 +159,21 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
     });
     try {
       await invoke("toggle_star", { id, isStarred });
+    } catch (error) {
+      set({ entries: previous, error: String(error) });
+    }
+  },
+
+  // Soft-delete (see commands::entries::delete_entry) -- the entry moves to
+  // the bookmark trash, so it's removed from this list optimistically same
+  // as the other actions here, but never restored back into it locally
+  // (the user has to go through TrashOverlay to bring it back, which
+  // re-fetches from list_entries on its own).
+  deleteEntry: async (id: number) => {
+    const previous = get().entries;
+    set({ entries: previous.filter((entry) => entry.id !== id) });
+    try {
+      await invoke("delete_entry", { id });
     } catch (error) {
       set({ entries: previous, error: String(error) });
     }

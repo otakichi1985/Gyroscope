@@ -2,9 +2,35 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, State};
 
-use crate::db::Db;
+use crate::db::{settings, Db};
 use crate::error::{AppError, AppResult};
 use crate::paths::{self, DataDirInfo};
+
+pub(crate) const READ_HISTORY_RETENTION_KEY: &str = "read_history_retention_days";
+pub(crate) const UNLIMITED: &str = "unlimited";
+
+/// `None` means "keep forever". This is also the default when the setting
+/// has never been touched: read_history had no auto-delete at all before
+/// this feature existed, so defaulting to a finite duration would silently
+/// purge pre-existing history the first time an upgraded build starts up
+/// (see CLAUDE.md's "SPEC.mdからの意図的な差分" note).
+#[tauri::command]
+pub fn get_read_history_retention(db: State<'_, Db>) -> AppResult<Option<i64>> {
+    let conn = db.0.lock().unwrap();
+    let stored = settings::get(&conn, READ_HISTORY_RETENTION_KEY)?;
+    Ok(match stored.as_deref() {
+        None | Some(UNLIMITED) => None,
+        Some(days) => days.parse::<i64>().ok(),
+    })
+}
+
+#[tauri::command]
+pub fn set_read_history_retention(db: State<'_, Db>, days: Option<i64>) -> AppResult<()> {
+    let conn = db.0.lock().unwrap();
+    let value = days.map(|d| d.to_string()).unwrap_or_else(|| UNLIMITED.to_string());
+    settings::set(&conn, READ_HISTORY_RETENTION_KEY, &value)?;
+    Ok(())
+}
 
 #[tauri::command]
 pub fn get_data_dir_info(app: AppHandle) -> DataDirInfo {

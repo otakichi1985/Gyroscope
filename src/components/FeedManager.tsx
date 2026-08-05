@@ -1,16 +1,94 @@
 import { useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { useFeedsStore } from "../stores/feedsStore";
-import { BellIcon, BellOffIcon, RefreshIcon, TrashIcon, WarningIcon } from "./icons";
+import { BellIcon, BellOffIcon, CloseIcon, RefreshIcon, TrashIcon, WarningIcon } from "./icons";
 
 const OPML_FILTER = [{ name: "OPML", extensions: ["opml", "xml"] }];
+
+function GenreManager() {
+  const { genres, createGenre, deleteGenre } = useFeedsStore();
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await createGenre(name.trim());
+      setName("");
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(genre: string) {
+    setError(null);
+    try {
+      await deleteGenre(genre);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded border border-black/10 p-2 dark:border-white/10">
+      <div className="text-xs font-medium opacity-70">ジャンルを管理</div>
+      {genres.length === 0 ? (
+        <p className="text-xs opacity-50">まだジャンルがありません</p>
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          {genres.map((genre) => (
+            <span
+              key={genre}
+              className="flex items-center gap-1 rounded-full bg-black/5 py-0.5 pl-2 pr-1 text-xs dark:bg-white/5"
+            >
+              {genre}
+              <button
+                type="button"
+                onClick={() => handleDelete(genre)}
+                aria-label={`${genre}を削除`}
+                title={`${genre}を削除（このジャンルのフィードは未分類に戻ります）`}
+                className="flex items-center rounded-full p-0.5 opacity-50 transition-colors duration-150 hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10"
+              >
+                <CloseIcon className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <form onSubmit={handleCreate} className="flex gap-1">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="新しいジャンル名"
+          className="min-w-0 flex-1 rounded border border-black/10 bg-black/5 px-1.5 py-0.5 text-xs outline-none dark:border-white/10 dark:bg-white/5"
+        />
+        <button
+          type="submit"
+          disabled={busy || !name.trim()}
+          className="rounded bg-black/10 px-2 py-0.5 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 disabled:opacity-50 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
+        >
+          追加
+        </button>
+      </form>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 export function FeedManager() {
   const {
     feeds,
+    genres,
     loading,
     error,
     refresh,
+    refreshGenres,
     addFeed,
     deleteFeed,
     refreshFeed,
@@ -28,7 +106,8 @@ export function FeedManager() {
 
   useEffect(() => {
     refresh();
-  }, [refresh]);
+    refreshGenres();
+  }, [refresh, refreshGenres]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -52,6 +131,7 @@ export function FeedManager() {
       const path = await open({ filters: OPML_FILTER, multiple: false, directory: false });
       if (!path || Array.isArray(path)) return;
       const summary = await importOpml(path);
+      await refreshGenres();
       setOpmlMessage(`${summary.added}件追加、${summary.skipped}件スキップ`);
     } catch (err) {
       setOpmlError(String(err));
@@ -109,11 +189,27 @@ export function FeedManager() {
       </form>
       {addError && <p className="text-xs text-red-500">{addError}</p>}
       {error && <p className="text-xs text-red-500">{error}</p>}
+      <p className="text-xs opacity-60">
+        記事系サイト以外や、一部サイトからはRSSを取得できない場合があります
+      </p>
+
+      {/* Genre-first, folder-like organization: create a genre here, then
+          assign feeds into it below via a <select> -- replaces the old
+          free-text-per-feed field, where reusing a genre meant retyping the
+          exact same string and any mismatch (case, full/half-width, a
+          stray space) silently created a separate genre instead of joining
+          the existing one (user feedback). */}
+      <GenreManager />
 
       {loading && feeds.length === 0 ? (
         <p className="opacity-60">読み込み中...</p>
       ) : feeds.length === 0 ? (
-        <p className="opacity-60">フィードがまだありません</p>
+        // Kept inline rather than the full-height StatePanel: this sits
+        // directly under the add-feed form that already tells you what to
+        // do, so it only needs to fill the gap, not restate the CTA.
+        <p className="rounded border border-dashed border-black/15 px-3 py-6 text-center text-xs opacity-50 dark:border-white/15">
+          フィードがまだありません
+        </p>
       ) : (
         <ul className="flex flex-col gap-1">
           {feeds.map((feed) => (
@@ -129,18 +225,28 @@ export function FeedManager() {
                 )}
                 <span className="truncate font-medium">{feed.custom_title ?? feed.title ?? feed.url}</span>
                 {feed.unread_count > 0 && (
-                  <span className="shrink-0 text-xs opacity-60">({feed.unread_count})</span>
+                  // tabular-nums so the count keeps a fixed width as it
+                  // changes -- otherwise every refresh nudges the row's
+                  // layout by a pixel or two as digits swap.
+                  <span className="shrink-0 text-xs tabular-nums opacity-60">({feed.unread_count})</span>
                 )}
               </div>
               <div className="flex items-center gap-1">
-                <input
-                  type="text"
-                  placeholder="ジャンル"
-                  defaultValue={feed.folder ?? ""}
-                  onBlur={(e) => setFeedFolder(feed.id, e.target.value.trim() || null)}
+                <select
+                  value={feed.folder ?? ""}
+                  onChange={(e) => setFeedFolder(feed.id, e.target.value || null)}
                   className="min-w-0 flex-1 rounded border border-black/10 bg-black/5 px-1 py-0.5 text-xs outline-none dark:border-white/10 dark:bg-white/5"
                   aria-label="ジャンル"
-                />
+                >
+                  <option value="" className="text-black">
+                    未分類
+                  </option>
+                  {genres.map((genre) => (
+                    <option key={genre} value={genre} className="text-black">
+                      {genre}
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="number"
                   min={1}

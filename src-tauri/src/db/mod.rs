@@ -1,5 +1,6 @@
 pub mod migrations;
 pub mod models;
+pub mod settings;
 
 use std::collections::HashSet;
 use std::path::Path;

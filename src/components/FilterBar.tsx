@@ -1,42 +1,96 @@
-import { useEffect, useMemo } from "react";
-import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
-import { useFeedsStore } from "../stores/feedsStore";
-import type { Feed } from "../lib/types";
+import { useRef, useState } from "react";
+import type { SVGProps } from "react";
+import { useEntriesStore } from "../stores/entriesStore";
 import { useAppearanceStore } from "../stores/appearanceStore";
-import { useUiStore } from "../stores/uiStore";
-import { ClockIcon, CloseIcon, PaletteIcon, RssIcon, StarIcon } from "./icons";
+import { useUiStore, type Screen } from "../stores/uiStore";
+import { ClockIcon, CloseIcon, PaletteIcon, PinIcon, RssIcon, SearchIcon, StarIcon, TrashIcon } from "./icons";
 
-const VIEW_MODES: { mode: ViewMode; label: string }[] = [
-  { mode: "card", label: "カード" },
-  { mode: "list", label: "リスト" },
-  { mode: "compact", label: "コンパクト" },
+const NAV_ICONS: {
+  screen: Exclude<Screen, "timeline" | "reader">;
+  label: string;
+  shortLabel: string;
+  Icon: (props: SVGProps<SVGSVGElement>) => React.ReactElement;
+}[] = [
+  { screen: "history", label: "既読履歴を開く", shortLabel: "履歴", Icon: ClockIcon },
+  { screen: "trash", label: "ゴミ箱を開く", shortLabel: "ゴミ箱", Icon: TrashIcon },
+  { screen: "feedManager", label: "フィード管理を開く", shortLabel: "フィード", Icon: RssIcon },
+  { screen: "settings", label: "外観設定を開く", shortLabel: "設定", Icon: PaletteIcon },
 ];
 
-export function FilterBar() {
-  const feeds = useFeedsStore((s) => s.feeds);
-  const refreshFeeds = useFeedsStore((s) => s.refresh);
-  const {
-    filterFeedId,
-    setFilterFeedId,
-    filterFolder,
-    setFilterFolder,
-    starredOnly,
-    setStarredOnly,
-    searchQuery,
-    setSearchQuery,
-    viewMode,
-    setViewMode,
-    markAllRead,
-    markAllUnread,
-  } = useEntriesStore();
-  const toggleScreen = useUiStore((s) => s.toggleScreen);
-  const positionLocked = useAppearanceStore((s) => s.positionLocked);
-  const titleBarVisible = useAppearanceStore((s) => s.titleBarVisible);
+// Shared so the bookmark/search/refresh toggles (not screen-nav -- see
+// below) get the exact same icon-only/icon+label/coloring treatment as
+// NAV_ICONS while sitting visually in the same cluster.
+function IconButton({
+  onClick,
+  active,
+  label,
+  shortLabel,
+  showLabel,
+  Icon,
+  className = "",
+}: {
+  onClick: () => void;
+  active: boolean;
+  label: string;
+  shortLabel: string;
+  showLabel: boolean;
+  Icon: (props: SVGProps<SVGSVGElement>) => React.ReactElement;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      // `accent-text` always at full strength, never dimmed with opacity --
+      // opacity-based dimming on top of an already only-moderate-contrast
+      // hue (blue especially, against a similarly pale-blue panel bg in the
+      // "blue" skin) pushed real contrast below comfortable reading levels
+      // (user feedback: "sunk" icons, opacity makes it worse for some
+      // colors). The active state is distinguished by the soft background
+      // fill alone, never by dimming the icon itself.
+      className={`accent-text flex shrink-0 items-center rounded transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
+        showLabel ? "flex-col gap-0.5 px-1.5 py-1" : "p-1"
+      } ${active ? "accent-bg-soft" : "hover:bg-black/5 dark:hover:bg-white/5"} ${className}`}
+      aria-label={label}
+      aria-pressed={active}
+    >
+      <Icon className="h-4 w-4" />
+      {showLabel && <span className="text-[9px] leading-none">{shortLabel}</span>}
+    </button>
+  );
+}
 
-  useEffect(() => {
-    refreshFeeds();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+export function FilterBar() {
+  const { starredOnly, setStarredOnly, searchQuery, setSearchQuery, markAllRead, markAllUnread } =
+    useEntriesStore();
+  const toggleScreen = useUiStore((s) => s.toggleScreen);
+  // Settings/History/FeedManager/Trash are full-screen overlays drawn *over*
+  // EntryList only (see App.tsx) -- FilterBar itself sits above all of them
+  // and was never disabled while one was open, so "全既読" or the search box
+  // kept firing on clicks aimed at whatever overlay was showing (reported as
+  // accidental timeline actions while in Settings). Only the timeline-scoped
+  // controls below get wrapped in `inert`; the screen-nav icons must stay
+  // clickable so overlays can still be switched/closed.
+  const activeScreen = useUiStore((s) => s.activeScreen);
+  const isTimeline = activeScreen === "timeline";
+  const positionLocked = useAppearanceStore((s) => s.positionLocked);
+  const setPositionLocked = useAppearanceStore((s) => s.setPositionLocked);
+  const titleBarVisible = useAppearanceStore((s) => s.titleBarVisible);
+  const showIconLabels = useAppearanceStore((s) => s.showIconLabels);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  // Search is used rarely enough that giving it a permanent full-width row
+  // was disproportionate (user feedback) -- collapsed to an icon that
+  // expands an input on demand, same idea as a toolbar search button.
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  function toggleSearch() {
+    const next = !searchOpen;
+    setSearchOpen(next);
+    if (next) {
+      // Focus needs to wait for the input to actually mount.
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    }
+  }
 
   // When the title bar is hidden there'd otherwise be no way to drag the
   // window at all -- let this bar's own (mostly-empty, since it wraps)
@@ -45,117 +99,115 @@ export function FilterBar() {
   // same thing for no reason, and always skipped when locked.
   const dragRegion = !positionLocked && !titleBarVisible ? true : undefined;
 
-  // Groups feeds by their (optional) genre/folder so the timeline picker can
-  // offer "this whole genre" as well as individual feeds -- feeds.folder is
-  // set per-feed in FeedManager.tsx or via OPML import.
-  const { folders, feedsByFolder, unfiledFeeds } = useMemo(() => {
-    const byFolder = new Map<string, Feed[]>();
-    const unfiled: Feed[] = [];
-    for (const feed of feeds) {
-      if (feed.folder) {
-        const list = byFolder.get(feed.folder) ?? [];
-        list.push(feed);
-        byFolder.set(feed.folder, list);
-      } else {
-        unfiled.push(feed);
-      }
-    }
-    return {
-      folders: [...byFolder.keys()].sort(),
-      feedsByFolder: byFolder,
-      unfiledFeeds: unfiled,
-    };
-  }, [feeds]);
-
-  const selectValue = filterFolder ? `folder:${filterFolder}` : (filterFeedId ?? "");
-
-  function handleFilterChange(value: string) {
-    if (value === "") {
-      setFilterFeedId(null);
-    } else if (value.startsWith("folder:")) {
-      setFilterFolder(value.slice("folder:".length));
-    } else {
-      setFilterFeedId(Number(value));
-    }
-  }
-
   return (
     <div
       data-tauri-drag-region={dragRegion}
       className="flex shrink-0 flex-wrap items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10"
     >
-      <select
-        value={selectValue}
-        onChange={(e) => handleFilterChange(e.target.value)}
-        // The closed box's displayed text uses the <select>'s own `color`
-        // (so it must stay dark:-aware to read against the panel), but that
-        // same `color` also cascades into the dropdown *popup*'s <option>
-        // list -- which Chromium renders with its own light background,
-        // regardless of our theme. Fixing the popup by forcing the select's
-        // own color (previous attempt) broke the closed-box display in dark
-        // mode instead. The actual fix: leave the select's color theme-aware,
-        // and set a fixed dark `color` directly on each <option> below --
-        // Chromium's native popup *does* honor per-option color/background,
-        // and that styling only applies inside the open list, not the closed
-        // box.
-        className="min-w-0 max-w-[45%] flex-1 rounded border border-black/10 bg-black/5 px-1 py-1 text-xs outline-none dark:border-white/10 dark:bg-white/5"
-      >
-        <option value="" className="text-black">
-          全フィード
-        </option>
-        {folders.map((folder) => (
-          <option key={folder} value={`folder:${folder}`} className="text-black">
-            ジャンル: {folder}
-          </option>
-        ))}
-        {unfiledFeeds.map((feed) => (
-          <option key={feed.id} value={feed.id} className="text-black">
-            {feed.custom_title ?? feed.title ?? feed.url}
-          </option>
-        ))}
-        {folders.map((folder) => (
-          <optgroup key={folder} label={folder} className="text-black">
-            {feedsByFolder.get(folder)!.map((feed) => (
-              <option key={feed.id} value={feed.id} className="text-black">
-                {feed.custom_title ?? feed.title ?? feed.url}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
+      {/* "位置を固定" stands alone at the far left, separated by a divider
+          from everything else -- it used to sit in the same run as the
+          other icons and was easy to hit by accident while reaching for a
+          neighbor (user feedback). Not timeline-scoped (a window-behavior
+          setting, meaningful no matter which screen is open), so it's
+          always active, never inert-gated. */}
+      <IconButton
+        onClick={() => setPositionLocked(!positionLocked)}
+        active={positionLocked}
+        label={positionLocked ? "位置の固定を解除" : "位置を固定"}
+        shortLabel="位置固定"
+        showLabel={showIconLabels}
+        Icon={PinIcon}
+      />
+      <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10 dark:bg-white/10" />
 
-      <div className="flex shrink-0 gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
-        {VIEW_MODES.map(({ mode, label }) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => setViewMode(mode)}
-            className={`rounded px-1.5 py-0.5 transition-colors duration-150 ${
-              viewMode === mode
-                ? "accent-bg-soft accent-text font-medium"
-                : "opacity-60 hover:opacity-100"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex w-full items-center gap-1">
+      {/* `contents` keeps this group invisible to the flex-wrap layout above
+          (identical visual result to not wrapping at all) while still
+          letting `inert` disable the whole group as one unit. */}
+      <div className="contents" inert={!isTimeline}>
+      {/* すべて既読/すべて未読 boxed together as their own segmented group
+          (same look as the view-mode tabs elsewhere) rather than sitting as
+          two plain buttons loose in the row -- a bulk, hard-to-undo action
+          needs to read as visually distinct from routine icon clicks (user
+          feedback). `ml-auto` on the icon cluster after it opens a real gap
+          between the two groups. */}
+      <div className="flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
         <button
           type="button"
-          onClick={() => setStarredOnly(!starredOnly)}
-          className={`flex shrink-0 items-center rounded p-1 transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
-            starredOnly ? "accent-text" : "opacity-60 hover:opacity-100"
-          }`}
-          aria-label={starredOnly ? "ブックマークの絞り込みを解除" : "ブックマークのみ表示"}
-          title="ブックマークのみ表示"
+          onClick={() => markAllRead()}
+          className="rounded px-1.5 py-1 opacity-60 transition-colors duration-150 hover:opacity-100 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
         >
-          <StarIcon filled={starredOnly} className="h-4 w-4" />
+          すべて既読
         </button>
+        <button
+          type="button"
+          onClick={() => markAllUnread()}
+          className="rounded px-1.5 py-1 opacity-60 transition-colors duration-150 hover:opacity-100 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+        >
+          すべて未読
+        </button>
+      </div>
 
-        <div className="relative min-w-0 flex-1">
+      <IconButton
+        onClick={() => setStarredOnly(!starredOnly)}
+        active={starredOnly}
+        className="ml-auto"
+        label={starredOnly ? "ブックマークの絞り込みを解除" : "ブックマークのみ表示"}
+        shortLabel="ブクマ"
+        showLabel={showIconLabels}
+        Icon={(props) => <StarIcon filled={starredOnly} {...props} />}
+      />
+      <IconButton
+        onClick={toggleSearch}
+        active={searchOpen || searchQuery.length > 0}
+        label={searchOpen ? "検索欄を閉じる" : "記事を検索"}
+        shortLabel="検索"
+        showLabel={showIconLabels}
+        Icon={SearchIcon}
+      />
+      </div>
+
+      {/* Reusing the same accent treatment across this whole cluster (not a
+          new pattern per icon) -- without it, all icons looked identical
+          whether their screen was open or not, so there was no way to tell
+          which panel you were in, or that re-clicking the same icon is what
+          closes it (reported: this was driving accidental clicks on
+          neighboring icons). Order is history → trash → feedManager →
+          settings: trash sits next to history since both are "past reading
+          activity" views, rather than leading the group as an odd first icon. */}
+      {NAV_ICONS.map(({ screen, label, shortLabel, Icon }) => (
+        <IconButton
+          key={screen}
+          onClick={() => toggleScreen(screen)}
+          active={activeScreen === screen}
+          label={label}
+          shortLabel={shortLabel}
+          showLabel={showIconLabels}
+          Icon={Icon}
+        />
+      ))}
+
+      {/* Own `contents`+`inert` wrapper (same reasoning as above) rather
+          than living inside the first one, so this can render *after*
+          NAV_ICONS in DOM/flex order -- the expanding search field then
+          drops below the whole icon row (as a `w-full` line) instead of
+          splitting the icon cluster in two while it's open. Always
+          mounted (not `{searchOpen && ...}`) and animated via max-height
+          instead, so opening/closing it smoothly slides rather than
+          snapping instantly -- matching the slide/fade language used
+          everywhere else in this app (user feedback: this abrupt show/hide
+          stood out as the one interaction that didn't animate). `inert`
+          while collapsed keeps a zero-height input from still being
+          Tab-focusable. */}
+      <div className="contents" inert={!isTimeline}>
+      <div
+        className={`w-full overflow-hidden transition-all duration-200 ease-out ${
+          searchOpen ? "mt-1 max-h-10 opacity-100" : "max-h-0 opacity-0"
+        }`}
+        inert={!searchOpen}
+      >
+        <div className="relative">
           <input
+            ref={searchInputRef}
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -174,49 +226,7 @@ export function FilterBar() {
           )}
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={() => markAllRead()}
-        className="shrink-0 rounded px-1.5 py-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
-      >
-        すべて既読
-      </button>
-
-      <button
-        type="button"
-        onClick={() => markAllUnread()}
-        className="shrink-0 rounded px-1.5 py-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
-      >
-        すべて未読
-      </button>
-
-      <button
-        type="button"
-        onClick={() => toggleScreen("history")}
-        className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
-        aria-label="既読履歴を開く"
-      >
-        <ClockIcon className="h-4 w-4" />
-      </button>
-
-      <button
-        type="button"
-        onClick={() => toggleScreen("feedManager")}
-        className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
-        aria-label="フィード管理を開く"
-      >
-        <RssIcon className="h-4 w-4" />
-      </button>
-
-      <button
-        type="button"
-        onClick={() => toggleScreen("settings")}
-        className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
-        aria-label="外観設定を開く"
-      >
-        <PaletteIcon className="h-4 w-4" />
-      </button>
+      </div>
     </div>
   );
 }

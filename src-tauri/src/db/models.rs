@@ -66,10 +66,11 @@ pub struct Entry {
     pub fetched_at: String,
     pub is_read: bool,
     pub is_starred: bool,
+    pub deleted_at: Option<String>,
 }
 
 pub const ENTRY_COLUMNS: &str = "id, feed_id, guid, title, link, author, summary, content_html, \
-     thumbnail_url, published_at, fetched_at, is_read, is_starred";
+     thumbnail_url, published_at, fetched_at, is_read, is_starred, deleted_at";
 
 impl Entry {
     pub fn from_row(row: &Row) -> rusqlite::Result<Entry> {
@@ -87,6 +88,7 @@ impl Entry {
             fetched_at: row.get(10)?,
             is_read: row.get(11)?,
             is_starred: row.get(12)?,
+            deleted_at: row.get(13)?,
         })
     }
 }
