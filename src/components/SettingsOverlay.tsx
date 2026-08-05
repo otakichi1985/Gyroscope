@@ -3,7 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { SKINS } from "../lib/skins";
 import { useVibrancyMode } from "../hooks/useVibrancyMode";
-import { useAppearanceStore, type CardGap, type CardSize, type ClickBehavior } from "../stores/appearanceStore";
+import {
+  useAppearanceStore,
+  type CardGap,
+  type CardSize,
+  type ClickBehavior,
+  type ThemeMode,
+} from "../stores/appearanceStore";
 import type { DataDirInfo } from "../lib/types";
 import { FontPicker } from "./FontPicker";
 import { ScreenOverlay } from "./ScreenOverlay";
@@ -23,6 +29,12 @@ const CARD_GAPS: { id: CardGap; label: string }[] = [
 const CLICK_BEHAVIORS: { id: ClickBehavior; label: string }[] = [
   { id: "browser", label: "既定のブラウザ" },
   { id: "reader", label: "アプリ内で読む" },
+];
+
+const THEME_MODES: { id: ThemeMode; label: string }[] = [
+  { id: "system", label: "システム" },
+  { id: "light", label: "ライト" },
+  { id: "dark", label: "ダーク" },
 ];
 
 function ToggleRow({
@@ -214,6 +226,7 @@ export function SettingsOverlay() {
     clickBehavior,
     showIconLabels,
     titleMarquee,
+    themeMode,
     setOpacity,
     setSkin,
     setCardSize,
@@ -227,6 +240,7 @@ export function SettingsOverlay() {
     setClickBehavior,
     setShowIconLabels,
     setTitleMarquee,
+    setThemeMode,
   } = useAppearanceStore();
   const vibrancy = useVibrancyMode();
   const opacityDisabled = vibrancy === "none";
@@ -250,6 +264,26 @@ export function SettingsOverlay() {
             levels of hierarchy don't compete. */}
         <section className="flex flex-col gap-4">
         <h2 className="text-xs font-semibold tracking-wide opacity-70">見た目</h2>
+        <div>
+          <div className="mb-1.5 text-xs font-medium opacity-70">表示テーマ</div>
+          <div className="flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
+            {THEME_MODES.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setThemeMode(id)}
+                className={`flex-1 rounded px-1.5 py-1 text-xs transition-colors duration-150 ${
+                  themeMode === id ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed opacity-60">
+            システムはWindowsのアプリモードに合わせて自動で切り替わります
+          </p>
+        </div>
         <div>
           <div className="mb-1.5 text-xs font-medium opacity-70">スキン</div>
           <div className="grid grid-cols-2 gap-2">

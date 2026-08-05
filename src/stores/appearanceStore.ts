@@ -4,6 +4,7 @@ import { DEFAULT_SKIN_ID, SKINS } from "../lib/skins";
 export type CardSize = "small" | "medium" | "large";
 export type CardGap = "compact" | "normal" | "relaxed";
 export type ClickBehavior = "browser" | "reader";
+export type ThemeMode = "system" | "light" | "dark";
 
 const CARD_SIZES: CardSize[] = ["small", "medium", "large"];
 const CARD_GAPS: CardGap[] = ["compact", "normal", "relaxed"];
@@ -26,6 +27,7 @@ interface StoredAppearance {
   clickBehavior: ClickBehavior;
   showIconLabels: boolean;
   titleMarquee: boolean;
+  themeMode: ThemeMode;
 }
 
 function loadAppearance(): StoredAppearance {
@@ -45,6 +47,7 @@ function loadAppearance(): StoredAppearance {
     clickBehavior: "reader",
     showIconLabels: true,
     titleMarquee: true,
+    themeMode: "system",
   };
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return fallback;
@@ -76,6 +79,10 @@ function loadAppearance(): StoredAppearance {
     const showIconLabels =
       typeof parsed.showIconLabels === "boolean" ? parsed.showIconLabels : fallback.showIconLabels;
     const titleMarquee = typeof parsed.titleMarquee === "boolean" ? parsed.titleMarquee : fallback.titleMarquee;
+    const themeMode =
+      parsed.themeMode === "system" || parsed.themeMode === "light" || parsed.themeMode === "dark"
+        ? parsed.themeMode
+        : fallback.themeMode;
     return {
       opacity,
       skinId,
@@ -90,6 +97,7 @@ function loadAppearance(): StoredAppearance {
       clickBehavior,
       showIconLabels,
       titleMarquee,
+      themeMode,
     };
   } catch {
     return fallback;
@@ -114,6 +122,7 @@ interface AppearanceState extends StoredAppearance {
   setClickBehavior: (value: ClickBehavior) => void;
   setShowIconLabels: (value: boolean) => void;
   setTitleMarquee: (value: boolean) => void;
+  setThemeMode: (value: ThemeMode) => void;
 }
 
 export const useAppearanceStore = create<AppearanceState>((set, get) => ({
@@ -183,5 +192,10 @@ export const useAppearanceStore = create<AppearanceState>((set, get) => ({
   setTitleMarquee: (value: boolean) => {
     set({ titleMarquee: value });
     save({ ...get(), titleMarquee: value });
+  },
+
+  setThemeMode: (value: ThemeMode) => {
+    set({ themeMode: value });
+    save({ ...get(), themeMode: value });
   },
 }));
