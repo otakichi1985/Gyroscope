@@ -55,11 +55,11 @@ function ToggleRow({
         aria-checked={value}
         onClick={() => onChange(!value)}
         className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150 ${
-          value ? "accent-bg" : "bg-black/15 dark:bg-white/15"
+          value ? "toggle-on accent-bg" : "bg-black/15 dark:bg-white/15"
         }`}
       >
         <span
-          className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-150 dark:bg-neutral-200 ${
+          className={`toggle-thumb absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-[transform,background-color,box-shadow] duration-150 dark:bg-neutral-200 ${
             value ? "translate-x-4" : "translate-x-0"
           }`}
         />
@@ -300,7 +300,7 @@ export function SettingsOverlay() {
               >
                 {skin.dualSwatch ? (
                   <span
-                    className="skin-swatch-dual h-4 w-4 shrink-0 rounded-full border border-black/10 dark:border-white/20"
+                    className="skin-swatch-frame h-4 w-4 shrink-0 overflow-hidden rounded-full border border-black/15 dark:border-white/25"
                     style={
                       {
                         "--swatch-a-light": skin.light,
@@ -309,17 +309,21 @@ export function SettingsOverlay() {
                         "--swatch-b-dark": skin.accentDark,
                       } as React.CSSProperties
                     }
-                  />
+                  >
+                    <span className="skin-swatch-dual block h-full w-full" />
+                  </span>
                 ) : (
                   <span
-                    className="skin-swatch h-4 w-4 shrink-0 rounded-full border border-black/10 dark:border-white/20"
+                    className="skin-swatch-frame h-4 w-4 shrink-0 overflow-hidden rounded-full border border-black/15 dark:border-white/25"
                     style={
                       {
                         "--swatch-rgb-light": skin.accentLight,
                         "--swatch-rgb-dark": skin.accentDark,
                       } as React.CSSProperties
                     }
-                  />
+                  >
+                    <span className="skin-swatch block h-full w-full" />
+                  </span>
                 )}
                 {skin.label}
               </button>
