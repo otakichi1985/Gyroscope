@@ -48,7 +48,7 @@ function IconButton({
       // (user feedback: "sunk" icons, opacity makes it worse for some
       // colors). The active state is distinguished by the soft background
       // fill alone, never by dimming the icon itself.
-      className={`accent-text flex shrink-0 items-center rounded transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
+      className={`accent-text flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
         showLabel ? "flex-col gap-0.5 px-1.5 py-1" : "p-1"
       } ${active ? "accent-bg-soft" : "hover:bg-black/5 dark:hover:bg-white/5"} ${className}`}
       aria-label={label}
@@ -134,14 +134,14 @@ export function FilterBar() {
         <button
           type="button"
           onClick={() => markAllRead()}
-          className="rounded px-1.5 py-1 opacity-60 transition-colors duration-150 hover:opacity-100 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+          className="min-h-7 rounded px-1.5 py-1 opacity-60 transition-colors duration-150 hover:opacity-100 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
         >
           すべて既読
         </button>
         <button
           type="button"
           onClick={() => markAllUnread()}
-          className="rounded px-1.5 py-1 opacity-60 transition-colors duration-150 hover:opacity-100 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+          className="min-h-7 rounded px-1.5 py-1 opacity-60 transition-colors duration-150 hover:opacity-100 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
         >
           すべて未読
         </button>

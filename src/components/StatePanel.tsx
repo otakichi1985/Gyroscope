@@ -26,9 +26,9 @@ export function StatePanel({
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-      <div className={tone === "error" ? "text-red-500" : "accent-text opacity-50"}>{icon}</div>
+      <div className={tone === "error" ? "text-red-500" : "accent-text opacity-70"}>{icon}</div>
       <p className={`text-sm ${tone === "error" ? "text-red-500" : "opacity-80"}`}>{title}</p>
-      {detail && <p className="text-xs opacity-50">{detail}</p>}
+      {detail && <p className="max-w-[34ch] text-xs leading-relaxed opacity-60">{detail}</p>}
       {action && (
         <button
           type="button"

@@ -55,7 +55,7 @@ export function TimelineToolbar() {
         <button
           type="button"
           onClick={handleRefreshClick}
-          className="accent-text flex shrink-0 items-center gap-1 rounded px-1.5 py-1 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+          className="accent-text flex min-h-7 shrink-0 items-center gap-1 rounded px-1.5 py-1 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
         >
           <RefreshIcon className={`h-4 w-4 ${refreshingAll ? "animate-spin" : ""}`} />
           記事を更新
@@ -98,7 +98,7 @@ export function TimelineToolbar() {
             key={mode}
             type="button"
             onClick={() => setViewMode(mode)}
-            className={`rounded px-1.5 py-0.5 transition-colors duration-150 ${
+            className={`min-h-6 rounded px-1.5 py-0.5 transition-colors duration-150 ${
               viewMode === mode ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
             }`}
           >

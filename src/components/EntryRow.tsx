@@ -95,7 +95,7 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     <>
       {feedTitle && <span className="accent-text">{feedTitle}</span>}
       {feedTitle && published && <span className="opacity-60"> · </span>}
-      {published && <span className="opacity-60">{published}</span>}
+      {published && <span className="opacity-60 tabular-nums">{published}</span>}
     </>
   );
 
