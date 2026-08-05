@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { entrySnippet, formatPublished } from "../lib/text";
@@ -16,6 +16,14 @@ const CARD_THUMB_SIZE: Record<CardSize, string> = {
   small: "h-12 w-12",
   medium: "h-16 w-16",
   large: "h-24 w-24",
+};
+// Fixed outer heights keep the virtualizer's measurements stable when a
+// thumbnail or feed icon becomes available after the entry first renders.
+// Each value still leaves enough room for that size's clamped text + meta.
+const CARD_ROW_HEIGHT: Record<CardSize, string> = {
+  small: "h-[72px]",
+  medium: "h-[96px]",
+  large: "h-[120px]",
 };
 const CARD_TITLE_SIZE: Record<CardSize, string> = {
   small: "text-xs",
@@ -51,6 +59,12 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
   // show an image for this article" per the request that prompted the
   // feed-icon fallback below.
   const [thumbFailed, setThumbFailed] = useState(false);
+  const [feedIconFailed, setFeedIconFailed] = useState(false);
+
+  // A refresh can replace either URL without remounting this keyed row.
+  // Let the new resource try instead of keeping an old failure forever.
+  useEffect(() => setThumbFailed(false), [entry.thumbnail_url]);
+  useEffect(() => setFeedIconFailed(false), [feedIconUrl]);
 
   async function handleOpen() {
     if (!entry.is_read) markRead(entry.id, true);
@@ -225,7 +239,7 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
       // Same glass-card language as list mode, just with room for the
       // thumbnail and a soft shadow since card mode is the most spacious view.
       // See list mode above for `entry-card`/`transition`/`active:scale`.
-      className="entry-card flex w-full cursor-pointer gap-2 rounded-lg border border-black/5 bg-black/[0.03] px-2 py-2 shadow-sm transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10"
+      className={`entry-card ${CARD_ROW_HEIGHT[cardSize]} flex w-full cursor-pointer gap-2 overflow-hidden rounded-lg border border-black/5 bg-black/[0.03] px-2 py-2 shadow-sm transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10`}
     >
       {blockImages ? (
         // Block at the element level, not just visually -- an <img> that's
@@ -244,8 +258,7 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
           onError={() => setThumbFailed(true)}
           className={`${CARD_THUMB_SIZE[cardSize]} shrink-0 rounded object-cover`}
         />
-      ) : (
-        feedIconUrl && (
+      ) : feedIconUrl && !feedIconFailed ? (
           // A favicon-ish image is small/square and looks stretched and
           // blurry filling the same box object-cover does for a real
           // thumbnail -- contain it with padding on a neutral fill instead,
@@ -253,11 +266,21 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
           <div
             className={`${CARD_THUMB_SIZE[cardSize]} flex shrink-0 items-center justify-center rounded bg-black/5 p-2 dark:bg-white/5`}
           >
-            <img src={feedIconUrl} alt="" className="max-h-full max-w-full object-contain" />
+            <img
+              src={feedIconUrl}
+              alt=""
+              onError={() => setFeedIconFailed(true)}
+              className="max-h-full max-w-full object-contain"
+            />
           </div>
-        )
+      ) : (
+        <div
+          className={`${CARD_THUMB_SIZE[cardSize]} flex shrink-0 items-center justify-center rounded bg-black/5 dark:bg-white/5`}
+        >
+          <ImageOffIcon className="h-1/2 w-1/2 opacity-30" />
+        </div>
       )}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
         <MarqueeTitle text={title} textClassName={`${CARD_TITLE_SIZE[cardSize]} ${entry.is_read ? "" : "font-medium"}`} />
         <p className={`mt-0.5 ${CARD_SNIPPET_CLAMP[cardSize]} text-xs opacity-70`}>{entrySnippet(entry)}</p>
         {meta && <div className="mt-0.5 truncate text-xs">{meta}</div>}

@@ -12,23 +12,38 @@ use super::client::{fetch_conditional, FetchOutcome};
 /// `<head>` for a `<link rel="icon">`-family tag.
 pub async fn discover_favicon(client: &Client, site_url: &str) -> Option<String> {
     let base = Url::parse(site_url).ok()?;
+    let root = base.join("/").ok()?;
 
-    if let Ok(favicon_url) = base.join("/favicon.ico") {
+    if let Ok(favicon_url) = root.join("favicon.ico") {
         if resource_exists(client, favicon_url.as_str()).await {
             return Some(favicon_url.to_string());
         }
     }
 
-    let html = fetch_html(client, &base).await?;
-    find_icon_link(&html, &base)
+    if let Some(html) = fetch_html(client, &base).await {
+        if let Some(icon) = find_icon_link(&html, &base) {
+            return Some(icon);
+        }
+    }
+
+    // OPML files in the wild often put the feed URL in htmlUrl as well as
+    // xmlUrl. Parsing that RSS document as HTML finds no <link rel=icon>,
+    // so retry the origin homepage before giving up.
+    if base != root {
+        let html = fetch_html(client, &root).await?;
+        return find_icon_link(&html, &root);
+    }
+    None
 }
 
-/// A plain 2xx check via HEAD -- deliberately not verifying content-type,
-/// since some servers misconfigure it for static files like favicon.ico
-/// and a false negative here just means falling through to the (more
-/// expensive) HTML-parsing tier for no reason.
+/// Prefer a cheap HEAD request, but retry with GET because many otherwise
+/// valid sites reject HEAD with 403/405. `send()` leaves the body streaming,
+/// so the successful probe does not need to buffer the icon into memory.
 async fn resource_exists(client: &Client, url: &str) -> bool {
-    matches!(client.head(url).send().await, Ok(resp) if resp.status().is_success())
+    if matches!(client.head(url).send().await, Ok(resp) if resp.status().is_success()) {
+        return true;
+    }
+    matches!(client.get(url).send().await, Ok(resp) if resp.status().is_success())
 }
 
 async fn fetch_html(client: &Client, base: &Url) -> Option<Vec<u8>> {
@@ -41,14 +56,19 @@ async fn fetch_html(client: &Client, base: &Url) -> Option<Vec<u8>> {
 fn find_icon_link(html: &[u8], base: &Url) -> Option<String> {
     let html = String::from_utf8_lossy(html);
     let document = scraper::Html::parse_document(&html);
-    let selector = scraper::Selector::parse(
-        "link[rel=icon], link[rel='shortcut icon'], link[rel='apple-touch-icon']",
-    )
-    .ok()?;
+    let selector = scraper::Selector::parse("link[href][rel]").ok()?;
 
     document
         .select(&selector)
-        .find_map(|el| el.value().attr("href"))
+        .find(|el| {
+            el.value().attr("rel").is_some_and(|rel| {
+                rel.split_ascii_whitespace().any(|token| {
+                    token.eq_ignore_ascii_case("icon")
+                        || token.eq_ignore_ascii_case("apple-touch-icon")
+                })
+            })
+        })
+        .and_then(|el| el.value().attr("href"))
         .and_then(|href| base.join(href).ok())
         .map(|url| url.to_string())
 }
@@ -91,5 +111,15 @@ mod tests {
         let base = Url::parse("https://example.com/").unwrap();
         let found = find_icon_link(html, &base).unwrap();
         assert_eq!(found, "https://cdn.example.com/icon.png");
+    }
+
+    #[test]
+    fn accepts_case_insensitive_and_multi_token_rel() {
+        let html = br#"<link rel="Shortcut ICON" href="/icon.png">"#;
+        let base = Url::parse("https://example.com/feed.xml").unwrap();
+        assert_eq!(
+            find_icon_link(html, &base),
+            Some("https://example.com/icon.png".to_string())
+        );
     }
 }

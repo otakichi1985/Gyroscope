@@ -59,6 +59,10 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
   （`EntryRow.tsx`のサムネイル寸法・文字サイズ・行クランプ数を切替）。間隔は表示モード共通で
   `EntryList.tsx`の仮想化された行ラッパーに`paddingBottom`として付与する方式（`margin`だと
   `virtualizer.measureElement`の計測に含まれず行の位置がズレるため、必ず`padding`側に乗せる）
+  カード本体の高さは small=72px / medium=96px / large=120px に固定し、`EntryList`の推定値も
+  必ず同じ値にする。フィード情報やfaviconが非同期で届いた後にカードだけ伸びると、仮想リストが
+  古い位置へ次行を描いてカード同士が重なるため（実機スクリーンショットで判明）。画像がない場合も
+  faviconまたは`ImageOffIcon`の同寸枠を常に描画し、高さと本文幅を変動させない
 - ネイティブ`<select>`のドロップダウン一覧はページのTailwindクラスをほとんど無視してブラウザ既定
   （ライト）でレンダリングされるが、文字色だけはページから継承されるため、ダークモード時に
   「白背景+白文字」で読めなくなっていた（実機で指摘されて発覚）。`src/styles/index.css`の
@@ -108,6 +112,10 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
     （`ON CONFLICT DO UPDATE`は常に1件変更と報告するため`changes()`では新規/更新を区別できず、
     upsert前に既存guid集合をSELECTしてから差分を取る方式にした）。これを使って
     `notify_enabled`なフィードに新着があった場合だけ`tauri_plugin_notification`で通知する
+  - favicon探索は`HEAD`だけに依存しない（正常な画像でもHEADを403/405にするサイトがあるため、
+    失敗時はGETで再試行）。OPMLの`htmlUrl`へ誤ってフィードURLが入る実例もあるため、文書内で
+    iconが見つからなければサイトルートも探索する。OPMLインポート直後はアイコン未取得なので、
+    初回の正常なフィード更新でも`icon_path IS NULL`なら探索する
   - トレイ（`tray.rs`）: メニューは「表示/非表示」「更新」「終了」の3項目。「終了」は
     `MenuBuilder::quit_with_text`（muda組み込み項目）ではなく素の`text()`+`app.exit(0)`にしている
     （組み込みitemがネイティブ側で何をするか不明瞭で、閉じる=非表示化と衝突する可能性を避けるため）

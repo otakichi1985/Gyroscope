@@ -3,8 +3,8 @@
   <head><title>RSS Widget</title></head>
   <body>
     <outline text="VR">
-      <outline type="rss" text="メタカル最前線" title="メタカル最前線" xmlUrl="https://metacul-frontier.com/?feed=rss2" htmlUrl="https://metacul-frontier.com/?feed=rss2"/>
-      <outline type="rss" text="ぴけっとガジェット" title="ぴけっとガジェット" xmlUrl="https://blog.pikegadge.com/feed/" htmlUrl="https://blog.pikegadge.com/feed/"/>
+      <outline type="rss" text="メタカル最前線" title="メタカル最前線" xmlUrl="https://metacul-frontier.com/?feed=rss2" htmlUrl="https://metacul-frontier.com/"/>
+      <outline type="rss" text="ぴけっとガジェット" title="ぴけっとガジェット" xmlUrl="https://blog.pikegadge.com/feed/" htmlUrl="https://blog.pikegadge.com/"/>
     </outline>
     <outline text="テック">
       <outline type="rss" text="窓の杜" title="窓の杜" xmlUrl="https://forest.watch.impress.co.jp/data/rss/1.0/wf/feed.rdf" htmlUrl="https://forest.watch.impress.co.jp/"/>
