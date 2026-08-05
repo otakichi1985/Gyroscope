@@ -55,6 +55,11 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
   あるため、`opacity::LastOpacity`（`app.manage`）に最後に設定したバイト値を保持し、
   `lib.rs`の`window.on_window_event`で`WindowEvent::Resized`を受けるたびに`opacity::apply`で
   再適用している（実機で「最大化すると不透明度が100%に戻る」と指摘されて発覚）
+- 表示テーマ（`appearanceStore.themeMode`）は`system | light | dark`。`App.tsx`がアプリのルート要素の
+  `.dark`クラスと`<html>`の`color-scheme`を同期し、system時だけ`matchMedia`の変更を購読する。Tailwind v4は
+  `index.css`先頭の`@custom-variant dark (&:where(.dark, .dark *))`で同じクラスを参照し、独自CSSも
+  OSのmedia queryではなく`.dark`へ統一すること。media queryが残ると、暗色OS上でライト固定が
+  部分的にダーク表示になる
 - カードサイズ/間隔（`appearanceStore`の`cardSize`/`cardGap`）: サイズはcardモードのみ対象
   （`EntryRow.tsx`のサムネイル寸法・文字サイズ・行クランプ数を切替）。間隔は表示モード共通で
   `EntryList.tsx`の仮想化された行ラッパーに`paddingBottom`として付与する方式（`margin`だと

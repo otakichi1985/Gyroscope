@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { EntryList } from "./components/EntryList";
 import { FeedManagerOverlay } from "./components/FeedManagerOverlay";
 import { FilterBar } from "./components/FilterBar";
@@ -26,12 +26,31 @@ const IDLE_PATTERNS = ["idle-corner-tl", "idle-corner-tr", "idle-corner-bl", "id
 
 function App() {
   const vibrancy = useVibrancyMode();
-  const { opacity, skinId, fontId, alwaysOnTop, titleBarVisible, minimizeToTray } = useAppearanceStore();
+  const { opacity, skinId, fontId, alwaysOnTop, titleBarVisible, minimizeToTray, themeMode } =
+    useAppearanceStore();
   const isTimeline = useUiStore((s) => s.activeScreen === "timeline");
   useFeedsUpdatedListener();
   const isIdle = useIdleTimer();
 
   const [idlePattern, setIdlePattern] = useState(IDLE_PATTERNS[0]);
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia("(prefers-color-scheme: dark)").matches,
+  );
+  const isDark = themeMode === "dark" || (themeMode === "system" && systemDark);
+
+  useLayoutEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncSystemTheme = () => setSystemDark(media.matches);
+    syncSystemTheme();
+    if (themeMode !== "system") return;
+    media.addEventListener("change", syncSystemTheme);
+    return () => media.removeEventListener("change", syncSystemTheme);
+  }, [themeMode]);
+
+  useLayoutEffect(() => {
+    document.documentElement.classList.remove("dark");
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+  }, [isDark]);
   useEffect(() => {
     if (isIdle) {
       setIdlePattern(IDLE_PATTERNS[Math.floor(Math.random() * IDLE_PATTERNS.length)]);
@@ -71,7 +90,7 @@ function App() {
   return (
     <div
       style={panelStyle}
-      className="panel-bg flex h-screen w-screen flex-col overflow-hidden rounded-2xl text-neutral-900 dark:text-neutral-100"
+      className={`${isDark ? "dark" : ""} panel-bg flex h-screen w-screen flex-col overflow-hidden rounded-2xl text-neutral-900 dark:text-neutral-100`}
     >
       {titleBarVisible && <TitleBar />}
       <FilterBar />

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 html,
 body,
@@ -36,10 +37,8 @@ html {
   outline: 2px solid rgb(var(--accent-rgb-light, 37 99 235));
   outline-offset: 1px;
 }
-@media (prefers-color-scheme: dark) {
-  :focus-visible {
-    outline-color: rgb(var(--accent-rgb-dark, 96 165 250));
-  }
+.dark :focus-visible {
+  outline-color: rgb(var(--accent-rgb-dark, 96 165 250));
 }
 
 /* Slim custom scrollbar app-wide -- WebView2/Chromium honors the
@@ -68,16 +67,14 @@ html {
 *::-webkit-scrollbar-thumb:hover {
   background-color: rgb(0 0 0 / 0.32);
 }
-@media (prefers-color-scheme: dark) {
-  * {
-    scrollbar-color: rgb(255 255 255 / 0.22) transparent;
-  }
-  *::-webkit-scrollbar-thumb {
-    background-color: rgb(255 255 255 / 0.2);
-  }
-  *::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(255 255 255 / 0.34);
-  }
+.dark * {
+  scrollbar-color: rgb(255 255 255 / 0.22) transparent;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgb(255 255 255 / 0.2);
+}
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(255 255 255 / 0.34);
 }
 
 /* Soft fade at the top/bottom edge of the timeline's scroll area, so rows
@@ -159,10 +156,8 @@ html {
   background: radial-gradient(circle, rgb(var(--accent-rgb-light) / 0.14), transparent 70%);
   animation: idle-breathe 5s ease-in-out infinite;
 }
-@media (prefers-color-scheme: dark) {
-  .idle-bg::before {
-    background: radial-gradient(circle, rgb(var(--accent-rgb-dark) / 0.17), transparent 70%);
-  }
+.dark .idle-bg::before {
+  background: radial-gradient(circle, rgb(var(--accent-rgb-dark) / 0.17), transparent 70%);
 }
 .idle-bg.idle-corner-tl::before {
   top: -40%;
@@ -256,14 +251,12 @@ html {
 .mouse-spotlight.spotlight-active {
   opacity: 1;
 }
-@media (prefers-color-scheme: dark) {
-  .mouse-spotlight {
-    background: radial-gradient(
-      circle 200px at var(--spot-x, 50%) var(--spot-y, 50%),
-      rgb(var(--accent-rgb-dark) / 0.1),
-      transparent 70%
-    );
-  }
+.dark .mouse-spotlight {
+  background: radial-gradient(
+    circle 200px at var(--spot-x, 50%) var(--spot-y, 50%),
+    rgb(var(--accent-rgb-dark) / 0.1),
+    transparent 70%
+  );
 }
 
 /* Panel background color driven by a CSS custom property set from React
@@ -282,10 +275,9 @@ html {
 .panel-bg {
   background-color: rgb(var(--panel-rgb-light));
 }
-@media (prefers-color-scheme: dark) {
-  .panel-bg {
-    background-color: rgb(var(--panel-rgb-dark));
-  }
+.dark.panel-bg,
+.dark .panel-bg {
+  background-color: rgb(var(--panel-rgb-dark));
 }
 
 /* Same light/dark-via-media-query mechanism as .panel-bg above, driven by
@@ -305,19 +297,17 @@ html {
 .accent-bg-soft {
   background-color: rgb(var(--accent-rgb-light) / 0.15);
 }
-@media (prefers-color-scheme: dark) {
-  .accent-text {
-    color: rgb(var(--accent-rgb-dark));
-  }
-  .accent-border {
-    border-color: rgb(var(--accent-rgb-dark));
-  }
-  .accent-bg {
-    background-color: rgb(var(--accent-rgb-dark));
-  }
-  .accent-bg-soft {
-    background-color: rgb(var(--accent-rgb-dark) / 0.18);
-  }
+.dark .accent-text {
+  color: rgb(var(--accent-rgb-dark));
+}
+.dark .accent-border {
+  border-color: rgb(var(--accent-rgb-dark));
+}
+.dark .accent-bg {
+  background-color: rgb(var(--accent-rgb-dark));
+}
+.dark .accent-bg-soft {
+  background-color: rgb(var(--accent-rgb-dark) / 0.18);
 }
 
 /* Per-skin swatch dot in SettingsOverlay's skin picker. Unlike .accent-*
@@ -329,10 +319,8 @@ html {
 .skin-swatch {
   background-color: rgb(var(--swatch-rgb-light));
 }
-@media (prefers-color-scheme: dark) {
-  .skin-swatch {
-    background-color: rgb(var(--swatch-rgb-dark));
-  }
+.dark .skin-swatch {
+  background-color: rgb(var(--swatch-rgb-dark));
 }
 
 /* Two-tone variant for the high-contrast skin family (SettingsOverlay.tsx
@@ -343,10 +331,8 @@ html {
 .skin-swatch-dual {
   background: linear-gradient(90deg, rgb(var(--swatch-a-light)) 50%, rgb(var(--swatch-b-light)) 50%);
 }
-@media (prefers-color-scheme: dark) {
-  .skin-swatch-dual {
-    background: linear-gradient(90deg, rgb(var(--swatch-a-dark)) 50%, rgb(var(--swatch-b-dark)) 50%);
-  }
+.dark .skin-swatch-dual {
+  background: linear-gradient(90deg, rgb(var(--swatch-a-dark)) 50%, rgb(var(--swatch-b-dark)) 50%);
 }
 
 /* Minimal readable-article styling for ReaderOverlay's DOMPurify-sanitized
@@ -386,10 +372,8 @@ html {
   padding-left: 0.75em;
   opacity: 0.85;
 }
-@media (prefers-color-scheme: dark) {
-  .reader-content blockquote {
-    border-left-color: rgb(255 255 255 / 0.15);
-  }
+.dark .reader-content blockquote {
+  border-left-color: rgb(255 255 255 / 0.15);
 }
 
 /* Plays a one-shot slide+fade whenever the element it's on gets a fresh
