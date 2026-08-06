@@ -15,6 +15,7 @@ interface FeedPickerProps {
 const GAP_PX = 4;
 const MAX_LIST_HEIGHT_PX = 260;
 const MIN_LIST_HEIGHT_PX = 100;
+const POPUP_BORDER_PX = 2;
 
 // Same portal-positioned-popup architecture as FontPicker.tsx (see its own
 // doc comment for why a native <select> doesn't work here either: its
@@ -67,12 +68,18 @@ export function FeedPicker({ feeds, filterFeedId, filterFolder, onSelectAll, onS
     if (!rect) return;
     const spaceBelow = window.innerHeight - rect.bottom - GAP_PX;
     const spaceAbove = rect.top - GAP_PX;
-    const openUpward = spaceBelow < MIN_LIST_HEIGHT_PX && spaceAbove > spaceBelow;
-    const available = Math.max(MIN_LIST_HEIGHT_PX, Math.min(MAX_LIST_HEIGHT_PX, openUpward ? spaceAbove : spaceBelow));
+    const openUpward = spaceBelow < MIN_LIST_HEIGHT_PX + POPUP_BORDER_PX && spaceAbove > spaceBelow;
+    // Never force the minimum height when the viewport genuinely has less
+    // room. Doing so pushes the fixed popup past the native window edge,
+    // where no amount of scrolling can reveal the clipped portion.
+    const available = Math.max(
+      0,
+      Math.min(MAX_LIST_HEIGHT_PX, (openUpward ? spaceAbove : spaceBelow) - POPUP_BORDER_PX),
+    );
     setPos({
       left: rect.left,
       width: rect.width,
-      top: openUpward ? rect.top - GAP_PX - available : rect.bottom + GAP_PX,
+      top: openUpward ? rect.top - GAP_PX - available - POPUP_BORDER_PX : rect.bottom + GAP_PX,
       maxHeight: available,
     });
     setOpen(true);
@@ -88,10 +95,12 @@ export function FeedPicker({ feeds, filterFeedId, filterFolder, onSelectAll, onS
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    // The toolbar row itself doesn't scroll, but the timeline behind it
-    // does -- simplest correctness fix (same one FontPicker uses) is to
-    // just close on any scroll rather than tracking position live.
-    function handleScroll() {
+    // Scroll events are observed in the capture phase, so the popup's own
+    // overflow container arrives here too. Ignore those; otherwise the
+    // first wheel tick closes the list before it can actually scroll.
+    function handleScroll(e: Event) {
+      const target = e.target;
+      if (target instanceof Node && listRef.current?.contains(target)) return;
       setOpen(false);
     }
     document.addEventListener("mousedown", handlePointerDown);
