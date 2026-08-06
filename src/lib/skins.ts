@@ -37,7 +37,7 @@ export interface Skin {
   swatchComplement?: string;
   swatchLight?: string;
   swatchDark?: string;
-  visualStyle?: "aurora" | "velvet" | "terminal";
+  visualStyle?: "aurora" | "velvet" | "terminal" | "link";
 }
 
 export const SKINS: Skin[] = [
@@ -217,6 +217,20 @@ export const SKINS: Skin[] = [
     swatchLight: "42 197 74",
     swatchDark: "74 246 38",
     visualStyle: "terminal",
+  },
+  {
+    id: "link-amber",
+    label: "リンク・アンバー",
+    category: "style",
+    description: "白い浮遊パネルと山吹色のリンク演出を使った、軽快なUIテーマ",
+    light: "246 247 249",
+    dark: "27 29 33",
+    accentLight: "147 91 0",
+    accentDark: "247 187 67",
+    dualSwatch: true,
+    swatchPrimary: "224 226 231",
+    swatchComplement: "230 164 46",
+    visualStyle: "link",
   },
 ];
 

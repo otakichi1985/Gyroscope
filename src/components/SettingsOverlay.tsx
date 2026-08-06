@@ -308,7 +308,9 @@ export function SettingsOverlay() {
   const opacityDisabled = vibrancy === "none";
   const selectedSkin = SKINS.find((skin) => skin.id === skinId) ?? SKINS[0];
   const terminalSelected = selectedSkin.visualStyle === "terminal";
-  const displayedThemeMode: ThemeMode = terminalSelected ? "dark" : themeMode;
+  const linkSelected = selectedSkin.visualStyle === "link";
+  const themeModeLocked = terminalSelected || linkSelected;
+  const displayedThemeMode: ThemeMode = terminalSelected ? "dark" : linkSelected ? "light" : themeMode;
   const [openSections, setOpenSections] = useState(loadOpenSections);
 
   const toggleSection = (id: SettingsSectionId) => {
@@ -336,12 +338,12 @@ export function SettingsOverlay() {
         >
         <div>
           <div className="mb-1.5 text-xs font-medium opacity-70">表示モード</div>
-          <div className={`flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5 ${terminalSelected ? "opacity-45" : ""}`}>
+          <div className={`flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5 ${themeModeLocked ? "opacity-45" : ""}`}>
             {THEME_MODES.map(({ id, label }) => (
               <button
                 key={id}
                 type="button"
-                disabled={terminalSelected}
+                disabled={themeModeLocked}
                 onClick={() => setThemeMode(id)}
                 className={`flex-1 rounded px-1.5 py-1 text-xs transition-colors duration-150 ${
                   displayedThemeMode === id ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
@@ -354,7 +356,9 @@ export function SettingsOverlay() {
           <p className="mt-1.5 text-xs leading-relaxed opacity-60">
             {terminalSelected
               ? "ターミナルは視認性と世界観を保つため、選択中のみダーク表示に固定されます"
-              : "システムはWindowsのアプリモードに合わせて自動で切り替わります"}
+              : linkSelected
+                ? "リンク・アンバーは白いパネル表現を保つため、選択中のみライト表示に固定されます"
+                : "システムはWindowsのアプリモードに合わせて自動で切り替わります"}
           </p>
         </div>
         <div>
