@@ -148,7 +148,10 @@ export function EntryList() {
   useEffect(() => {
     if (wasLoading.current && !loading) {
       setRevealing(true);
-      const timer = setTimeout(() => setRevealing(false), 800);
+      // Must outlast the longest row: the last stagger step plus the
+      // animation itself (see the delays in index.css). Dropping the class
+      // early truncates the tail of the cascade.
+      const timer = setTimeout(() => setRevealing(false), 1100);
       wasLoading.current = loading;
       return () => clearTimeout(timer);
     }
