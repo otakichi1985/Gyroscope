@@ -49,11 +49,11 @@ export function ScreenOverlay({ screen, title, headerActions, children }: Screen
           <button
             type="button"
             onClick={goHome}
-            className="flex items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs text-red-600 transition-colors duration-150 hover:bg-red-500 hover:text-white active:bg-red-600 dark:border-red-400/40 dark:text-red-400 dark:hover:text-white"
+            className="screen-close-button flex items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs text-red-600 transition-colors duration-150 hover:bg-red-500 hover:text-white active:bg-red-600 dark:border-red-400/40 dark:text-red-400 dark:hover:text-white"
             aria-label="閉じる"
           >
-            <CloseIcon className="h-3 w-3" />
-            閉じる
+            <CloseIcon className="screen-close-icon h-3 w-3" />
+            <span className="screen-close-label">閉じる</span>
           </button>
         </div>
       </div>
