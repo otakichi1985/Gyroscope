@@ -737,34 +737,88 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   color: rgb(var(--cardinal-ink));
 }
 
-/* Circular rail buttons: unfilled and quiet at rest, solid amber when the
+/* The rail floats. No plate behind it -- the reference hangs its circular
+   buttons directly in the world, and putting a panel under them turns the
+   rail back into an ordinary toolbar (user). The title bar and the timeline
+   toolbar keep their plates; those carry running text, this row does not.
+   Labels get a white halo instead of a surface, since the ink they are drawn
+   in has to survive an unknown wallpaper. */
+.skin-cardinality .app-filterbar {
+  margin-left: 0;
+  margin-right: 0;
+  border: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+/* White with a dark shadow, not the theme's ink. These labels sit directly
+   on the desktop now, so they have to survive both a black wallpaper and a
+   white one -- an ink glyph with a white halo only manages the second. The
+   reference rail carries no captions at all, so anyone who wants that look
+   can switch labels off in settings; this keeps the setting meaningful
+   instead of quietly ignoring it for one theme. */
+.skin-cardinality .app-filterbar .icon-button span {
+  color: rgb(255 255 255);
+  text-shadow:
+    0 1px 3px rgb(0 0 0 / 0.75),
+    0 0 8px rgb(0 0 0 / 0.5);
+}
+.skin-cardinality .app-filterbar > .w-px {
+  background-color: rgb(var(--cardinal-line) / 0.5);
+}
+
+/* Circular rail buttons: steel and quiet at rest, solid amber when the
    screen they open is the one showing. The disc goes on the glyph rather
    than the button for the same reason it does in Ordinary -- so switching
-   icon labels on keeps a circle with a caption under it. */
+   icon labels on keeps a circle with a caption under it.
+
+   Two things follow the reference closely. The glyph is deliberately large
+   relative to its disc (roughly 70% across, against the ~57% an earlier pass
+   used): in the source the glyph is what you read, not the circle around it.
+   And each disc carries a hairline ring standing off its edge, which is what
+   makes a flat filled circle read as a control. */
 .skin-cardinality .icon-button,
 .skin-cardinality .icon-button:hover,
 .skin-cardinality .icon-button.accent-bg-soft {
   padding: 0;
-  gap: 3px;
+  gap: 4px;
   background-color: transparent;
   color: rgb(var(--cardinal-ink));
 }
+/* Pale disc, GREY glyph -- not the other way round. An earlier pass filled
+   the disc with steel and drew the glyph in white, which is inverted.
+   Measured off the flat asset sheet by sampling an annulus (disc fill) apart
+   from the centre (glyph): fill #C0DDF8, glyph #94A3B3. Only the selected
+   state inverts to a filled disc with a white glyph.
+   The glyph here is darkened from the reference's own #94A3B3, which sits at
+   2.37:1 against the disc; #6C7B8A reaches 4.00:1 and keeps the same read. */
 .skin-cardinality .icon-button > svg {
   box-sizing: content-box;
-  padding: 6px;
+  width: 19px;
+  height: 19px;
+  padding: 4px;
   border-radius: 50%;
-  border: 1px solid rgb(255 255 255 / 0.6);
-  background-color: rgb(var(--cardinal-steel) / 0.9);
-  color: rgb(255 255 255);
+  border: 1px solid rgb(255 255 255 / 0.9);
+  background-color: rgb(242 246 250 / 0.94);
+  color: rgb(108 123 138);
+  stroke-width: 1.5;
+  box-shadow:
+    0 0 0 2px transparent,
+    0 0 0 3px rgb(var(--cardinal-line) / 0.4);
   transition:
     background-color 150ms ease-out,
     border-color 150ms ease-out,
+    color 150ms ease-out,
     box-shadow 150ms ease-out,
     transform 120ms ease-out;
 }
 .skin-cardinality .icon-button:hover > svg {
-  background-color: rgb(var(--cardinal-steel));
-  border-color: rgb(255 255 255);
+  background-color: rgb(255 255 255);
+  color: rgb(79 93 107);
+  box-shadow:
+    0 0 0 2px transparent,
+    0 0 0 3px rgb(var(--cardinal-amber) / 0.75);
 }
 .skin-cardinality .icon-button:active > svg {
   transform: scale(0.92);
@@ -781,7 +835,10 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   background-color: rgb(var(--cardinal-amber));
   color: rgb(255 255 255);
   stroke-width: 2;
-  box-shadow: 0 0 10px rgb(var(--cardinal-amber) / 0.7);
+  box-shadow:
+    0 0 0 2px transparent,
+    0 0 0 3px rgb(var(--cardinal-amber) / 0.85),
+    0 0 12px rgb(var(--cardinal-amber) / 0.6);
 }
 /* The pointer is a connector, not an ornament: in the reference it marks
    the edge a submenu grows out of. It used to be drawn as a pair flanking
@@ -1649,7 +1706,8 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 /* ---- Floating skins: timeline card motion -------------------------------
 
    Rows only animate while the scroll container carries `list-reveal`, which
-   EntryList holds for 800ms after a fresh list arrives. Putting the
+   EntryList holds for a window long enough to cover the last row's stagger
+   step plus its animation. Keep the two in step when either changes. Putting the
    animation on `.entry-card` unconditionally would replay it every time a
    virtualised row scrolled back into view -- see the long comment in
    EntryList.tsx.
@@ -1679,25 +1737,25 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 .skin-floating .list-reveal .entry-compact {
   animation: card-reveal 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.skin-floating .list-reveal > div > div:nth-child(3n + 1) { --reveal-x: -4px; }
-.skin-floating .list-reveal > div > div:nth-child(3n + 2) { --reveal-x: 3px; }
+.skin-floating .list-reveal > div > div:nth-child(3n + 1) { --reveal-x: -5px; }
+.skin-floating .list-reveal > div > div:nth-child(3n + 2) { --reveal-x: 4px; }
 .skin-floating .list-reveal > div > div:nth-child(3n) { --reveal-x: -2px; }
 .skin-floating .list-reveal > div > div:nth-child(1) .entry-card,
 .skin-floating .list-reveal > div > div:nth-child(1) .entry-compact { animation-delay: 0ms; }
 .skin-floating .list-reveal > div > div:nth-child(2) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(2) .entry-compact { animation-delay: 45ms; }
+.skin-floating .list-reveal > div > div:nth-child(2) .entry-compact { animation-delay: 60ms; }
 .skin-floating .list-reveal > div > div:nth-child(3) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(3) .entry-compact { animation-delay: 90ms; }
+.skin-floating .list-reveal > div > div:nth-child(3) .entry-compact { animation-delay: 120ms; }
 .skin-floating .list-reveal > div > div:nth-child(4) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(4) .entry-compact { animation-delay: 135ms; }
+.skin-floating .list-reveal > div > div:nth-child(4) .entry-compact { animation-delay: 240ms; }
 .skin-floating .list-reveal > div > div:nth-child(5) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(5) .entry-compact { animation-delay: 180ms; }
+.skin-floating .list-reveal > div > div:nth-child(5) .entry-compact { animation-delay: 240ms; }
 .skin-floating .list-reveal > div > div:nth-child(6) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(6) .entry-compact { animation-delay: 225ms; }
+.skin-floating .list-reveal > div > div:nth-child(6) .entry-compact { animation-delay: 300ms; }
 .skin-floating .list-reveal > div > div:nth-child(7) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(7) .entry-compact { animation-delay: 270ms; }
+.skin-floating .list-reveal > div > div:nth-child(7) .entry-compact { animation-delay: 360ms; }
 .skin-floating .list-reveal > div > div:nth-child(n + 8) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(n + 8) .entry-compact { animation-delay: 315ms; }
+.skin-floating .list-reveal > div > div:nth-child(n + 8) .entry-compact { animation-delay: 420ms; }
 
 /* Cardinality's rows arrive from above, filling the list downward the way
    the menu lists in the source do (user: "上からパラパラと流れてくる感じの方が
@@ -1709,9 +1767,9 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 @keyframes card-reveal-drop {
   from {
     opacity: 0;
-    translate: var(--reveal-x, 0) -6px;
+    translate: var(--reveal-x, 0) -26px;
   }
-  70% {
+  55% {
     opacity: 1;
   }
   to {
