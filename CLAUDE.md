@@ -196,13 +196,15 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
     （`@`始まりの名前、CJKフォントに付随することが多い）は除外。`windows-sys`のこのAPI周りの
     型（`LPARAM`は tupleではなく`isize`のtype alias、`DEFAULT_CHARSET`は既に`u8`など）は
     実際に`cargo build`のエラーを見ながら確定させた
-  - これに伴い`appearanceStore`の`fontId`の意味が変わった: 5種類の固定IDの1つではなく、
-    実際のシステムフォントのファミリー名そのもの（空文字列 = 既定/上書きなし）。
-    マシンごとに変わる動的リストなので読み込み時のバリデーションは「文字列であること」のみ。
-    固定リストだった`src/lib/fonts.ts`は削除済み。`SettingsOverlay.tsx`のフォント欄は
-    数百件規模になり得るためボタングリッドではなく`<select>`（`FilterBar`のフィード選択と
-    同じ「popup側は`text-black`固定、closed box側はテーマ追従の`color`のまま」という
-    コントラスト対策を踏襲）
+  - `appearanceStore`は英数字用`latinFontId`と日本語用`japaneseFontId`を別々に保存する。
+    旧バージョンの`fontId`だけがある場合は初回読み込みで両方へコピーし、既存ユーザーの見た目を
+    保つ。実際のシステムフォント名そのものを保存し、空文字列はテーマ／システム既定を表す
+  - `App.tsx`は動的な`@font-face`エイリアスと`unicode-range`でLatinと日本語の担当範囲を分離する。
+    単純なfont-familyの並び順だけでは、先頭のフォントがCJKグリフを持つ場合に日本語設定が
+    無視されるため。ターミナルの未指定時はLatin=`Cascadia Mono`→`Consolas`、日本語=
+    `BIZ UDGothic`→`Yu Gothic UI`→`MS Gothic`の順。ユーザーの保存値自体はテーマ変更で上書きしない
+  - 固定リストだった`src/lib/fonts.ts`は削除済み。数百件規模の候補は検索欄付きの
+    `FontPicker.tsx`で選ぶ。英数字／日本語の両Pickerは同じ列挙結果を再利用する
 - 画面遷移モデルの刷新（バグ報告「設定パネルが画面に写っていなくてもクリックで展開できる」+
   要望「画面が切り替わるような動作にしたい」）:
   - 原因は`uiStore`が`feedManagerOpen`/`historyOpen`/`settingsOpen`という3つの独立した
@@ -235,14 +237,17 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
     アクセント化の対象外にした（選択中を示すアクセントと役割が違うため）
   - `Skin.category`で`basic | contrast | style`に分類し、設定画面では3グループに分けて表示する。
     `visualStyle`を持つオーロラ／ベルベット／ターミナルだけが配色以外の背景処理や書体・形状を
-    変更する。通常テーマへスタイル用CSSを漏らさないこと。オーロラ／ベルベットは3色の光源と
-    半透明面・内側ハイライトで立体感を出すが、スクロールする記事カードへの`backdrop-filter`は
-    再描画負荷を避けるため使わない。ターミナルは選択中だけダーク表示へ固定し、保存済みの
-    `themeMode`自体は上書きしない。低コントラストのデータストリームは`aria-hidden`かつ
-    `prefers-reduced-motion`対応にする
+    変更する。通常テーマへスタイル用CSSを漏らさないこと。オーロラ／ベルベットは3色の光源、
+    半透明面、内側ハイライト、限定的な`backdrop-filter`で磨りガラスの奥行きを出す。
+    ターミナルは選択中だけダーク表示へ固定し、保存済みの`themeMode`自体は上書きしない。
+    データストリームは起動ごとに列位置・長さ・速度・開始位相を生成して機械的な反復を避け、
+    `aria-hidden`かつ`prefers-reduced-motion`対応にする
   - 設定画面の5区分は個別に折りたためる。初期状態は「見た目」のみ開き、開閉状態を
     `rss-widget:settings-sections`へ保存する。折りたたんだ内容は`hidden`で非表示にして、
     データ保存先などの状態を閉じるたびに失わないようDOMは維持する
+  - 通常のUIと記事カードは`user-select: none`にし、ドラッグ操作で文字列を誤選択しない。
+    リーダー本文、入力欄、データ保存先（`.allow-text-selection`）だけは選択可能。選択可能領域の
+    外を押した際は`window.getSelection().removeAllRanges()`で残った選択も解除する
 - アイコンの再選定（「機能に対して連想しづらい」というフィードバック、`icons.tsx`）:
   - フィード管理用に使っていた`GearIcon`（汎用の歯車）は「設定全般」を指す記号として
     外観設定と意味が衝突し、「フィード管理」を連想させなかったため削除し、RSSの定番グリフ

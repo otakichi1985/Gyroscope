@@ -18,7 +18,8 @@ interface StoredAppearance {
   skinId: string;
   cardSize: CardSize;
   cardGap: CardGap;
-  fontId: string;
+  latinFontId: string;
+  japaneseFontId: string;
   alwaysOnTop: boolean;
   positionLocked: boolean;
   titleBarVisible: boolean;
@@ -38,7 +39,8 @@ function loadAppearance(): StoredAppearance {
     skinId: DEFAULT_SKIN_ID,
     cardSize: "medium",
     cardGap: "normal",
-    fontId: "",
+    latinFontId: "",
+    japaneseFontId: "",
     alwaysOnTop: false,
     positionLocked: false,
     titleBarVisible: false,
@@ -52,7 +54,7 @@ function loadAppearance(): StoredAppearance {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return fallback;
   try {
-    const parsed = JSON.parse(raw) as Partial<StoredAppearance>;
+    const parsed = JSON.parse(raw) as Partial<StoredAppearance> & { fontId?: unknown };
     const opacity =
       typeof parsed.opacity === "number" && parsed.opacity >= MIN_OPACITY && parsed.opacity <= MAX_OPACITY
         ? parsed.opacity
@@ -60,11 +62,16 @@ function loadAppearance(): StoredAppearance {
     const skinId = SKINS.some((s) => s.id === parsed.skinId) ? (parsed.skinId as string) : fallback.skinId;
     const cardSize = CARD_SIZES.includes(parsed.cardSize as CardSize) ? (parsed.cardSize as CardSize) : fallback.cardSize;
     const cardGap = CARD_GAPS.includes(parsed.cardGap as CardGap) ? (parsed.cardGap as CardGap) : fallback.cardGap;
-    // fontId is now the actual system font family name (empty string =
-    // default/no override) rather than one of a fixed curated set, so there
-    // is no static list to validate membership against -- just require it
-    // to be a string.
-    const fontId = typeof parsed.fontId === "string" ? parsed.fontId : fallback.fontId;
+    // Before the Latin/Japanese split, one `fontId` controlled every script.
+    // Copy that legacy value into both new fields so existing installations
+    // keep exactly the same typography until the user changes either picker.
+    const legacyFontId = typeof parsed.fontId === "string" ? parsed.fontId : "";
+    const latinFontId =
+      typeof parsed.latinFontId === "string" ? parsed.latinFontId : legacyFontId || fallback.latinFontId;
+    const japaneseFontId =
+      typeof parsed.japaneseFontId === "string"
+        ? parsed.japaneseFontId
+        : legacyFontId || fallback.japaneseFontId;
     const alwaysOnTop = typeof parsed.alwaysOnTop === "boolean" ? parsed.alwaysOnTop : fallback.alwaysOnTop;
     const positionLocked = typeof parsed.positionLocked === "boolean" ? parsed.positionLocked : fallback.positionLocked;
     const titleBarVisible =
@@ -88,7 +95,8 @@ function loadAppearance(): StoredAppearance {
       skinId,
       cardSize,
       cardGap,
-      fontId,
+      latinFontId,
+      japaneseFontId,
       alwaysOnTop,
       positionLocked,
       titleBarVisible,
@@ -113,7 +121,8 @@ interface AppearanceState extends StoredAppearance {
   setSkin: (id: string) => void;
   setCardSize: (size: CardSize) => void;
   setCardGap: (gap: CardGap) => void;
-  setFont: (id: string) => void;
+  setLatinFont: (id: string) => void;
+  setJapaneseFont: (id: string) => void;
   setAlwaysOnTop: (value: boolean) => void;
   setPositionLocked: (value: boolean) => void;
   setTitleBarVisible: (value: boolean) => void;
@@ -149,9 +158,14 @@ export const useAppearanceStore = create<AppearanceState>((set, get) => ({
     save({ ...get(), cardGap: gap });
   },
 
-  setFont: (id: string) => {
-    set({ fontId: id });
-    save({ ...get(), fontId: id });
+  setLatinFont: (id: string) => {
+    set({ latinFontId: id });
+    save({ ...get(), latinFontId: id });
+  },
+
+  setJapaneseFont: (id: string) => {
+    set({ japaneseFontId: id });
+    save({ ...get(), japaneseFontId: id });
   },
 
   setAlwaysOnTop: (value: boolean) => {

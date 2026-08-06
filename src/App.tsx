@@ -24,10 +24,55 @@ import { useUiStore } from "./stores/uiStore";
 // feedback: "not moving around, glowing bigger at an edge, heartbeat-like").
 const IDLE_PATTERNS = ["idle-corner-tl", "idle-corner-tr", "idle-corner-bl", "idle-corner-br"];
 
+const LATIN_UNICODE_RANGE =
+  "U+0000-024F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF, U+2100-214F";
+const JAPANESE_UNICODE_RANGE =
+  "U+2E80-2FDF, U+3000-30FF, U+31F0-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF";
+const TERMINAL_LATIN_FONTS = ["Cascadia Mono", "Consolas"];
+const TERMINAL_JAPANESE_FONTS = ["BIZ UDGothic", "Yu Gothic UI", "MS Gothic"];
+
+function safeFontName(name: string) {
+  return name.replace(/[\\"<>\r\n]/g, "").trim();
+}
+
+function fontFaceRule(alias: string, names: string[], unicodeRange: string) {
+  const sources = names.map(safeFontName).filter(Boolean).map((name) => `local("${name}")`);
+  if (sources.length === 0) return "";
+  return `@font-face{font-family:"${alias}";src:${sources.join(",")};font-display:swap;unicode-range:${unicodeRange};}`;
+}
+
+function createTerminalStreams(count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const length = 22 + Math.floor(Math.random() * 96);
+    const duration = 16 + Math.random() * 23;
+    const laneCenter = ((index + 0.5) / count) * 100;
+    return {
+      bits: Array.from({ length }, () => (Math.random() > 0.5 ? "1" : "0")).join(""),
+      style: {
+        left: `${Math.max(2, Math.min(98, laneCenter + (Math.random() - 0.5) * 7))}%`,
+        fontSize: `${8 + Math.random() * 2.5}px`,
+        opacity: 0.55 + Math.random() * 0.45,
+        animationDuration: `${duration.toFixed(1)}s`,
+        animationDelay: `${(-Math.random() * duration).toFixed(1)}s`,
+      } as React.CSSProperties,
+    };
+  });
+}
+
+const TERMINAL_STREAMS = createTerminalStreams(9);
+
 function App() {
   const vibrancy = useVibrancyMode();
-  const { opacity, skinId, fontId, alwaysOnTop, titleBarVisible, minimizeToTray, themeMode } =
-    useAppearanceStore();
+  const {
+    opacity,
+    skinId,
+    latinFontId,
+    japaneseFontId,
+    alwaysOnTop,
+    titleBarVisible,
+    minimizeToTray,
+    themeMode,
+  } = useAppearanceStore();
   const isTimeline = useUiStore((s) => s.activeScreen === "timeline");
   useFeedsUpdatedListener();
   const isIdle = useIdleTimer();
@@ -77,6 +122,16 @@ function App() {
     spotlightRef.current?.style.setProperty("--spot-y", `${e.clientY - rect.top}px`);
   }
 
+  function handleRootPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    const target = e.target;
+    if (
+      target instanceof Element &&
+      !target.closest("input, textarea, [contenteditable='true'], .allow-text-selection")
+    ) {
+      window.getSelection()?.removeAllRanges();
+    }
+  }
+
   // No vibrancy backdrop means nothing but the raw desktop sits behind this
   // window -- forcing full opacity here keeps that case looking solid
   // instead of a very plain flat-colored window with no blur to soften it.
@@ -85,27 +140,54 @@ function App() {
   useSyncAlwaysOnTop(alwaysOnTop);
   useSyncMinimizeToTray(minimizeToTray);
 
+  const terminalStyle = skin.visualStyle === "terminal";
+  const latinSources = latinFontId
+    ? [latinFontId]
+    : terminalStyle
+      ? TERMINAL_LATIN_FONTS
+      : [];
+  const japaneseSources = japaneseFontId
+    ? [japaneseFontId]
+    : terminalStyle
+      ? TERMINAL_JAPANESE_FONTS
+      : [];
+  const splitFontCss = [
+    fontFaceRule("RssWidgetLatin", latinSources, LATIN_UNICODE_RANGE),
+    fontFaceRule("RssWidgetJapanese", japaneseSources, JAPANESE_UNICODE_RANGE),
+  ].join("");
+  const resolvedFontFamilies = [
+    latinSources.length > 0 ? '"RssWidgetLatin"' : "",
+    japaneseSources.length > 0 ? '"RssWidgetJapanese"' : "",
+    "ui-sans-serif",
+    "system-ui",
+    "sans-serif",
+  ].filter(Boolean);
+
   const panelStyle = {
     "--panel-rgb-light": skin.light,
     "--panel-rgb-dark": skin.dark,
     "--accent-rgb-light": skin.accentLight,
     "--accent-rgb-dark": skin.accentDark,
-    ...(fontId ? { fontFamily: `"${fontId}", sans-serif` } : {}),
+    ...(latinSources.length > 0 || japaneseSources.length > 0
+      ? { fontFamily: resolvedFontFamilies.join(", ") }
+      : {}),
   } as React.CSSProperties;
   const skinStyleClass = skin.visualStyle ? `skin-${skin.visualStyle}` : "";
 
   return (
     <div
       style={panelStyle}
+      onPointerDown={handleRootPointerDown}
       className={`${isDark ? "dark" : ""} ${skinStyleClass} panel-bg relative isolate flex h-screen w-screen flex-col overflow-hidden text-neutral-900 ring-1 ring-inset ring-black/10 dark:text-neutral-100 dark:ring-white/10`}
     >
+      {splitFontCss && <style>{splitFontCss}</style>}
       {skin.visualStyle === "terminal" && (
         <div className="terminal-data-stream" aria-hidden="true">
-          <span>0100100101100011011010000110100101100111011011110101010001100101011100100110110101101001011011100110000101101100</span>
-          <span>0011000100110000001100010011000000110001001100010011000000110001001100000011000000110001001100010011000000110001</span>
-          <span>010100100101001101010011001000000110011001100101011001010110010000100000011100110111010001110010011001010110000101101101</span>
-          <span>011101110110100101100100011001110110010101110100001000000110111101101110011011000110100101101110011001010010000001100100011000010111010001100001</span>
-          <span>001101000110011000110010001100000110000100110111011000110011100100110001001100010110010000110000001101010110010100110001011000100110001100110110</span>
+          {TERMINAL_STREAMS.map((stream, index) => (
+            <span key={index} style={stream.style}>
+              {stream.bits}
+            </span>
+          ))}
         </div>
       )}
       {titleBarVisible && <TitleBar />}
