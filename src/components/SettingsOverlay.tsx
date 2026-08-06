@@ -37,6 +37,12 @@ const THEME_MODES: { id: ThemeMode; label: string }[] = [
   { id: "dark", label: "ダーク" },
 ];
 
+const SKIN_GROUPS = [
+  { id: "basic", label: "ベーシック" },
+  { id: "contrast", label: "コントラスト" },
+  { id: "style", label: "スタイル" },
+] as const;
+
 function ToggleRow({
   label,
   value,
@@ -244,6 +250,7 @@ export function SettingsOverlay() {
   } = useAppearanceStore();
   const vibrancy = useVibrancyMode();
   const opacityDisabled = vibrancy === "none";
+  const selectedSkin = SKINS.find((skin) => skin.id === skinId) ?? SKINS[0];
 
   const [systemFonts, setSystemFonts] = useState<string[] | null>(null);
   useEffect(() => {
@@ -265,7 +272,7 @@ export function SettingsOverlay() {
         <section className="flex flex-col gap-4">
         <h2 className="text-xs font-semibold tracking-wide opacity-70">見た目</h2>
         <div>
-          <div className="mb-1.5 text-xs font-medium opacity-70">表示テーマ</div>
+          <div className="mb-1.5 text-xs font-medium opacity-70">表示モード</div>
           <div className="flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
             {THEME_MODES.map(({ id, label }) => (
               <button
@@ -285,48 +292,57 @@ export function SettingsOverlay() {
           </p>
         </div>
         <div>
-          <div className="mb-1.5 text-xs font-medium opacity-70">スキン</div>
-          <div className="grid grid-cols-2 gap-2">
-            {SKINS.map((skin) => (
-              <button
-                key={skin.id}
-                type="button"
-                onClick={() => setSkin(skin.id)}
-                className={`flex items-center gap-2 rounded border px-2 py-1.5 text-left text-xs transition-colors duration-150 ${
-                  skinId === skin.id
-                    ? "accent-border"
-                    : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
-                }`}
-              >
-                {skin.dualSwatch ? (
-                  <span
-                    className="skin-swatch-frame h-4 w-4 shrink-0 overflow-hidden rounded-full border border-black/15 dark:border-white/25"
-                    style={
-                      {
-                        "--swatch-primary": skin.swatchPrimary,
-                        "--swatch-complement": skin.swatchComplement,
-                      } as React.CSSProperties
-                    }
-                  >
-                    <span className="skin-swatch-dual block h-full w-full" />
-                  </span>
-                ) : (
-                  <span
-                    className="skin-swatch-frame h-4 w-4 shrink-0 overflow-hidden rounded-full border border-black/15 dark:border-white/25"
-                    style={
-                      {
-                        "--swatch-rgb-light": skin.accentLight,
-                        "--swatch-rgb-dark": skin.accentDark,
-                      } as React.CSSProperties
-                    }
-                  >
-                    <span className="skin-swatch block h-full w-full" />
-                  </span>
-                )}
-                {skin.label}
-              </button>
+          <div className="mb-2 text-xs font-medium opacity-70">カラーテーマ</div>
+          <div className="flex flex-col gap-3">
+            {SKIN_GROUPS.map((group) => (
+              <div key={group.id}>
+                <div className="mb-1.5 text-[10px] font-medium tracking-wide opacity-50">{group.label}</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {SKINS.filter((skin) => skin.category === group.id).map((skin) => (
+                    <button
+                      key={skin.id}
+                      type="button"
+                      aria-pressed={skinId === skin.id}
+                      onClick={() => setSkin(skin.id)}
+                      className={`flex min-w-0 items-center gap-2 rounded border px-2 py-1.5 text-left text-xs transition-colors duration-150 ${
+                        skinId === skin.id
+                          ? "accent-border accent-bg-soft"
+                          : "border-black/10 hover:border-black/20 hover:bg-black/[0.03] dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      {skin.dualSwatch ? (
+                        <span
+                          className="skin-swatch-frame h-4 w-4 shrink-0 overflow-hidden rounded-full border border-black/15 dark:border-white/25"
+                          style={
+                            {
+                              "--swatch-primary": skin.swatchPrimary,
+                              "--swatch-complement": skin.swatchComplement,
+                            } as React.CSSProperties
+                          }
+                        >
+                          <span className="skin-swatch-dual block h-full w-full" />
+                        </span>
+                      ) : (
+                        <span
+                          className="skin-swatch-frame h-4 w-4 shrink-0 overflow-hidden rounded-full border border-black/15 dark:border-white/25"
+                          style={
+                            {
+                              "--swatch-rgb-light": skin.swatchLight ?? skin.accentLight,
+                              "--swatch-rgb-dark": skin.swatchDark ?? skin.accentDark,
+                            } as React.CSSProperties
+                          }
+                        >
+                          <span className="skin-swatch block h-full w-full" />
+                        </span>
+                      )}
+                      <span className="truncate">{skin.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
+          <p className="mt-2 text-xs leading-relaxed opacity-60">{selectedSkin.description}</p>
         </div>
 
         <div>

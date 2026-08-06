@@ -86,11 +86,12 @@ function App() {
     "--accent-rgb-dark": skin.accentDark,
     ...(fontId ? { fontFamily: `"${fontId}", sans-serif` } : {}),
   } as React.CSSProperties;
+  const skinStyleClass = skin.visualStyle ? `skin-${skin.visualStyle}` : "";
 
   return (
     <div
       style={panelStyle}
-      className={`${isDark ? "dark" : ""} panel-bg flex h-screen w-screen flex-col overflow-hidden text-neutral-900 ring-1 ring-inset ring-black/10 dark:text-neutral-100 dark:ring-white/10`}
+      className={`${isDark ? "dark" : ""} ${skinStyleClass} panel-bg flex h-screen w-screen flex-col overflow-hidden text-neutral-900 ring-1 ring-inset ring-black/10 dark:text-neutral-100 dark:ring-white/10`}
     >
       {titleBarVisible && <TitleBar />}
       <FilterBar />
