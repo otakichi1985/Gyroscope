@@ -87,8 +87,8 @@ function App() {
   // different skin restores the mode they had chosen before.
   const isDark =
     skin.visualStyle === "terminal" ||
-    themeMode === "dark" ||
-    (themeMode === "system" && systemDark);
+    (skin.visualStyle !== "link" &&
+      (themeMode === "dark" || (themeMode === "system" && systemDark)));
 
   useLayoutEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -188,6 +188,13 @@ function App() {
               {stream.bits}
             </span>
           ))}
+        </div>
+      )}
+      {skin.visualStyle === "link" && (
+        <div className="link-interface-lines" aria-hidden="true">
+          <span />
+          <span />
+          <span />
         </div>
       )}
       {titleBarVisible && <TitleBar />}
