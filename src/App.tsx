@@ -179,7 +179,7 @@ function App() {
     <div
       style={panelStyle}
       onPointerDown={handleRootPointerDown}
-      className={`${isDark ? "dark" : ""} ${skinStyleClass} panel-bg relative isolate flex h-screen w-screen flex-col overflow-hidden text-neutral-900 ring-1 ring-inset ring-black/10 dark:text-neutral-100 dark:ring-white/10`}
+      className={`${isDark ? "dark" : ""} ${skinStyleClass} ${isIdle ? "app-idle" : ""} panel-bg relative isolate flex h-screen w-screen flex-col overflow-hidden text-neutral-900 ring-1 ring-inset ring-black/10 dark:text-neutral-100 dark:ring-white/10`}
     >
       {splitFontCss && <style>{splitFontCss}</style>}
       {skin.visualStyle === "terminal" && (
