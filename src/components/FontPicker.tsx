@@ -11,6 +11,7 @@ interface FontPickerProps {
 const GAP_PX = 4;
 const MAX_LIST_HEIGHT_PX = 220;
 const MIN_LIST_HEIGHT_PX = 100;
+const POPUP_CHROME_PX = 32;
 
 /// A dropdown for the (potentially hundreds of entries long) system font
 /// list. A native <select> was used originally, but its popup is an
@@ -35,12 +36,17 @@ export function FontPicker({ value, options, onChange }: FontPickerProps) {
     if (!rect) return;
     const spaceBelow = window.innerHeight - rect.bottom - GAP_PX;
     const spaceAbove = rect.top - GAP_PX;
-    const openUpward = spaceBelow < MIN_LIST_HEIGHT_PX && spaceAbove > spaceBelow;
-    const available = Math.max(MIN_LIST_HEIGHT_PX, Math.min(MAX_LIST_HEIGHT_PX, openUpward ? spaceAbove : spaceBelow));
+    const openUpward = spaceBelow < MIN_LIST_HEIGHT_PX + POPUP_CHROME_PX && spaceAbove > spaceBelow;
+    // Reserve space for the filter input and popup borders, and never make
+    // the list taller than the viewport can actually show.
+    const available = Math.max(
+      0,
+      Math.min(MAX_LIST_HEIGHT_PX, (openUpward ? spaceAbove : spaceBelow) - POPUP_CHROME_PX),
+    );
     setPos({
       left: rect.left,
       width: rect.width,
-      top: openUpward ? rect.top - GAP_PX - available : rect.bottom + GAP_PX,
+      top: openUpward ? rect.top - GAP_PX - available - POPUP_CHROME_PX : rect.bottom + GAP_PX,
       maxHeight: available,
     });
     setFilter("");
@@ -57,10 +63,11 @@ export function FontPicker({ value, options, onChange }: FontPickerProps) {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    // The settings panel itself scrolls, which would leave this
-    // fixed-positioned popup floating over the wrong spot -- simplest fix
-    // is to just close it on any scroll rather than tracking position.
-    function handleScroll() {
+    // The settings panel scrolling should dismiss this fixed popup, but the
+    // font list's own scroll must remain usable.
+    function handleScroll(e: Event) {
+      const target = e.target;
+      if (target instanceof Node && listRef.current?.contains(target)) return;
       setOpen(false);
     }
     document.addEventListener("mousedown", handlePointerDown);
