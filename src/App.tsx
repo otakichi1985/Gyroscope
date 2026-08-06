@@ -87,7 +87,8 @@ function App() {
   // different skin restores the mode they had chosen before.
   const isDark =
     skin.visualStyle === "terminal" ||
-    (skin.visualStyle !== "link" &&
+    skin.visualStyle === "ordinary" ||
+    (skin.visualStyle !== "cardinality" &&
       (themeMode === "dark" || (themeMode === "system" && systemDark)));
 
   useLayoutEffect(() => {
@@ -190,11 +191,19 @@ function App() {
           ))}
         </div>
       )}
-      {skin.visualStyle === "link" && (
-        <div className="link-interface-lines" aria-hidden="true">
+      {skin.visualStyle === "cardinality" && (
+        <div className="cardinality-interface" aria-hidden="true">
           <span />
           <span />
           <span />
+        </div>
+      )}
+      {skin.visualStyle === "ordinary" && (
+        <div className="ordinary-hud" aria-hidden="true">
+          <span className="ordinary-orbit ordinary-orbit-a" />
+          <span className="ordinary-orbit ordinary-orbit-b" />
+          <span className="ordinary-orbit ordinary-orbit-c" />
+          <i className="ordinary-reticle" />
         </div>
       )}
       {titleBarVisible && <TitleBar />}
