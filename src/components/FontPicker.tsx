@@ -6,6 +6,8 @@ interface FontPickerProps {
   value: string; // "" = default (no override)
   options: string[] | null; // null = still loading
   onChange: (value: string) => void;
+  defaultLabel?: string;
+  previewText?: string;
 }
 
 const GAP_PX = 4;
@@ -24,7 +26,13 @@ const POPUP_CHROME_PX = 32;
 /// own inner height, so it's guaranteed to stay inside the window -- plus a
 /// filter box, which a plain constrained list of hundreds of items would
 /// otherwise be painful to scroll through by mouse alone.
-export function FontPicker({ value, options, onChange }: FontPickerProps) {
+export function FontPicker({
+  value,
+  options,
+  onChange,
+  defaultLabel = "既定",
+  previewText,
+}: FontPickerProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -92,7 +100,10 @@ export function FontPicker({ value, options, onChange }: FontPickerProps) {
         style={value ? { fontFamily: `"${value}"` } : undefined}
         className="flex w-full items-center justify-between gap-2 rounded border border-black/10 bg-black/5 px-2 py-1.5 text-left text-xs outline-none disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
       >
-        <span className="truncate">{value || "既定"}</span>
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span className="truncate">{value || defaultLabel}</span>
+          {previewText && <span className="shrink-0 opacity-55">{previewText}</span>}
+        </span>
         <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
       </button>
       {open &&
@@ -134,7 +145,7 @@ export function FontPicker({ value, options, onChange }: FontPickerProps) {
                   !value ? "font-medium" : ""
                 }`}
               >
-                既定
+                {defaultLabel}
               </button>
               {filtered.map((name) => (
                 <button
@@ -145,11 +156,12 @@ export function FontPicker({ value, options, onChange }: FontPickerProps) {
                     setOpen(false);
                   }}
                   style={{ fontFamily: `"${name}"` }}
-                  className={`block w-full truncate px-2 py-1 text-left text-xs text-neutral-900 transition-colors duration-150 hover:bg-black/5 dark:text-neutral-100 dark:hover:bg-white/10 ${
+                  className={`flex w-full items-baseline justify-between gap-3 px-2 py-1 text-left text-xs text-neutral-900 transition-colors duration-150 hover:bg-black/5 dark:text-neutral-100 dark:hover:bg-white/10 ${
                     value === name ? "font-medium" : ""
                   }`}
                 >
-                  {name}
+                  <span className="truncate">{name}</span>
+                  {previewText && <span className="shrink-0 opacity-55">{previewText}</span>}
                 </button>
               ))}
               {filtered.length === 0 && <p className="px-2 py-1 text-xs text-neutral-500">見つかりません</p>}

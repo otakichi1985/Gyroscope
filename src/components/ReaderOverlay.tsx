@@ -78,7 +78,7 @@ export function ReaderOverlay() {
         </button>
       }
     >
-      <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm">
+      <div className="allow-text-selection min-h-0 flex-1 overflow-y-auto p-3 text-sm">
         {!entry ? (
           <p className="p-1 text-xs opacity-60">記事を読み込めませんでした</p>
         ) : (

@@ -191,7 +191,7 @@ function DataDirSection() {
             ポータブル版（パッケージ内に保存）
           </span>
         )}
-        <p className="break-all rounded bg-black/5 px-2 py-1.5 font-mono text-[11px] dark:bg-white/5">
+        <p className="allow-text-selection break-all rounded bg-black/5 px-2 py-1.5 font-mono text-[11px] dark:bg-white/5">
           {info?.path ?? "読み込み中..."}
         </p>
         {info?.fallback_reason && <p className="text-xs text-red-500">{info.fallback_reason}</p>}
@@ -277,7 +277,8 @@ export function SettingsOverlay() {
     skinId,
     cardSize,
     cardGap,
-    fontId,
+    latinFontId,
+    japaneseFontId,
     alwaysOnTop,
     positionLocked,
     titleBarVisible,
@@ -291,7 +292,8 @@ export function SettingsOverlay() {
     setSkin,
     setCardSize,
     setCardGap,
-    setFont,
+    setLatinFont,
+    setJapaneseFont,
     setAlwaysOnTop,
     setPositionLocked,
     setTitleBarVisible,
@@ -468,8 +470,34 @@ export function SettingsOverlay() {
         </div>
 
         <div>
-          <div className="mb-1.5 text-xs font-medium opacity-70">フォント</div>
-          <FontPicker value={fontId} options={systemFonts} onChange={setFont} />
+          <div className="mb-2 text-xs font-medium opacity-70">フォント</div>
+          <div className="flex flex-col gap-2.5">
+            <div>
+              <div className="mb-1 text-[11px] opacity-60">英数字・記号</div>
+              <FontPicker
+                value={latinFontId}
+                options={systemFonts}
+                onChange={setLatinFont}
+                defaultLabel={terminalSelected ? "ターミナル既定" : "システム既定"}
+                previewText="Aa 0123"
+              />
+            </div>
+            <div>
+              <div className="mb-1 text-[11px] opacity-60">日本語</div>
+              <FontPicker
+                value={japaneseFontId}
+                options={systemFonts}
+                onChange={setJapaneseFont}
+                defaultLabel={terminalSelected ? "ターミナル既定" : "システム既定"}
+                previewText="日本語 かな"
+              />
+            </div>
+          </div>
+          {terminalSelected && (
+            <p className="mt-1.5 text-xs leading-relaxed opacity-60">
+              未指定時は英数字にCascadia Mono、日本語に細身のBIZ UDGothicを使います
+            </p>
+          )}
         </div>
         </SettingsSection>
 
