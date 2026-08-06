@@ -347,30 +347,105 @@ html {
 /* Rich style themes add a controlled material treatment on top of the
    palette. They are intentionally scoped to the selected skin so the
    established basic and contrast themes remain unchanged. */
+.skin-aurora {
+  --rich-primary: 34 211 238;
+  --rich-secondary: 168 85 247;
+  --rich-tertiary: 244 114 182;
+}
 .skin-aurora.panel-bg,
 .skin-aurora .panel-bg {
   background-image:
-    radial-gradient(circle at 12% 0%, rgb(34 211 238 / 0.14), transparent 38%),
-    radial-gradient(circle at 100% 78%, rgb(168 85 247 / 0.1), transparent 42%);
+    radial-gradient(circle at 12% 0%, rgb(var(--rich-primary) / 0.18), transparent 38%),
+    radial-gradient(circle at 100% 72%, rgb(var(--rich-secondary) / 0.14), transparent 42%),
+    radial-gradient(circle at 54% 110%, rgb(var(--rich-tertiary) / 0.1), transparent 34%);
 }
 .dark.skin-aurora.panel-bg,
 .dark.skin-aurora .panel-bg {
   background-image:
-    radial-gradient(circle at 12% 0%, rgb(34 211 238 / 0.12), transparent 40%),
-    radial-gradient(circle at 100% 78%, rgb(168 85 247 / 0.11), transparent 44%);
+    radial-gradient(circle at 12% 0%, rgb(var(--rich-primary) / 0.15), transparent 40%),
+    radial-gradient(circle at 100% 72%, rgb(var(--rich-secondary) / 0.15), transparent 44%),
+    radial-gradient(circle at 54% 110%, rgb(var(--rich-tertiary) / 0.1), transparent 36%);
 }
 
+.skin-velvet {
+  --rich-primary: 225 55 104;
+  --rich-secondary: 245 158 11;
+  --rich-tertiary: 56 189 248;
+}
 .skin-velvet.panel-bg,
 .skin-velvet .panel-bg {
   background-image:
-    radial-gradient(circle at 100% 0%, rgb(225 55 104 / 0.09), transparent 38%),
-    radial-gradient(circle at 0% 100%, rgb(245 158 11 / 0.08), transparent 42%);
+    radial-gradient(circle at 100% 0%, rgb(var(--rich-primary) / 0.14), transparent 38%),
+    radial-gradient(circle at 0% 100%, rgb(var(--rich-secondary) / 0.12), transparent 42%),
+    radial-gradient(circle at 46% -12%, rgb(var(--rich-tertiary) / 0.08), transparent 32%);
 }
 .dark.skin-velvet.panel-bg,
 .dark.skin-velvet .panel-bg {
   background-image:
-    radial-gradient(circle at 100% 0%, rgb(225 55 104 / 0.12), transparent 40%),
-    radial-gradient(circle at 0% 100%, rgb(245 158 11 / 0.08), transparent 44%);
+    radial-gradient(circle at 100% 0%, rgb(var(--rich-primary) / 0.16), transparent 40%),
+    radial-gradient(circle at 0% 100%, rgb(var(--rich-secondary) / 0.11), transparent 44%),
+    radial-gradient(circle at 46% -12%, rgb(var(--rich-tertiary) / 0.09), transparent 34%);
+}
+
+/* Aurora and Velvet use three light sources: two identity colors plus a
+   quieter tertiary glint. Translucent fills and inset highlights provide
+   the liquid-glass depth without applying backdrop-filter to scrolling
+   article cards (which would trigger expensive continuous repaints). */
+.skin-aurora .entry-card,
+.skin-velvet .entry-card {
+  background-color: rgb(255 255 255 / 0.18);
+  background-image: linear-gradient(
+    135deg,
+    rgb(255 255 255 / 0.34),
+    rgb(var(--rich-secondary) / 0.045) 52%,
+    rgb(var(--rich-tertiary) / 0.04)
+  );
+  border-color: rgb(var(--rich-primary) / 0.16);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    inset 0 -1px 0 rgb(var(--rich-secondary) / 0.06),
+    0 7px 20px rgb(var(--rich-secondary) / 0.045);
+}
+.dark.skin-aurora .entry-card,
+.dark.skin-velvet .entry-card {
+  background-color: rgb(255 255 255 / 0.025);
+  background-image: linear-gradient(
+    135deg,
+    rgb(255 255 255 / 0.055),
+    rgb(var(--rich-secondary) / 0.045) 52%,
+    rgb(var(--rich-tertiary) / 0.035)
+  );
+  border-color: rgb(var(--rich-primary) / 0.13);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    inset 0 -1px 0 rgb(var(--rich-secondary) / 0.08),
+    0 8px 22px rgb(0 0 0 / 0.08);
+}
+.skin-aurora .accent-bg-soft,
+.skin-velvet .accent-bg-soft {
+  background-color: rgb(var(--rich-primary) / 0.12);
+  background-image: linear-gradient(
+    135deg,
+    rgb(var(--rich-primary) / 0.18),
+    rgb(var(--rich-secondary) / 0.12) 56%,
+    rgb(var(--rich-tertiary) / 0.11)
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.34),
+    0 4px 12px rgb(var(--rich-secondary) / 0.06);
+}
+.dark.skin-aurora .accent-bg-soft,
+.dark.skin-velvet .accent-bg-soft {
+  background-color: rgb(var(--rich-primary) / 0.14);
+  background-image: linear-gradient(
+    135deg,
+    rgb(var(--rich-primary) / 0.2),
+    rgb(var(--rich-secondary) / 0.15) 56%,
+    rgb(var(--rich-tertiary) / 0.12)
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 5px 14px rgb(0 0 0 / 0.09);
 }
 
 /* Tactical terminal is the only theme allowed to alter geometry/type. The
@@ -400,6 +475,70 @@ html {
 }
 .skin-terminal :where(button, input, select, .entry-card) {
   border-radius: 2px;
+}
+.skin-terminal .toggle-thumb,
+.skin-terminal .skin-swatch-frame {
+  border-radius: 1px;
+}
+
+/* Slow, low-contrast data columns add motion to Terminal without competing
+   with article text. The real element is aria-hidden in App.tsx and sits
+   under every interactive child of the root. */
+.skin-terminal > :not(.terminal-data-stream) {
+  position: relative;
+  z-index: 1;
+}
+.terminal-data-stream {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  overflow: hidden;
+  color: rgb(var(--accent-rgb-dark));
+  opacity: 0.045;
+  pointer-events: none;
+}
+.terminal-data-stream span {
+  justify-self: center;
+  writing-mode: vertical-rl;
+  font: 9px/1 "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  letter-spacing: 0.55em;
+  word-break: break-all;
+  transform: translateY(-72%);
+  animation: terminal-data-fall 24s linear infinite;
+  will-change: transform;
+}
+.terminal-data-stream span:nth-child(2) {
+  animation-duration: 31s;
+  animation-delay: -17s;
+}
+.terminal-data-stream span:nth-child(3) {
+  animation-duration: 27s;
+  animation-delay: -9s;
+}
+.terminal-data-stream span:nth-child(4) {
+  animation-duration: 35s;
+  animation-delay: -24s;
+}
+.terminal-data-stream span:nth-child(5) {
+  animation-duration: 29s;
+  animation-delay: -13s;
+}
+@keyframes terminal-data-fall {
+  to {
+    transform: translateY(38%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-data-stream {
+    opacity: 0.025;
+  }
+  .terminal-data-stream span {
+    animation: none;
+    transform: translateY(-12%);
+    will-change: auto;
+  }
 }
 
 /* In the monochrome dark skin the ON track is intentionally light. Give

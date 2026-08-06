@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { SKINS } from "../lib/skins";
@@ -13,6 +13,7 @@ import {
 import type { DataDirInfo } from "../lib/types";
 import { FontPicker } from "./FontPicker";
 import { ScreenOverlay } from "./ScreenOverlay";
+import { ChevronDownIcon } from "./icons";
 
 const CARD_SIZES: { id: CardSize; label: string }[] = [
   { id: "small", label: "小" },
@@ -42,6 +43,59 @@ const SKIN_GROUPS = [
   { id: "contrast", label: "コントラスト" },
   { id: "style", label: "スタイル" },
 ] as const;
+
+type SettingsSectionId = "appearance" | "accessibility" | "behavior" | "privacy" | "data";
+
+const SETTINGS_SECTIONS_STORAGE_KEY = "rss-widget:settings-sections";
+const DEFAULT_OPEN_SECTIONS: Record<SettingsSectionId, boolean> = {
+  appearance: true,
+  accessibility: false,
+  behavior: false,
+  privacy: false,
+  data: false,
+};
+
+function loadOpenSections(): Record<SettingsSectionId, boolean> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_SECTIONS_STORAGE_KEY) ?? "null") as
+      | Partial<Record<SettingsSectionId, boolean>>
+      | null;
+    return saved ? { ...DEFAULT_OPEN_SECTIONS, ...saved } : DEFAULT_OPEN_SECTIONS;
+  } catch {
+    return DEFAULT_OPEN_SECTIONS;
+  }
+}
+
+function SettingsSection({
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border-b border-black/10 pb-3 last:border-b-0 dark:border-white/10">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="group flex w-full items-center justify-between rounded px-1 py-1.5 text-left transition-colors duration-150 hover:bg-black/[0.035] dark:hover:bg-white/[0.05]"
+      >
+        <h2 className="text-xs font-semibold tracking-wide opacity-70">{title}</h2>
+        <ChevronDownIcon
+          className={`h-3.5 w-3.5 shrink-0 opacity-55 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      <div hidden={!open} className="flex flex-col gap-4 px-1 pt-3">
+        {children}
+      </div>
+    </section>
+  );
+}
 
 function ToggleRow({
   label,
@@ -251,6 +305,17 @@ export function SettingsOverlay() {
   const vibrancy = useVibrancyMode();
   const opacityDisabled = vibrancy === "none";
   const selectedSkin = SKINS.find((skin) => skin.id === skinId) ?? SKINS[0];
+  const terminalSelected = selectedSkin.visualStyle === "terminal";
+  const displayedThemeMode: ThemeMode = terminalSelected ? "dark" : themeMode;
+  const [openSections, setOpenSections] = useState(loadOpenSections);
+
+  const toggleSection = (id: SettingsSectionId) => {
+    setOpenSections((current) => {
+      const next = { ...current, [id]: !current[id] };
+      localStorage.setItem(SETTINGS_SECTIONS_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
 
   const [systemFonts, setSystemFonts] = useState<string[] | null>(null);
   useEffect(() => {
@@ -261,34 +326,33 @@ export function SettingsOverlay() {
 
   return (
     <ScreenOverlay screen="settings" title="設定">
-      <div className="flex flex-col gap-6 overflow-y-auto p-3 text-sm">
-        {/* Grouped into 4 labeled sections with dividers between them --
-            previously every field (スキン, 不透明度, カードサイズ, ... 10 in
-            total) sat in one flat flex-col with identical-weight labels, no
-            visual break between unrelated settings (reported as cluttered,
-            especially here in Appearance). Group headers use a visibly
-            lighter/smaller treatment than each field's own label so the two
-            levels of hierarchy don't compete. */}
-        <section className="flex flex-col gap-4">
-        <h2 className="text-xs font-semibold tracking-wide opacity-70">見た目</h2>
+      <div className="flex flex-col gap-3 overflow-y-auto p-3 text-sm">
+        <SettingsSection
+          title="見た目"
+          open={openSections.appearance}
+          onToggle={() => toggleSection("appearance")}
+        >
         <div>
           <div className="mb-1.5 text-xs font-medium opacity-70">表示モード</div>
-          <div className="flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
+          <div className={`flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5 ${terminalSelected ? "opacity-45" : ""}`}>
             {THEME_MODES.map(({ id, label }) => (
               <button
                 key={id}
                 type="button"
+                disabled={terminalSelected}
                 onClick={() => setThemeMode(id)}
                 className={`flex-1 rounded px-1.5 py-1 text-xs transition-colors duration-150 ${
-                  themeMode === id ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
-                }`}
+                  displayedThemeMode === id ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
+                } disabled:cursor-not-allowed`}
               >
                 {label}
               </button>
             ))}
           </div>
           <p className="mt-1.5 text-xs leading-relaxed opacity-60">
-            システムはWindowsのアプリモードに合わせて自動で切り替わります
+            {terminalSelected
+              ? "ターミナルは視認性と世界観を保つため、選択中のみダーク表示に固定されます"
+              : "システムはWindowsのアプリモードに合わせて自動で切り替わります"}
           </p>
         </div>
         <div>
@@ -407,13 +471,13 @@ export function SettingsOverlay() {
           <div className="mb-1.5 text-xs font-medium opacity-70">フォント</div>
           <FontPicker value={fontId} options={systemFonts} onChange={setFont} />
         </div>
-        </section>
+        </SettingsSection>
 
-        {/* Was the last section (after データ管理), which read oddly --
-            moved right after 見た目 since it's really about how the rest of
-            the appearance-related UI (icon labels) reads (user feedback). */}
-        <section className="flex flex-col gap-4 border-t border-black/10 pt-4 dark:border-white/10">
-        <h2 className="text-xs font-semibold tracking-wide opacity-70">アクセシビリティ</h2>
+        <SettingsSection
+          title="アクセシビリティ"
+          open={openSections.accessibility}
+          onToggle={() => toggleSection("accessibility")}
+        >
         <div className="flex flex-col gap-2">
           <ToggleRow label="アイコンにテキストラベルを表示" value={showIconLabels} onChange={setShowIconLabels} />
           <p className="max-w-[72ch] text-xs leading-relaxed opacity-70">
@@ -430,10 +494,13 @@ export function SettingsOverlay() {
             動く文字が気になる場合はOFFにしてください（OFFでも「…」で省略表示されます）
           </p>
         </div>
-        </section>
+        </SettingsSection>
 
-        <section className="flex flex-col gap-4 border-t border-black/10 pt-4 dark:border-white/10">
-        <h2 className="text-xs font-semibold tracking-wide opacity-70">動作</h2>
+        <SettingsSection
+          title="動作"
+          open={openSections.behavior}
+          onToggle={() => toggleSection("behavior")}
+        >
         <div>
           <div className="mb-1.5 text-xs font-medium opacity-70">記事を開く方法</div>
           <div className="flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
@@ -473,10 +540,13 @@ export function SettingsOverlay() {
               : "×ボタンで閉じるとアプリを終了します"}
           </p>
         </div>
-        </section>
+        </SettingsSection>
 
-        <section className="flex flex-col gap-4 border-t border-black/10 pt-4 dark:border-white/10">
-        <h2 className="text-xs font-semibold tracking-wide opacity-70">プライバシー</h2>
+        <SettingsSection
+          title="プライバシー"
+          open={openSections.privacy}
+          onToggle={() => toggleSection("privacy")}
+        >
         <div className="flex flex-col gap-2">
           <ToggleRow label="外部画像を読み込まない" value={blockImages} onChange={setBlockImages} />
           <p className="max-w-[72ch] text-xs leading-relaxed opacity-70">
@@ -485,13 +555,16 @@ export function SettingsOverlay() {
             それを避けたい場合にONにしてください
           </p>
         </div>
-        </section>
+        </SettingsSection>
 
-        <section className="flex flex-col gap-4 border-t border-black/10 pt-4 dark:border-white/10">
-        <h2 className="text-xs font-semibold tracking-wide opacity-70">データ管理</h2>
+        <SettingsSection
+          title="データ管理"
+          open={openSections.data}
+          onToggle={() => toggleSection("data")}
+        >
         <HistoryRetentionSection />
         <DataDirSection />
-        </section>
+        </SettingsSection>
       </div>
     </ScreenOverlay>
   );

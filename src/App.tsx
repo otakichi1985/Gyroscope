@@ -36,7 +36,14 @@ function App() {
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
-  const isDark = themeMode === "dark" || (themeMode === "system" && systemDark);
+  const skin = getSkin(skinId);
+  // Terminal is designed as a dark CRT surface. Resolve it as dark without
+  // overwriting the user's saved display-mode preference, so switching to a
+  // different skin restores the mode they had chosen before.
+  const isDark =
+    skin.visualStyle === "terminal" ||
+    themeMode === "dark" ||
+    (themeMode === "system" && systemDark);
 
   useLayoutEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -70,7 +77,6 @@ function App() {
     spotlightRef.current?.style.setProperty("--spot-y", `${e.clientY - rect.top}px`);
   }
 
-  const skin = getSkin(skinId);
   // No vibrancy backdrop means nothing but the raw desktop sits behind this
   // window -- forcing full opacity here keeps that case looking solid
   // instead of a very plain flat-colored window with no blur to soften it.
@@ -91,8 +97,17 @@ function App() {
   return (
     <div
       style={panelStyle}
-      className={`${isDark ? "dark" : ""} ${skinStyleClass} panel-bg flex h-screen w-screen flex-col overflow-hidden text-neutral-900 ring-1 ring-inset ring-black/10 dark:text-neutral-100 dark:ring-white/10`}
+      className={`${isDark ? "dark" : ""} ${skinStyleClass} panel-bg relative isolate flex h-screen w-screen flex-col overflow-hidden text-neutral-900 ring-1 ring-inset ring-black/10 dark:text-neutral-100 dark:ring-white/10`}
     >
+      {skin.visualStyle === "terminal" && (
+        <div className="terminal-data-stream" aria-hidden="true">
+          <span>0100100101100011011010000110100101100111011011110101010001100101011100100110110101101001011011100110000101101100</span>
+          <span>0011000100110000001100010011000000110001001100010011000000110001001100000011000000110001001100010011000000110001</span>
+          <span>010100100101001101010011001000000110011001100101011001010110010000100000011100110111010001110010011001010110000101101101</span>
+          <span>011101110110100101100100011001110110010101110100001000000110111101101110011011000110100101101110011001010010000001100100011000010111010001100001</span>
+          <span>001101000110011000110010001100000110000100110111011000110011100100110001001100010110010000110000001101010110010100110001011000100110001100110110</span>
+        </div>
+      )}
       {titleBarVisible && <TitleBar />}
       <FilterBar />
       <div className="relative min-h-0 flex-1">
