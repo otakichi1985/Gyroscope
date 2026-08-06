@@ -83,10 +83,7 @@ fn toggle_main_window(app: &AppHandle) {
         // to fully opaque, and it fires neither WindowEvent::Resized nor the
         // always-on-top toggle, so neither existing reapply hook catches it
         // (user report: opacity snapped to 100% after show/hide via tray).
-        if let Some(state) = app.try_state::<opacity::LastOpacity>() {
-            let alpha_byte = *state.0.lock().unwrap();
-            let _ = opacity::apply(&window, alpha_byte);
-        }
+        opacity::restore(app, &window);
     }
 }
 

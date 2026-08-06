@@ -14,7 +14,7 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region={dragRegion}
-      className="flex h-8 shrink-0 items-center justify-between pl-3 pr-1 select-none"
+      className="app-titlebar flex h-8 shrink-0 items-center justify-between pl-3 pr-1 select-none"
     >
       <span data-tauri-drag-region={dragRegion} className="text-xs font-medium opacity-70">
         RSS Widget

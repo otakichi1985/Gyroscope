@@ -32,12 +32,12 @@ export function ScreenOverlay({ screen, title, headerActions, children }: Screen
 
   return (
     <div
-      className={`panel-bg absolute inset-0 z-10 flex flex-col transition-all duration-200 ease-out ${
+      className={`screen-overlay panel-bg absolute inset-0 z-10 flex flex-col transition-all duration-200 ease-out ${
         isActive ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0 pointer-events-none"
       }`}
       inert={!isActive}
     >
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-black/10 px-2 text-sm font-medium dark:border-white/10">
+      <div className="screen-overlay-header flex h-8 shrink-0 items-center justify-between border-b border-black/10 px-2 text-sm font-medium dark:border-white/10">
         <span className="truncate">{title}</span>
         <div className="flex shrink-0 items-center gap-1">
           {headerActions}

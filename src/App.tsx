@@ -11,6 +11,7 @@ import { TrashOverlay } from "./components/TrashOverlay";
 import { useFeedsUpdatedListener } from "./hooks/useFeedsUpdatedListener";
 import { useIdleTimer } from "./hooks/useIdleTimer";
 import { useSyncAlwaysOnTop } from "./hooks/useSyncAlwaysOnTop";
+import { useSyncFloatingMode } from "./hooks/useSyncFloatingMode";
 import { useSyncMinimizeToTray } from "./hooks/useSyncMinimizeToTray";
 import { useSyncWindowOpacity } from "./hooks/useSyncWindowOpacity";
 import { useVibrancyMode } from "./hooks/useVibrancyMode";
@@ -85,11 +86,18 @@ function App() {
   // Terminal is designed as a dark CRT surface. Resolve it as dark without
   // overwriting the user's saved display-mode preference, so switching to a
   // different skin restores the mode they had chosen before.
+  //
+  // Cardinality and Ordinary force *light* for the mirror-image reason: both
+  // are built around white floating panels carrying dark text. Ordinary ran
+  // as forced-dark until reference stills showed the Augma interface is
+  // predominantly white -- white circular controls, white information cards,
+  // hairline white arcs -- so every `dark:` variant in the overlays was
+  // fighting the theme rather than serving it. The chrome that sits directly
+  // over the desktop is re-lit to white in CSS instead (see .skin-ordinary).
+  const forcedLight = skin.visualStyle === "cardinality" || skin.visualStyle === "ordinary";
   const isDark =
     skin.visualStyle === "terminal" ||
-    skin.visualStyle === "ordinary" ||
-    (skin.visualStyle !== "cardinality" &&
-      (themeMode === "dark" || (themeMode === "system" && systemDark)));
+    (!forcedLight && (themeMode === "dark" || (themeMode === "system" && systemDark)));
 
   useLayoutEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -133,10 +141,18 @@ function App() {
     }
   }
 
+  // Floating skins (see Skin.floating) deliberately have no backdrop and no
+  // panel surface, and carry their opacity in CSS instead of native window
+  // alpha -- so the "no vibrancy means force it solid" rule below doesn't
+  // apply to them: there is nothing to look bare, that *is* the design.
+  const floating = skin.floating === true;
   // No vibrancy backdrop means nothing but the raw desktop sits behind this
   // window -- forcing full opacity here keeps that case looking solid
   // instead of a very plain flat-colored window with no blur to soften it.
-  const alpha = vibrancy === "none" ? 1 : opacity;
+  const alpha = vibrancy === "none" && !floating ? 1 : opacity;
+  // Before useSyncWindowOpacity on purpose: Rust needs to know the mode
+  // before it is handed an alpha to interpret under it.
+  useSyncFloatingMode(floating);
   useSyncWindowOpacity(alpha);
   useSyncAlwaysOnTop(alwaysOnTop);
   useSyncMinimizeToTray(minimizeToTray);
@@ -169,6 +185,11 @@ function App() {
     "--panel-rgb-dark": skin.dark,
     "--accent-rgb-light": skin.accentLight,
     "--accent-rgb-dark": skin.accentDark,
+    // Only meaningful while floating: with no native window alpha in play,
+    // every plate multiplies its own fill by this so the opacity slider
+    // still does something -- and here a CSS alpha genuinely reaches the
+    // desktop rather than just tinting Mica's blur.
+    ...(floating ? { "--float-alpha": alpha } : {}),
     ...(latinSources.length > 0 || japaneseSources.length > 0
       ? { fontFamily: resolvedFontFamilies.join(", ") }
       : {}),
@@ -179,7 +200,10 @@ function App() {
     <div
       style={panelStyle}
       onPointerDown={handleRootPointerDown}
-      className={`${isDark ? "dark" : ""} ${skinStyleClass} ${isIdle ? "app-idle" : ""} panel-bg relative isolate flex h-screen w-screen flex-col overflow-hidden text-neutral-900 ring-1 ring-inset ring-black/10 dark:text-neutral-100 dark:ring-white/10`}
+      // The inset ring reads as a window edge, which is the one thing a
+      // floating HUD must not have -- dropped along with the panel fill
+      // (the fill itself is cleared in CSS, see .skin-floating).
+      className={`${isDark ? "dark" : ""} ${skinStyleClass} ${floating ? "skin-floating" : "ring-1 ring-inset ring-black/10 dark:ring-white/10"} ${isIdle ? "app-idle" : ""} panel-bg relative isolate flex h-screen w-screen flex-col overflow-hidden text-neutral-900 dark:text-neutral-100`}
     >
       {splitFontCss && <style>{splitFontCss}</style>}
       {skin.visualStyle === "terminal" && (
@@ -191,18 +215,24 @@ function App() {
           ))}
         </div>
       )}
-      {skin.visualStyle === "cardinality" && (
-        <div className="cardinality-interface" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
-      )}
+      {/* Cardinality deliberately renders no background decoration. It used
+          to hang a connection rail down the left gutter with link lines
+          branching off it, on the reasoning that the reference chains its
+          panels together -- but in the source those connectors run *between
+          panels that are actually there*, and reproduced as loose lines over
+          an empty background they only read as stray rules (user: not
+          wanted). The connection language now lives where it belongs: on the
+          pointer pair flanking the selected rail button. */}
+      {/* Augma's framing, taken from reference stills: two hairline white
+          arcs spanning the full width -- one near the top, one near the
+          bottom, both sagging slightly at the centre -- with a small ring
+          sitting at the low point of the upper one. That is the whole of it;
+          the corner brackets and the coloured orbit rings that used to be
+          here were inventions and are gone. */}
       {skin.visualStyle === "ordinary" && (
         <div className="ordinary-hud" aria-hidden="true">
-          <span className="ordinary-orbit ordinary-orbit-a" />
-          <span className="ordinary-orbit ordinary-orbit-b" />
-          <span className="ordinary-orbit ordinary-orbit-c" />
+          <span className="ordinary-arc ordinary-arc-top" />
+          <span className="ordinary-arc ordinary-arc-bottom" />
           <i className="ordinary-reticle" />
         </div>
       )}
@@ -215,7 +245,7 @@ function App() {
             overlay is open -- overlays only visually cover this area, they
             never disabled it, so Tab-focus (and, before FilterBar's own fix,
             stray clicks) could still reach hidden rows underneath. */}
-        <div className="absolute inset-0 flex flex-col" inert={!isTimeline}>
+        <div className="timeline-pane absolute inset-0 flex flex-col" inert={!isTimeline}>
           <TimelineToolbar />
           {/* `idle-mode` cascades down to every `.entry-card` (EntryRow.tsx)
               for the idle sway -- see index.css. `onMouseMove` here (not on

@@ -361,7 +361,7 @@ export function SettingsOverlay() {
               : cardinalitySelected
                 ? "カーディナリティは白いVRメニュー表現を保つため、選択中のみライト表示に固定されます"
                 : ordinarySelected
-                  ? "オーディナリーは青白いAR表示を保つため、選択中のみダーク表示に固定されます"
+                  ? "オーディナリーは白い情報パネルと白い操作系で組まれたAR表示のため、選択中のみライト表示に固定されます"
                 : "システムはWindowsのアプリモードに合わせて自動で切り替わります"}
           </p>
         </div>
@@ -432,7 +432,11 @@ export function SettingsOverlay() {
             value={opacity}
             disabled={opacityDisabled}
             onChange={(e) => setOpacity(Number(e.target.value))}
-            className="w-full disabled:opacity-40"
+            // `accent-color` is the only hook a native range control offers
+            // for its fill; left unset it draws in the browser's own blue,
+            // which sat outside every skin's palette (caught on a screenshot
+            // of the amber-and-white SAO theme).
+            className="range-input w-full disabled:opacity-40"
           />
           {opacityDisabled && (
             <p className="mt-1 max-w-[72ch] text-xs leading-relaxed opacity-70">

@@ -133,7 +133,7 @@ export function FeedPicker({ feeds, filterFeedId, filterFolder, onSelectAll, onS
         // fully opaque solid colour, so blurring it returns the same colour
         // (see EntryRow.tsx for the full note). The popup below is the one
         // place it earns its cost, since that really does overlap content.
-        className="flex min-w-0 flex-1 items-center justify-between gap-1 rounded border border-black/10 bg-black/5 px-2 py-1 text-left text-xs outline-none dark:border-white/10 dark:bg-white/5"
+        className="picker-trigger flex min-w-0 flex-1 items-center justify-between gap-1 rounded border border-black/10 bg-black/5 px-2 py-1 text-left text-xs outline-none dark:border-white/10 dark:bg-white/5"
       >
         <span className="truncate">{selectedLabel}</span>
         <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />

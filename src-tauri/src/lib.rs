@@ -47,6 +47,7 @@ pub fn run() {
             app.manage(HttpClient(client));
 
             app.manage(opacity::LastOpacity::default());
+            app.manage(vibrancy::FloatingMode::default());
             app.manage(tray::MinimizeToTray::default());
 
             // MUST stay a direct call on the main thread. tray-icon creates a
@@ -110,9 +111,7 @@ pub fn run() {
                     }
                 }
                 tauri::WindowEvent::Resized(_) => {
-                    let state = resize_app.state::<opacity::LastOpacity>();
-                    let alpha_byte = *state.0.lock().unwrap();
-                    let _ = opacity::apply(&resize_window, alpha_byte);
+                    opacity::restore(&resize_app, &resize_window);
                 }
                 _ => {}
             });
@@ -121,6 +120,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             vibrancy::get_vibrancy_mode,
+            vibrancy::set_floating_mode,
             opacity::set_window_opacity,
             opacity::set_always_on_top,
             tray::set_minimize_to_tray,

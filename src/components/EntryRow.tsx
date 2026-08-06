@@ -174,7 +174,14 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
         // other two modes below (user feedback: entries were hard to tell
         // apart; a full glass-card treatment here would fight the "as many
         // rows as possible" intent).
-        className="flex w-full cursor-pointer items-baseline gap-2 rounded border-b border-black/5 px-2 py-1 text-sm transition duration-150 hover:bg-black/5 active:scale-[0.98] active:bg-black/10 dark:border-white/5 dark:hover:bg-white/5 dark:active:bg-white/10"
+        //
+        // `entry-compact` exists for the floating skins only. Those have no
+        // panel behind the list at all, so "a hairline border is enough"
+        // stops being true: the rows were left as bare text hanging over the
+        // desktop (user report). They get a surface back in index.css --
+        // deliberately not `entry-card`, which would also hand every other
+        // skin's card treatment to a density mode that does not want it.
+        className="entry-compact flex w-full cursor-pointer items-baseline gap-2 rounded border-b border-black/5 px-2 py-1 text-sm transition duration-150 hover:bg-black/5 active:scale-[0.98] active:bg-black/10 dark:border-white/5 dark:hover:bg-white/5 dark:active:bg-white/10"
       >
         <MarqueeTitle text={title} className="flex-1" textClassName={entry.is_read ? "" : "font-medium"} />
         {feedTitle && (
