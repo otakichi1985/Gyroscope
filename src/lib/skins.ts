@@ -37,7 +37,7 @@ export interface Skin {
   swatchComplement?: string;
   swatchLight?: string;
   swatchDark?: string;
-  visualStyle?: "aurora" | "velvet" | "terminal" | "link";
+  visualStyle?: "aurora" | "velvet" | "terminal" | "cardinality" | "ordinary";
 }
 
 export const SKINS: Skin[] = [
@@ -220,17 +220,31 @@ export const SKINS: Skin[] = [
   },
   {
     id: "link-amber",
-    label: "リンク・アンバー",
+    label: "カーディナリティ",
     category: "style",
-    description: "白い浮遊パネルと山吹色のリンク演出を使った、軽快なUIテーマ",
-    light: "246 247 249",
+    description: "白と銀灰のフローティングメニューに、鮮やかな金色を添えたVR UIテーマ",
+    light: "247 248 250",
     dark: "27 29 33",
-    accentLight: "147 91 0",
-    accentDark: "247 187 67",
+    accentLight: "151 76 0",
+    accentDark: "255 199 64",
     dualSwatch: true,
-    swatchPrimary: "224 226 231",
-    swatchComplement: "230 164 46",
-    visualStyle: "link",
+    swatchPrimary: "222 225 230",
+    swatchComplement: "245 181 0",
+    visualStyle: "cardinality",
+  },
+  {
+    id: "ordinary",
+    label: "オーディナリー",
+    category: "style",
+    description: "青白い同心円と走査光を重ねた、オーグマー風のAR UIテーマ",
+    light: "231 246 250",
+    dark: "6 18 29",
+    accentLight: "0 94 128",
+    accentDark: "103 224 255",
+    dualSwatch: true,
+    swatchPrimary: "38 194 232",
+    swatchComplement: "225 250 255",
+    visualStyle: "ordinary",
   },
 ];
 

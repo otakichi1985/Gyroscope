@@ -308,9 +308,11 @@ export function SettingsOverlay() {
   const opacityDisabled = vibrancy === "none";
   const selectedSkin = SKINS.find((skin) => skin.id === skinId) ?? SKINS[0];
   const terminalSelected = selectedSkin.visualStyle === "terminal";
-  const linkSelected = selectedSkin.visualStyle === "link";
-  const themeModeLocked = terminalSelected || linkSelected;
-  const displayedThemeMode: ThemeMode = terminalSelected ? "dark" : linkSelected ? "light" : themeMode;
+  const cardinalitySelected = selectedSkin.visualStyle === "cardinality";
+  const ordinarySelected = selectedSkin.visualStyle === "ordinary";
+  const themeModeLocked = terminalSelected || cardinalitySelected || ordinarySelected;
+  const displayedThemeMode: ThemeMode =
+    terminalSelected || ordinarySelected ? "dark" : cardinalitySelected ? "light" : themeMode;
   const [openSections, setOpenSections] = useState(loadOpenSections);
 
   const toggleSection = (id: SettingsSectionId) => {
@@ -356,8 +358,10 @@ export function SettingsOverlay() {
           <p className="mt-1.5 text-xs leading-relaxed opacity-60">
             {terminalSelected
               ? "ターミナルは視認性と世界観を保つため、選択中のみダーク表示に固定されます"
-              : linkSelected
-                ? "リンク・アンバーは白いパネル表現を保つため、選択中のみライト表示に固定されます"
+              : cardinalitySelected
+                ? "カーディナリティは白いVRメニュー表現を保つため、選択中のみライト表示に固定されます"
+                : ordinarySelected
+                  ? "オーディナリーは青白いAR表示を保つため、選択中のみダーク表示に固定されます"
                 : "システムはWindowsのアプリモードに合わせて自動で切り替わります"}
           </p>
         </div>
