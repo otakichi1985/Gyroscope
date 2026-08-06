@@ -46,7 +46,7 @@ export function TimelineToolbar() {
   }
 
   return (
-    <div className="flex shrink-0 items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10">
+    <div className="timeline-toolbar flex shrink-0 items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10">
       {/* Moved here from FilterBar's icon cluster -- an icon-only button
           sitting among bookmark/search/nav icons was too easy to hit by
           accident (user feedback). Paired with a text label and given its
@@ -55,7 +55,7 @@ export function TimelineToolbar() {
         <button
           type="button"
           onClick={handleRefreshClick}
-          className="accent-text flex min-h-7 shrink-0 items-center gap-1 rounded px-1.5 py-1 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+          className="pill-button accent-text flex min-h-7 shrink-0 items-center gap-1 rounded px-1.5 py-1 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
         >
           <RefreshIcon className={`h-4 w-4 ${refreshingAll ? "animate-spin" : ""}`} />
           記事を更新
@@ -92,7 +92,7 @@ export function TimelineToolbar() {
         onSelectFolder={(folder) => setFilterFolder(folder)}
       />
 
-      <div className="flex shrink-0 gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
+      <div className="segmented flex shrink-0 gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
         {VIEW_MODES.map(({ mode, label }) => (
           <button
             key={mode}

@@ -38,6 +38,22 @@ export interface Skin {
   swatchLight?: string;
   swatchDark?: string;
   visualStyle?: "aurora" | "velvet" | "terminal" | "cardinality" | "ordinary";
+  /** Drops the window's DWM backdrop and paints no panel surface at all, so
+   * the chrome and article cards read as separate plates hanging over the
+   * real desktop rather than as contents of a window.
+   *
+   * This is what makes the two SAO-derived skins land: their source material
+   * is a heads-up display in mid-air, and every amount of decoration applied
+   * to a solid panel still reads as a list inside a box. Deliberately tied to
+   * the skin instead of exposed as a setting -- the rest of the skins are
+   * designed against an opaque surface and would lose their legibility floor
+   * without it.
+   *
+   * Costs, all accepted: the opacity slider moves from native window alpha to
+   * CSS (see window/opacity.rs `clear_layered`), the transparent regions
+   * still swallow clicks meant for whatever is behind them, and every piece
+   * of text has to sit on a plate of its own rather than on the panel. */
+  floating?: boolean;
 }
 
 export const SKINS: Skin[] = [
@@ -222,29 +238,46 @@ export const SKINS: Skin[] = [
     id: "link-amber",
     label: "カーディナリティ",
     category: "style",
-    description: "白と銀灰のフローティングメニューに、鮮やかな金色を添えたVR UIテーマ",
-    light: "247 248 250",
+    description: "直角の白い半透明パネルを橙色一色でまとめた、SAOメニュー風のVR UIテーマ",
+    // Retuned against reference stills of the SAO menu. The accent moved
+    // from gold to an orange-leaning amber, and the whole theme went square
+    // -- see the note at the top of `.skin-cardinality` in index.css.
+    // #B45309 measures 4.73:1 on the panel and 5.02:1 under white text, so
+    // it covers both jobs the accent has to do; the brighter fill amber
+    // (#F0A030, 2.02:1) is a separate token used only under dark ink.
+    light: "250 251 253",
     dark: "27 29 33",
-    accentLight: "151 76 0",
-    accentDark: "255 199 64",
+    accentLight: "180 83 9",
+    accentDark: "251 176 92",
     dualSwatch: true,
-    swatchPrimary: "222 225 230",
-    swatchComplement: "245 181 0",
+    swatchPrimary: "250 251 253",
+    swatchComplement: "245 162 0",
     visualStyle: "cardinality",
+    floating: true,
   },
   {
     id: "ordinary",
     label: "オーディナリー",
     category: "style",
-    description: "青白い同心円と走査光を重ねた、オーグマー風のAR UIテーマ",
-    light: "231 246 250",
-    dark: "6 18 29",
-    accentLight: "0 94 128",
-    accentDark: "103 224 255",
+    description: "白い円形コントロールと情報パネルを機能色で塗り分けた、オーグマー風のAR UIテーマ",
+    // Rebuilt against reference stills of the Augma interface. Two things
+    // changed from the first pass: it resolves as *light* (the source is
+    // predominantly white, not charcoal -- see App.tsx `forcedLight`), and
+    // the accent is one of several role colours rather than the only one.
+    // Blue #1565C0 measures 5.75:1 both on white and under white text, so it
+    // satisfies the two jobs the accent has to carry (see the note on
+    // `accentLight` above). The amber that fills the panel headers is
+    // deliberately not the accent: it cannot support white text at all
+    // (1.73:1), so it is used as a fill under dark ink only.
+    light: "236 244 249",
+    dark: "38 42 48",
+    accentLight: "21 101 192",
+    accentDark: "125 195 255",
     dualSwatch: true,
-    swatchPrimary: "38 194 232",
-    swatchComplement: "225 250 255",
+    swatchPrimary: "255 255 255",
+    swatchComplement: "240 190 51",
     visualStyle: "ordinary",
+    floating: true,
   },
 ];
 

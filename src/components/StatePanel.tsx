@@ -25,7 +25,9 @@ export function StatePanel({
   tone?: "muted" | "error";
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+    // `state-panel` is a styling hook for floating skins, where this text
+    // would otherwise sit directly on the desktop with nothing behind it.
+    <div className="state-panel flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
       <div className={tone === "error" ? "text-red-500" : "accent-text opacity-70"}>{icon}</div>
       <p className={`text-sm ${tone === "error" ? "text-red-500" : "opacity-80"}`}>{title}</p>
       {detail && <p className="max-w-[34ch] text-xs leading-relaxed opacity-60">{detail}</p>}

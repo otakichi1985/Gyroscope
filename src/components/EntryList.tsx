@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
@@ -129,6 +129,32 @@ export function EntryList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reveal window for the row entrance animation (floating skins draw their
+  // cards in rather than having them just be there).
+  //
+  // The animation CANNOT live on the row itself. Rows are virtualised, so
+  // they mount and unmount constantly while scrolling, and an entrance on
+  // the row would replay every time one scrolled back into view. Instead the
+  // scroll container carries `list-reveal` for a short window and the CSS
+  // targets rows only through that class -- so the rows present when a fresh
+  // list arrives animate, and everything mounted later by scrolling does not.
+  //
+  // `loading` is the right trigger: refresh() sets it, fetchMore() uses
+  // `loadingMore` instead, so this fires on a genuine list replacement
+  // (first load, feed/genre change, search, view switch) and never on an
+  // infinite-scroll append.
+  const [revealing, setRevealing] = useState(false);
+  const wasLoading = useRef(false);
+  useEffect(() => {
+    if (wasLoading.current && !loading) {
+      setRevealing(true);
+      const timer = setTimeout(() => setRevealing(false), 800);
+      wasLoading.current = loading;
+      return () => clearTimeout(timer);
+    }
+    wasLoading.current = loading;
+  }, [loading]);
+
   const parentRef = useRef<HTMLDivElement>(null);
 
   const baseSize = viewMode === "card" ? CARD_BASE_SIZE[cardSize] : OTHER_BASE_SIZE[viewMode];
@@ -184,7 +210,9 @@ export function EntryList() {
     <div
       key={starredOnly ? "starred" : "all"}
       ref={parentRef}
-      className="timeline-enter entry-list-scroll h-full overflow-y-auto px-2 py-1 text-sm"
+      className={`timeline-enter entry-list-scroll h-full overflow-y-auto px-2 py-1 text-sm ${
+        revealing ? "list-reveal" : ""
+      }`}
     >
       <div
         style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}

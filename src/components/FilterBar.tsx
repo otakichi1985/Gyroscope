@@ -5,16 +5,26 @@ import { useAppearanceStore } from "../stores/appearanceStore";
 import { useUiStore, type Screen } from "../stores/uiStore";
 import { ClockIcon, CloseIcon, PaletteIcon, PinIcon, RssIcon, SearchIcon, StarIcon, TrashIcon } from "./icons";
 
+/**
+ * `hue` names a role colour rather than a literal colour. Only skins whose
+ * source material colour-codes its controls read it (Ordinary: the Augma
+ * interface is white discs carrying differently coloured glyphs, never one
+ * accent applied uniformly). Every other skin ignores the attribute and
+ * keeps drawing the whole cluster in its single accent.
+ */
+type IconHue = "blue" | "teal" | "green" | "coral" | "pink";
+
 const NAV_ICONS: {
   screen: Exclude<Screen, "timeline" | "reader">;
   label: string;
   shortLabel: string;
+  hue: IconHue;
   Icon: (props: SVGProps<SVGSVGElement>) => React.ReactElement;
 }[] = [
-  { screen: "history", label: "既読履歴を開く", shortLabel: "履歴", Icon: ClockIcon },
-  { screen: "trash", label: "ゴミ箱を開く", shortLabel: "ゴミ箱", Icon: TrashIcon },
-  { screen: "feedManager", label: "フィード管理を開く", shortLabel: "フィード", Icon: RssIcon },
-  { screen: "settings", label: "外観設定を開く", shortLabel: "設定", Icon: PaletteIcon },
+  { screen: "history", label: "既読履歴を開く", shortLabel: "履歴", hue: "teal", Icon: ClockIcon },
+  { screen: "trash", label: "ゴミ箱を開く", shortLabel: "ゴミ箱", hue: "pink", Icon: TrashIcon },
+  { screen: "feedManager", label: "フィード管理を開く", shortLabel: "フィード", hue: "green", Icon: RssIcon },
+  { screen: "settings", label: "外観設定を開く", shortLabel: "設定", hue: "blue", Icon: PaletteIcon },
 ];
 
 // Shared so the bookmark/search/refresh toggles (not screen-nav -- see
@@ -26,6 +36,8 @@ function IconButton({
   label,
   shortLabel,
   showLabel,
+  hue,
+  opensScreen,
   Icon,
   className = "",
 }: {
@@ -34,6 +46,12 @@ function IconButton({
   label: string;
   shortLabel: string;
   showLabel: boolean;
+  hue?: IconHue;
+  /** True for the buttons that open a full screen, as opposed to the ones
+   * that toggle a filter in place. Only the former can meaningfully draw a
+   * connector to the panel they opened -- see the pointer note in
+   * `.skin-cardinality`. */
+  opensScreen?: boolean;
   Icon: (props: SVGProps<SVGSVGElement>) => React.ReactElement;
   className?: string;
 }) {
@@ -41,6 +59,8 @@ function IconButton({
     <button
       type="button"
       onClick={onClick}
+      data-hue={hue}
+      data-opens-screen={opensScreen ? "" : undefined}
       // `accent-text` always at full strength, never dimmed with opacity --
       // opacity-based dimming on top of an already only-moderate-contrast
       // hue (blue especially, against a similarly pale-blue panel bg in the
@@ -48,7 +68,11 @@ function IconButton({
       // (user feedback: "sunk" icons, opacity makes it worse for some
       // colors). The active state is distinguished by the soft background
       // fill alone, never by dimming the icon itself.
-      className={`accent-text flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
+      // `icon-button` is a styling hook, not a look of its own: skins that
+      // draw their controls as discs rather than flat glyphs (Ordinary, whose
+      // reference UI is entirely white circular buttons) need to target these
+      // without also catching the segmented text groups next to them.
+      className={`icon-button accent-text flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
         showLabel ? "flex-col gap-0.5 px-1.5 py-1" : "p-1"
       } ${active ? "accent-bg-soft" : "hover:bg-black/5 dark:hover:bg-white/5"} ${className}`}
       aria-label={label}
@@ -102,7 +126,7 @@ export function FilterBar() {
   return (
     <div
       data-tauri-drag-region={dragRegion}
-      className="flex shrink-0 flex-wrap items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10"
+      className="app-filterbar flex shrink-0 flex-wrap items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10"
     >
       {/* "位置を固定" stands alone at the far left, separated by a divider
           from everything else -- it used to sit in the same run as the
@@ -116,6 +140,7 @@ export function FilterBar() {
         label={positionLocked ? "位置の固定を解除" : "位置を固定"}
         shortLabel="位置固定"
         showLabel={showIconLabels}
+        hue="teal"
         Icon={PinIcon}
       />
       <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10 dark:bg-white/10" />
@@ -130,7 +155,7 @@ export function FilterBar() {
           needs to read as visually distinct from routine icon clicks (user
           feedback). `ml-auto` on the icon cluster after it opens a real gap
           between the two groups. */}
-      <div className="flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
+      <div className="segmented flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
         <button
           type="button"
           onClick={() => markAllRead()}
@@ -154,6 +179,7 @@ export function FilterBar() {
         label={starredOnly ? "ブックマークの絞り込みを解除" : "ブックマークのみ表示"}
         shortLabel="ブクマ"
         showLabel={showIconLabels}
+        hue="coral"
         Icon={(props) => <StarIcon filled={starredOnly} {...props} />}
       />
       <IconButton
@@ -162,6 +188,7 @@ export function FilterBar() {
         label={searchOpen ? "検索欄を閉じる" : "記事を検索"}
         shortLabel="検索"
         showLabel={showIconLabels}
+        hue="blue"
         Icon={SearchIcon}
       />
       </div>
@@ -174,7 +201,7 @@ export function FilterBar() {
           neighboring icons). Order is history → trash → feedManager →
           settings: trash sits next to history since both are "past reading
           activity" views, rather than leading the group as an odd first icon. */}
-      {NAV_ICONS.map(({ screen, label, shortLabel, Icon }) => (
+      {NAV_ICONS.map(({ screen, label, shortLabel, hue, Icon }) => (
         <IconButton
           key={screen}
           onClick={() => toggleScreen(screen)}
@@ -182,6 +209,8 @@ export function FilterBar() {
           label={label}
           shortLabel={shortLabel}
           showLabel={showIconLabels}
+          hue={hue}
+          opensScreen
           Icon={Icon}
         />
       ))}

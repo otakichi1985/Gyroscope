@@ -319,6 +319,14 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 .accent-bg-soft {
   background-color: rgb(var(--accent-rgb-light) / 0.15);
 }
+/* Native range controls expose nothing but `accent-color`; without it they
+   draw in the browser's blue regardless of the skin. */
+.range-input {
+  accent-color: rgb(var(--accent-rgb-light));
+}
+.dark .range-input {
+  accent-color: rgb(var(--accent-rgb-dark));
+}
 .dark .accent-text {
   color: rgb(var(--accent-rgb-dark));
 }
@@ -363,6 +371,167 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 }
 .dark .skin-swatch-frame {
   background-color: rgb(0 0 0 / 0.24);
+}
+
+/* ---- Floating skins (transparent window) --------------------------------
+
+   `Skin.floating` makes Rust strip the DWM backdrop entirely
+   (window/vibrancy.rs), so the webview composites straight onto the desktop
+   and anything this stylesheet leaves transparent really is transparent.
+   Everything in this section follows from that single fact.
+
+   The rule that replaces `.panel-bg`: there is no panel any more, so no text
+   may sit on one. Every piece of chrome carries its own plate, and the plate
+   tokens below are what each floating skin re-tints.
+
+   Two techniques that are dead weight everywhere else become real here:
+
+   - `backdrop-filter` finally has something to blur. Over the normal opaque
+     `.panel-bg` it is a documented no-op (blurring a flat color returns the
+     same flat color) and was stripped out of the card list for that reason;
+     over a transparent window it is what makes a plate read as frosted glass.
+   - a CSS alpha finally reaches the desktop. Normally the opacity slider has
+     to go through Win32 layered-window alpha because a CSS alpha would only
+     blend against Mica's own blur -- so in floating mode the slider is fed in
+     here as `--float-alpha` (App.tsx) and multiplied into every plate fill,
+     and the native path is switched off (window/opacity.rs `clear_layered`). */
+.skin-floating {
+  --plate-radius: 10px;
+  --plate-fill: 255 255 255;
+  --plate-fill-alpha: 0.82;
+  --plate-border: 255 255 255;
+  --plate-border-alpha: 0.5;
+  --plate-blur: 14px;
+  --plate-inset: 8px;
+  /* Elevation WITHOUT a soft drop shadow, and this is not a style choice --
+     a drop shadow is structurally broken once the window is transparent.
+     Article rows tile 8px apart, so a 26px blur cast by the row above and
+     the row below overlaps and fills the gap completely. Measured against a
+     capture of the same desktop with the window hidden, that put a uniform
+     36% black wash across the entire list area: reported as "there's still a
+     base window behind it, it isn't fully transparent", and it really was a
+     dark rectangle the exact size of the window.
+     A glow brightens instead of darkening, so it cannot accumulate into a
+     veil no matter how many rows tile. Black is limited to a 3px contact
+     shadow -- short enough that the middle of an 8px gap stays untouched.
+     Verified after the change: gap pixels match the bare desktop exactly.
+     Do not reintroduce a wide soft shadow in floating mode. */
+  --glow-rgb: 255 255 255;
+  --plate-glow:
+    0 0 0 1px rgb(var(--glow-rgb) / 0.26),
+    0 0 12px rgb(var(--glow-rgb) / 0.2);
+  --plate-shadow: 0 1px 3px rgb(0 0 0 / 0.16), var(--plate-glow);
+}
+.skin-floating.panel-bg,
+.dark.skin-floating.panel-bg {
+  background-color: transparent;
+  background-image: none;
+}
+
+/* Chrome strips become separate plates rather than bands of one surface.
+   Kept as three stacked plates (title / filter / toolbar) instead of merged
+   into one: a stack of independently floating strips is the arrangement both
+   source UIs actually use. */
+.skin-floating .app-titlebar,
+.skin-floating .app-filterbar,
+.skin-floating .timeline-toolbar {
+  position: relative;
+  margin: 6px var(--plate-inset) 0;
+  border: 1px solid rgb(var(--plate-border) / calc(var(--plate-border-alpha) * var(--float-alpha, 1)));
+  border-radius: var(--plate-radius);
+  background-color: rgb(var(--plate-fill) / calc(var(--plate-fill-alpha) * var(--float-alpha, 1)));
+  -webkit-backdrop-filter: blur(var(--plate-blur)) saturate(1.15);
+  backdrop-filter: blur(var(--plate-blur)) saturate(1.15);
+  box-shadow: var(--plate-shadow);
+}
+.skin-floating .entry-list-scroll {
+  padding-left: var(--plate-inset);
+  padding-right: var(--plate-inset);
+  /* Without this the last card runs into the window edge, which reads as
+     content clipped by a window -- the one impression this whole mode is
+     trying to avoid. */
+  padding-bottom: var(--plate-inset);
+}
+.skin-floating .entry-card {
+  box-shadow: var(--plate-shadow);
+}
+
+/* Compact rows carry only a hairline divider in every other skin, because
+   there is always an opaque panel behind them. Here there isn't, so they
+   were literally text floating on the desktop (user report). Given a
+   surface of their own -- at gap 0 the rows abut and read as one continuous
+   panel, which is what this density level wants anyway. */
+.skin-floating .entry-compact {
+  border-bottom-color: rgb(var(--plate-border) / 0.5);
+  background-color: rgb(var(--plate-fill) / calc(var(--plate-fill-alpha) * var(--float-alpha, 1)));
+  box-shadow: var(--plate-shadow);
+}
+
+/* The default thumb is sized and coloured for a solid panel; over the
+   desktop it reads as a stray bright bar hanging off the edge. */
+.skin-floating .entry-list-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--plate-border) / 0.32);
+  border-radius: 999px;
+}
+.skin-floating .entry-list-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--plate-border) / 0.5);
+}
+
+/* Overlays sit on top of the timeline, and in every other skin the opaque
+   `.panel-bg` hides it. Here nothing does, so the article list ghosted
+   straight through the settings text (caught on a screenshot -- headlines
+   legible behind the labels). Fading the timeline out while an overlay owns
+   the screen is what `.panel-bg` was doing implicitly; the alternative,
+   making overlays fully opaque, would mean the opacity slider stopped
+   applying to half the app.
+   `[inert]` is already set on this pane whenever a screen other than the
+   timeline is active (App.tsx), so it doubles as the state selector. */
+.skin-floating .timeline-pane {
+  transition: opacity 200ms ease-out;
+}
+.skin-floating .timeline-pane[inert] {
+  opacity: 0;
+}
+
+/* Full-screen overlays keep a much more solid fill than the chrome strips:
+   these are dense reading surfaces (settings especially), and legibility
+   over an unknown wallpaper matters more than seeing through them. Margins
+   work here despite `absolute inset-0` -- with all four insets pinned and
+   auto sizing, margins reduce the used size. */
+.skin-floating .screen-overlay.panel-bg,
+.dark.skin-floating .screen-overlay.panel-bg {
+  margin: 6px var(--plate-inset) var(--plate-inset);
+  overflow: hidden;
+  border: 1px solid rgb(var(--plate-border) / calc(var(--plate-border-alpha) * var(--float-alpha, 1)));
+  border-radius: var(--plate-radius);
+  background-color: rgb(var(--plate-fill) / calc(0.96 * var(--float-alpha, 1)));
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: blur(22px) saturate(1.2);
+  box-shadow: var(--plate-shadow);
+}
+
+/* Empty/error states are loose centered text with nothing behind them once
+   the panel is gone. The plate is drawn as a pseudo-element sized to the
+   message rather than as a background on the full-height flex container,
+   which would just repaint the whole area. */
+.skin-floating .state-panel {
+  position: relative;
+}
+.skin-floating .state-panel::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: -1;
+  width: min(90%, 300px);
+  height: 208px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgb(var(--plate-border) / calc(var(--plate-border-alpha) * var(--float-alpha, 1)));
+  border-radius: var(--plate-radius);
+  background-color: rgb(var(--plate-fill) / calc(var(--plate-fill-alpha) * var(--float-alpha, 1)));
+  -webkit-backdrop-filter: blur(var(--plate-blur)) saturate(1.15);
+  backdrop-filter: blur(var(--plate-blur)) saturate(1.15);
+  box-shadow: var(--plate-shadow);
 }
 
 /* Rich style themes add a controlled material treatment on top of the
@@ -477,35 +646,546 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
     0 6px 18px rgb(0 0 0 / 0.13);
 }
 
-/* Cardinality deliberately follows the anime's original floating-menu
-   grammar more closely than the general skin system: silver-white beveled
-   panels, circular connection points and a vivid yellow-gold selection
-   signal. The dark text accent and bright visual gold are separate tokens,
-   so links stay readable without turning the whole interface brown. */
+/* ---- Cardinality / SAO --------------------------------------------------
+
+   Rebuilt against reference stills of the SAO menu (a fan recreation the
+   user supplied, plus the menus it is copying). The grammar there is much
+   more austere than the first pass assumed:
+
+     - square corners, everywhere. Not "small radius" -- actually square.
+       This is the single biggest tell and the first pass had 8px rounding
+       on everything
+     - near-white translucent rectangles with one hairline border, nothing
+       beveled or layered
+     - one accent, an orange-leaning amber, and nothing else. Where Ordinary
+       spreads six role colours around, this commits to a single one -- the
+       two skins are meant to read as opposites in that respect
+     - a centred title with a thin rule under it as the panel header
+     - circular buttons in a rail, translucent and unfilled at rest, the
+       selected one filled solid amber
+     - the active panel outlined in glowing amber
+     - a small triangular notch pointing from the rail to whatever panel it
+       opened
+
+   Not copied, on request: the chromatic aberration, bloom and lens warp the
+   reference applies on top. Those are VR-headset artefacts and would wreck
+   legibility on a 2D desktop.
+
+   Two amber tokens, for the reason the accent notes above spell out. The
+   reference amber measures 2.02:1 against the panel -- unusable as text,
+   fine as a fill under dark ink (5.98:1). Text and glyphs use the deeper
+   `accentLight` (#B45309, 4.73:1 on panel and 5.02:1 under white). */
 .skin-cardinality {
-  --cardinal-gold: 245 181 0;
-  --cardinal-silver: 119 124 132;
-  --cardinal-ink: 55 58 64;
+  /* Sampled off the flat references, not the VR ones. Amber is the value in
+     the clean 2D menu render (#F59E01 / #F9B104 / #F2A501 across three
+     selected elements); the asset sheet runs slightly yellower.
+     The role colours are the kit's own: it puts a blue disc and a red disc
+     side by side at the foot of its Alert panel, which fixes this theme's
+     semantics as amber = selected, blue = confirm, red = cancel. */
+  --cardinal-amber: 245 162 0;
+  --cardinal-amber-deep: 180 83 9;
+  --cardinal-blue: 36 124 234;
+  --cardinal-red: 229 58 92;
+  /* For labelled buttons only. The reference blue carries white text at
+     4.08:1; deepened to 5.75:1 where an actual word sits on it, the same
+     fill-versus-text split the amber already uses. */
+  --cardinal-blue-deep: 21 101 192;
+  --cardinal-line: 132 138 148;
+  --cardinal-ink: 46 49 55;
+  /* Unselected rail buttons are a filled steel disc with a white glyph in
+     the reference, not an outline. Darkened from the reference's own
+     blue-grey (3.42:1 under white) to 4.89:1 so the glyph stays legible. */
+  --cardinal-steel: 104 114 125;
+
+  --plate-fill: 250 251 253;
+  --plate-fill-alpha: 0.84;
+  --plate-border: 255 255 255;
+  --plate-border-alpha: 0.9;
+  /* Square. See the note above -- this is the theme's strongest signature. */
+  --plate-radius: 0px;
+  /* Neutral, NOT amber. An earlier pass outlined every panel and card in
+     amber, having read the warm fringe along the panel edges in the VR
+     screenshots as a designed border. It is chromatic aberration: scanning
+     the channels across one panel gives R-B = +112 on its left edge and
+     R-B = -115 on its top edge -- opposite-signed fringing on perpendicular
+     edges, which is what a lens does, not what a border does. The flat asset
+     sheet, which never went through a headset, shows panels with a soft
+     shadow and no coloured stroke at all.
+     Amber in this theme means *selected*, and nothing else. */
+  --glow-rgb: 255 255 255;
 }
-.skin-cardinality.panel-bg,
-.skin-cardinality .panel-bg {
-  background-image:
-    linear-gradient(145deg, rgb(255 255 255 / 0.94) 0 30%, transparent 57%),
-    linear-gradient(325deg, rgb(var(--cardinal-silver) / 0.08), transparent 48%);
-}
-.skin-cardinality > :not(.cardinality-interface) {
+.skin-cardinality > * {
   position: relative;
   z-index: 1;
 }
-.skin-cardinality :where(button, input, select, .entry-card) {
-  border-radius: 6px;
+.skin-cardinality :where(button, input, select, .entry-card, .segmented, .picker-trigger) {
+  border-radius: 0;
 }
+/* The switch track is a `<button>` and gets squared by the rule above, but
+   its knob is a `<span>` and kept its pill radius -- leaving a square track
+   carrying a round knob (user: make them match). Squared to follow the
+   theme; the round rail buttons stay round because those are discs by
+   design, not rounded rectangles. */
 .skin-cardinality [role="switch"],
 .skin-cardinality [role="switch"] .toggle-thumb {
-  border-radius: 999px;
+  border-radius: 0;
 }
-.skin-cardinality .screen-close-button {
+.skin-cardinality .app-titlebar,
+.skin-cardinality .app-filterbar,
+.skin-cardinality .timeline-toolbar {
+  border: 1px solid rgb(var(--cardinal-line) / 0.3);
+  color: rgb(var(--cardinal-ink));
+}
+
+/* Circular rail buttons: unfilled and quiet at rest, solid amber when the
+   screen they open is the one showing. The disc goes on the glyph rather
+   than the button for the same reason it does in Ordinary -- so switching
+   icon labels on keeps a circle with a caption under it. */
+.skin-cardinality .icon-button,
+.skin-cardinality .icon-button:hover,
+.skin-cardinality .icon-button.accent-bg-soft {
+  padding: 0;
+  gap: 3px;
+  background-color: transparent;
+  color: rgb(var(--cardinal-ink));
+}
+.skin-cardinality .icon-button > svg {
+  box-sizing: content-box;
+  padding: 6px;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 0.6);
+  background-color: rgb(var(--cardinal-steel) / 0.9);
+  color: rgb(255 255 255);
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out,
+    transform 120ms ease-out;
+}
+.skin-cardinality .icon-button:hover > svg {
+  background-color: rgb(var(--cardinal-steel));
+  border-color: rgb(255 255 255);
+}
+.skin-cardinality .icon-button:active > svg {
+  transform: scale(0.92);
+}
+/* Selected: amber disc, white ring, and the pair of white triangles the
+   reference flanks its active rail button with. */
+/* White on amber, as the reference does it. An earlier pass used dark ink
+   here on contrast grounds and that was overruled -- the amber disc with a
+   white glyph is too much of the theme's identity to trade away. The stroke
+   is thickened instead, since the reference's glyphs are solid silhouettes
+   that carry at low contrast and this app's are 1.25px outlines that don't. */
+.skin-cardinality .icon-button.accent-bg-soft > svg {
+  border-color: rgb(255 255 255);
+  background-color: rgb(var(--cardinal-amber));
+  color: rgb(255 255 255);
+  stroke-width: 2;
+  box-shadow: 0 0 10px rgb(var(--cardinal-amber) / 0.7);
+}
+/* The pointer is a connector, not an ornament: in the reference it marks
+   the edge a submenu grows out of. It used to be drawn as a pair flanking
+   every active control, including the filter toggles, which point at nothing
+   (user: adding it without that meaning is wrong).
+   Now there is exactly one, it points *down* -- the direction the panel
+   actually opens in this layout -- and only the buttons that open a panel
+   get it (`data-opens-screen`, set in FilterBar.tsx). */
+.skin-cardinality .icon-button[data-opens-screen].accent-bg-soft {
   position: relative;
+}
+.skin-cardinality .icon-button[data-opens-screen].accent-bg-soft::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  margin-left: -6px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid rgb(var(--cardinal-amber));
+}
+
+/* The kit's bars are not flat: each runs a little lighter at the top than
+   at the bottom, which is most of what stops them reading as plain
+   rectangles once the corners are square. */
+.skin-cardinality .segmented,
+.skin-cardinality .pill-button,
+.skin-cardinality .picker-trigger {
+  border: 1px solid rgb(var(--cardinal-line) / 0.36);
+  background-color: rgb(255 255 255 / 0.52);
+  background-image: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.55),
+    rgb(var(--cardinal-line) / 0.1)
+  );
+  color: rgb(var(--cardinal-ink));
+}
+.skin-cardinality .pill-button {
+  color: rgb(var(--cardinal-amber-deep));
+}
+.skin-cardinality .segmented button.accent-bg-soft {
+  color: rgb(255 255 255);
+  background-color: rgb(var(--cardinal-amber));
+  background-image: none;
+  border-color: transparent;
+  box-shadow: none;
+  font-weight: 600;
+}
+.skin-cardinality .segmented button.accent-text {
+  color: rgb(255 255 255);
+}
+
+/* Panel header: centred title over a thin rule, which is how every panel in
+   the reference is capped. The close control keeps its own corner. */
+/* Panels in the reference are not flat white: they run white at the top to
+   a light grey at the bottom, which is what stops a large panel reading as
+   a plain rectangle. */
+.skin-cardinality .screen-overlay.panel-bg,
+.dark.skin-cardinality .screen-overlay.panel-bg {
+  border: 1px solid rgb(var(--cardinal-line) / 0.3);
+  background-image: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.5),
+    rgb(var(--cardinal-line) / 0.1) 55%,
+    rgb(var(--cardinal-line) / 0.18)
+  );
+  color: rgb(var(--cardinal-ink));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 2px 6px rgb(0 0 0 / 0.2);
+}
+.skin-cardinality .screen-overlay-header {
+  position: relative;
+  justify-content: flex-start;
+  border: 0;
+  color: rgb(var(--cardinal-ink));
+}
+/* The title centres inside whatever space the header actions leave, rather
+   than across the whole header with the actions lifted out of flow. The
+   lifted-out version centred perfectly and let a long title run underneath
+   the buttons -- the reader screen, whose title is a full article headline
+   and whose actions include "ブラウザで開く", collided every time (user
+   report). Being a few percent off true centre is the cheaper error, and it
+   cannot break at any window width. */
+.skin-cardinality .screen-overlay-header > span {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.skin-cardinality .screen-overlay-header::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--cardinal-line) / 0.55) 15% 85%,
+    transparent
+  );
+}
+/* Red, not amber. The kit pairs a blue confirm disc with a red cancel disc
+   at the foot of its Alert panel; drawing this one in the accent colour made
+   it read as just another selected thing and let it sink into the rest of
+   the chrome (user report). Cancel is its own colour here. */
+.skin-cardinality .screen-close-button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  gap: 0;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.85);
+  border-radius: 50%;
+  color: rgb(255 255 255);
+  background-color: rgb(var(--cardinal-red));
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  transition:
+    background-color 150ms ease-out,
+    transform 120ms ease-out;
+}
+.skin-cardinality .screen-close-button:hover {
+  color: rgb(255 255 255);
+  background-color: rgb(246 82 116);
+}
+.skin-cardinality .screen-close-button:active {
+  transform: scale(0.9);
+}
+.skin-cardinality .screen-close-label {
+  display: none;
+}
+.skin-cardinality .screen-close-icon {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.4;
+}
+/* Confirm actions are blue, following the kit's Alert panel. `.accent-bg`
+   is what the app puts on its primary buttons ("フィードを追加", "再試行",
+   "ブラウザで全文を読む"), so those become the confirm colour rather than
+   another amber highlight. */
+.skin-cardinality .accent-bg {
+  color: rgb(255 255 255);
+  background-color: rgb(var(--cardinal-blue-deep));
+  background-image: none;
+}
+/* Declared after `.accent-bg` on purpose -- a toggle carries both classes,
+   and "on" is a selection, which in this theme means amber. */
+.skin-cardinality .toggle-on {
+  color: rgb(var(--cardinal-ink));
+  background-color: rgb(var(--cardinal-amber));
+  background-image: none;
+}
+.skin-cardinality .accent-bg-soft {
+  color: rgb(var(--cardinal-ink));
+  background-color: rgb(var(--cardinal-amber) / 0.24);
+  background-image: none;
+  border-color: rgb(var(--cardinal-amber) / 0.8);
+  box-shadow: none;
+}
+
+/* Article rows: square, near-white, one hairline. The amber slab that grows
+   on hover is the reference's selection marker. */
+.skin-cardinality .entry-card,
+.skin-cardinality .entry-compact {
+  position: relative;
+  overflow: hidden;
+  color: rgb(var(--cardinal-ink));
+  background-color: rgb(250 251 253 / calc(0.84 * var(--float-alpha, 1)));
+  background-image: none;
+  border: 1px solid rgb(var(--cardinal-line) / 0.26);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    var(--plate-shadow);
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms ease-out,
+    border-color 150ms ease-out;
+}
+.skin-cardinality .entry-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background-color: rgb(var(--cardinal-amber));
+  opacity: 0;
+  transform: scaleY(0.25);
+  transform-origin: center;
+  transition:
+    opacity 110ms ease-out,
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* Hover marks itself with the amber slab on the leading edge and nothing
+   else. The reference marks a selected row by *filling* it amber, never by
+   ringing it -- and the ring this used to draw was the misread aberration. */
+.skin-cardinality .entry-card:hover {
+  transform: translateX(4px);
+  border-color: rgb(var(--cardinal-line) / 0.4);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255),
+    0 2px 6px rgb(0 0 0 / 0.2);
+}
+.skin-cardinality .entry-card:hover::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+.skin-cardinality .entry-compact:hover {
+  background-color: rgb(var(--cardinal-amber) / 0.22);
+}
+.skin-cardinality .accent-text {
+  color: rgb(var(--cardinal-amber-deep));
+}
+
+/* No invented idle decoration here either. The perspective grid that used to
+   sweep the background was not in any reference; what the source actually
+   does while nothing is happening is hold still and glow slightly, so the
+   rail is what breathes. */
+.skin-cardinality .idle-bg::before,
+.skin-cardinality .idle-bg::after {
+  content: none;
+}
+
+/* ---- Ordinary / Augma ---------------------------------------------------
+
+   Rebuilt from reference stills after the first pass turned out to be aimed
+   the wrong way. The Augma interface is not dark smoked glass with a single
+   accent colour on it. It is:
+
+     - white circular controls carrying differently coloured glyphs, drawn
+       straight onto the camera view with no panel behind them at all
+     - two hairline white arcs, near the top and near the bottom, spanning
+       the full width and sagging slightly at the centre, with a small ring
+       at the low point of the upper one
+     - white information panels with a generous radius, a solid amber header
+       band and a solid amber circular close control
+     - several role colours in play at once (amber, blue, teal, green,
+       coral, pink) rather than one accent -- which is what separates it from
+       the SAO menus, and what this skin was missing most
+
+   One deliberate departure from the source: the reference puts white text on
+   its amber fills, which measures 1.73:1. Dark ink on the same amber
+   measures 8.32:1, so the fills carry ink here. This is still a reading
+   tool. Every glyph colour below clears 4:1 on white for the same reason --
+   the reference's own teal (3.22:1) was darkened to reach it. */
+.skin-ordinary {
+  --ord-ink: 38 42 48;
+  --ord-amber: 240 190 51;
+  --ord-blue: 21 101 192;
+  --ord-teal: 47 140 130;
+  --ord-green: 30 142 78;
+  --ord-coral: 217 72 42;
+  --ord-pink: 209 74 120;
+
+  --plate-fill: 255 255 255;
+  --plate-fill-alpha: 0.95;
+  --plate-border: 255 255 255;
+  --plate-border-alpha: 0.9;
+  --plate-radius: 14px;
+  --glow-rgb: 255 255 255;
+}
+.skin-ordinary > :not(.ordinary-hud) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Chrome carries no plate at all. Everything that used to be a strip of
+   smoked glass is bare over the desktop now, so its text is re-lit white
+   with a shadow -- the same thing the source does over its camera feed. */
+.skin-ordinary .app-titlebar,
+.skin-ordinary .app-filterbar,
+.skin-ordinary .timeline-toolbar {
+  margin-left: 0;
+  margin-right: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: rgb(255 255 255);
+  text-shadow:
+    0 1px 3px rgb(0 0 0 / 0.62),
+    0 0 10px rgb(0 0 0 / 0.38);
+}
+.skin-ordinary .app-filterbar .w-px {
+  background-color: rgb(255 255 255 / 0.45);
+}
+
+/* The disc goes on the glyph rather than on the button, so that turning on
+   icon labels keeps a circular control with its caption underneath instead
+   of stretching the circle into a lozenge. */
+.skin-ordinary .icon-button,
+.skin-ordinary .icon-button:hover,
+.skin-ordinary .icon-button.accent-bg-soft {
+  padding: 0;
+  gap: 3px;
+  background-color: transparent;
+  color: rgb(255 255 255);
+}
+.skin-ordinary .icon-button > svg {
+  box-sizing: content-box;
+  padding: 6px;
+  border-radius: 50%;
+  background-color: rgb(255 255 255 / 0.96);
+  color: rgb(var(--ord-blue));
+  box-shadow: 0 1px 5px rgb(0 0 0 / 0.32);
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out,
+    transform 120ms ease-out;
+}
+.skin-ordinary .icon-button:hover > svg {
+  background-color: rgb(255 255 255);
+}
+.skin-ordinary .icon-button:active > svg {
+  transform: scale(0.92);
+}
+/* Selected reads as a filled disc with a WHITE glyph -- the source's button
+   row inverts the same way (its active control is a filled orange-red disc
+   carrying white marks while its neighbours are white discs with coloured
+   glyphs). Stroke thickened because the reference's glyphs are solid shapes
+   and this app's are 1.25px outlines, which is what actually carries the
+   contrast here. */
+.skin-ordinary .icon-button.accent-bg-soft > svg {
+  background-color: rgb(var(--ord-amber));
+  color: rgb(255 255 255);
+  stroke-width: 2;
+}
+.skin-ordinary .icon-button[data-hue="teal"] > svg {
+  color: rgb(var(--ord-teal));
+}
+.skin-ordinary .icon-button[data-hue="green"] > svg {
+  color: rgb(var(--ord-green));
+}
+.skin-ordinary .icon-button[data-hue="coral"] > svg {
+  color: rgb(var(--ord-coral));
+}
+.skin-ordinary .icon-button[data-hue="pink"] > svg {
+  color: rgb(var(--ord-pink));
+}
+.skin-ordinary .icon-button.accent-bg-soft[data-hue] > svg {
+  color: rgb(255 255 255);
+}
+.skin-ordinary .icon-button span {
+  text-shadow:
+    0 1px 3px rgb(0 0 0 / 0.7),
+    0 0 8px rgb(0 0 0 / 0.4);
+}
+
+/* Text controls become white lozenges. The source has no segmented control
+   to copy, so they borrow the button row's material rather than inventing a
+   second one. */
+.skin-ordinary .segmented,
+.skin-ordinary .pill-button,
+.skin-ordinary .picker-trigger {
+  border: 0;
+  border-radius: 999px;
+  background-color: rgb(255 255 255 / 0.94);
+  box-shadow: 0 1px 5px rgb(0 0 0 / 0.3);
+  color: rgb(var(--ord-ink));
+  text-shadow: none;
+}
+.skin-ordinary .segmented button {
+  border-radius: 999px;
+  color: rgb(var(--ord-ink));
+}
+.skin-ordinary .segmented button.accent-text {
+  color: rgb(var(--ord-ink));
+}
+.skin-ordinary .segmented button.accent-bg-soft {
+  background-color: rgb(var(--ord-amber));
+  border-color: transparent;
+  box-shadow: none;
+}
+.skin-ordinary .pill-button {
+  padding-left: 10px;
+  padding-right: 12px;
+  color: rgb(var(--ord-blue));
+}
+.skin-ordinary .picker-trigger {
+  padding-left: 12px;
+  padding-right: 10px;
+}
+
+/* Information panels: white, generously rounded, amber header band. Taken
+   straight from the reference card. */
+.skin-ordinary .screen-overlay.panel-bg,
+.dark.skin-ordinary .screen-overlay.panel-bg {
+  border: 0;
+  background-color: rgb(255 255 255 / calc(0.97 * var(--float-alpha, 1)));
+  color: rgb(var(--ord-ink));
+}
+.skin-ordinary .screen-overlay-header {
+  border: 0;
+  background-color: rgb(var(--ord-amber));
+  color: rgb(var(--ord-ink));
+}
+.skin-ordinary .screen-close-button {
   display: grid;
   width: 26px;
   height: 26px;
@@ -513,312 +1193,18 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   place-items: center;
   gap: 0;
   padding: 0;
-  border: 2px solid rgb(255 255 255 / 0.96);
+  border: 0;
   border-radius: 50%;
-  color: white;
-  background-color: rgb(218 65 33);
-  background-image: linear-gradient(145deg, rgb(255 135 83), rgb(209 54 29) 64%, rgb(160 41 25));
-  box-shadow:
-    0 0 0 1px rgb(var(--cardinal-silver) / 0.46),
-    inset 0 1px 1px rgb(255 255 255 / 0.46),
-    0 3px 8px rgb(108 40 24 / 0.28);
-  clip-path: none;
-  isolation: isolate;
-  animation: cardinality-close-connect 440ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.skin-cardinality .screen-close-button::before {
-  content: "";
-  position: absolute;
-  inset: -5px;
-  z-index: -1;
-  border: 1px solid rgb(var(--cardinal-gold) / 0.58);
-  border-radius: 50%;
-  opacity: 0.55;
-}
-.skin-cardinality .screen-close-button:hover {
-  color: white;
-  background-color: rgb(231 74 38);
-  background-image: linear-gradient(145deg, rgb(255 154 91), rgb(224 60 30) 64%, rgb(178 43 24));
-  box-shadow:
-    0 0 0 1px rgb(var(--cardinal-gold) / 0.66),
-    inset 0 1px 1px rgb(255 255 255 / 0.55),
-    0 5px 11px rgb(108 40 24 / 0.34);
-}
-.skin-cardinality .screen-close-button:active {
-  transform: scale(0.92);
-}
-.skin-cardinality .screen-close-label {
-  display: none;
-}
-.skin-cardinality .screen-close-icon {
-  width: 12px;
-  height: 12px;
-  stroke-width: 2.25;
-}
-.skin-cardinality .accent-bg,
-.skin-cardinality .toggle-on {
-  color: rgb(53 38 0);
-  background-color: rgb(var(--cardinal-gold));
-  background-image: linear-gradient(180deg, rgb(255 211 62), rgb(var(--cardinal-gold)));
-}
-.skin-cardinality .entry-card {
-  position: relative;
-  overflow: hidden;
-  color: rgb(var(--cardinal-ink));
-  background-color: rgb(239 241 244 / 0.76);
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.92), rgb(218 222 227 / 0.68));
-  border-color: rgb(255 255 255 / 0.88);
-  -webkit-backdrop-filter: blur(9px) saturate(0.72);
-  backdrop-filter: blur(9px) saturate(0.72);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255),
-    inset 0 -1px 0 rgb(var(--cardinal-silver) / 0.18),
-    0 5px 13px rgb(64 68 76 / 0.16);
+  color: rgb(var(--ord-ink));
+  background-color: rgb(255 255 255 / 0.92);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.22);
   transition:
-    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 180ms ease-out,
-    filter 150ms ease-out;
-}
-.skin-cardinality .entry-card::before {
-  content: "";
-  position: absolute;
-  top: 9%;
-  bottom: 9%;
-  left: 0;
-  width: 5px;
-  background: linear-gradient(180deg, rgb(255 213 54), rgb(var(--cardinal-gold)));
-  clip-path: polygon(0 8px, 100% 0, 100% calc(100% - 8px), 0 100%);
-  opacity: 0;
-  transform: scaleY(0.3);
-  transition:
-    opacity 120ms ease-out,
-    transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.skin-cardinality .entry-card:hover {
-  transform: translateX(4px);
-  filter: brightness(1.025);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255),
-    inset 0 -1px 0 rgb(var(--cardinal-gold) / 0.3),
-    0 8px 18px rgb(64 68 76 / 0.2);
-}
-.skin-cardinality .entry-card:hover::before {
-  opacity: 1;
-  transform: scaleY(1);
-}
-.skin-cardinality .accent-bg-soft {
-  color: rgb(92 56 0);
-  background-color: rgb(var(--cardinal-gold) / 0.22);
-  background-image: linear-gradient(180deg, rgb(255 224 116 / 0.62), rgb(var(--cardinal-gold) / 0.25));
-  border-color: rgb(var(--cardinal-gold) / 0.72);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.9),
-    inset 0 -1px 0 rgb(var(--cardinal-gold) / 0.16),
-    0 4px 10px rgb(var(--cardinal-gold) / 0.08);
-}
-.cardinality-interface {
-  position: absolute;
-  top: 38px;
-  right: -8px;
-  z-index: 2;
-  width: min(43vw, 370px);
-  height: 104px;
-  overflow: hidden;
-  pointer-events: none;
-}
-.cardinality-interface span {
-  position: absolute;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgb(var(--cardinal-gold) / 0.82) 55%, rgb(var(--cardinal-silver) / 0.28));
-  opacity: 0.16;
-  transform: scaleX(1) rotate(-5deg);
-  transform-origin: right center;
-  animation: cardinality-link-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.cardinality-interface span::before {
-  content: "";
-  position: absolute;
-  left: 42%;
-  top: -4px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  border: 1px solid rgb(var(--cardinal-gold) / 0.72);
-  background: rgb(255 255 255 / 0.8);
-}
-.cardinality-interface span:nth-child(1) {
-  top: 18px;
-  width: 88%;
-}
-.cardinality-interface span:nth-child(2) {
-  top: 48px;
-  width: 66%;
-  animation-delay: 55ms;
-}
-.cardinality-interface span:nth-child(3) {
-  top: 77px;
-  width: 42%;
-  animation-delay: 105ms;
-}
-@keyframes cardinality-link-in {
-  0% {
-    opacity: 0;
-    transform: scaleX(0.04) rotate(-5deg);
-    filter: blur(3px);
-  }
-  60% {
-    opacity: 0.58;
-  }
-  100% {
-    opacity: 0.16;
-    transform: scaleX(1) rotate(-5deg);
-    filter: blur(0);
-  }
-}
-@keyframes cardinality-close-connect {
-  from {
-    opacity: 0;
-    transform: scale(0.56) rotate(-42deg);
-    filter: blur(2px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) rotate(0);
-    filter: blur(0);
-  }
-}
-
-.skin-cardinality .idle-bg::before {
-  inset: -32% -18%;
-  width: 118%;
-  height: 128%;
-  border: 1px solid rgb(var(--cardinal-gold) / 0.18);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 58% 42%, rgb(255 255 255 / 0.52), transparent 25%),
-    radial-gradient(circle, rgb(var(--cardinal-gold) / 0.16), transparent 67%);
-  box-shadow: inset 0 0 48px rgb(var(--cardinal-gold) / 0.06);
-  animation: cardinality-vr-field 9s ease-in-out infinite alternate;
-}
-.skin-cardinality .idle-bg::after {
-  content: "";
-  position: absolute;
-  inset: 9% 6%;
-  background:
-    linear-gradient(7deg, transparent 0 46%, rgb(var(--cardinal-gold) / 0.18) 46.2% 46.5%, transparent 46.7%),
-    linear-gradient(-8deg, transparent 0 62%, rgb(var(--cardinal-silver) / 0.14) 62.2% 62.45%, transparent 62.65%);
-  opacity: 0.7;
-  transform: perspective(700px) rotateX(64deg) translateY(8%);
-  animation: cardinality-vr-lines 11s ease-in-out infinite alternate;
-}
-.skin-cardinality .idle-mode {
-  perspective: 820px;
-  transform-style: preserve-3d;
-}
-.skin-cardinality .idle-mode .entry-card {
-  --vr-x: 2px;
-  --vr-y: -4px;
-  --vr-scale: 1.006;
-  animation: cardinality-card-float 7.4s ease-in-out infinite alternate;
-}
-.skin-cardinality .idle-mode .entry-card:nth-child(3n + 1) {
-  --vr-x: -2px;
-  --vr-y: -3px;
-  --vr-scale: 0.997;
-}
-.skin-cardinality .idle-mode .entry-card:nth-child(3n + 2) {
-  --vr-x: 3px;
-  --vr-y: -5px;
-  --vr-scale: 1.009;
-}
-.skin-cardinality.app-idle .cardinality-interface {
-  opacity: 0.86;
-  transform: translate3d(-5px, 3px, 0) scale(1.04);
-  transition: opacity 600ms ease-out, transform 800ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-@keyframes cardinality-card-float {
-  from {
-    transform: translate3d(0, 1px, -5px) scale(0.998);
-  }
-  to {
-    transform: translate3d(var(--vr-x), var(--vr-y), 9px) scale(var(--vr-scale));
-  }
-}
-@keyframes cardinality-vr-field {
-  from { opacity: 0.5; transform: translate3d(-2%, 1%, 0) scale(0.94); }
-  to { opacity: 0.95; transform: translate3d(2%, -1%, 0) scale(1.04); }
-}
-@keyframes cardinality-vr-lines {
-  to { opacity: 1; transform: perspective(700px) rotateX(64deg) translate3d(1.5%, 5%, 0); }
-}
-
-/* Ordinary treats the desktop as an Augmented Reality field: clipped cyan
-   glass, optical rings and a single retinal scan on connection. Unlike
-   Cardinality's physical silver panels, all geometry is thin and emissive. */
-.skin-ordinary {
-  --ordinary-cyan: 103 224 255;
-  --ordinary-blue: 37 155 218;
-  --ordinary-ice: 224 250 255;
-}
-.dark.skin-ordinary.panel-bg,
-.dark.skin-ordinary .panel-bg {
-  background-image:
-    radial-gradient(circle at 82% 8%, rgb(var(--ordinary-cyan) / 0.13), transparent 34%),
-    radial-gradient(circle at 10% 92%, rgb(var(--ordinary-blue) / 0.12), transparent 40%),
-    linear-gradient(145deg, rgb(255 255 255 / 0.025), transparent 52%);
-}
-.skin-ordinary > :not(.ordinary-hud) {
-  position: relative;
-  z-index: 1;
-}
-.skin-ordinary :where(button, input, select, .entry-card),
-.skin-ordinary .toggle-thumb {
-  border-radius: 0;
-  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-}
-.skin-ordinary [role="switch"] .toggle-thumb {
-  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
-}
-.skin-ordinary .screen-close-button {
-  position: relative;
-  display: grid;
-  width: 27px;
-  height: 27px;
-  flex: 0 0 27px;
-  place-items: center;
-  gap: 0;
-  padding: 0;
-  border: 1px solid rgb(var(--ordinary-cyan) / 0.8);
-  border-radius: 50%;
-  color: rgb(var(--ordinary-ice));
-  background-color: rgb(5 27 42 / 0.82);
-  background-image: radial-gradient(circle, rgb(var(--ordinary-blue) / 0.28), rgb(4 20 33 / 0.88) 70%);
-  box-shadow:
-    inset 0 0 8px rgb(var(--ordinary-cyan) / 0.22),
-    0 3px 9px rgb(0 7 14 / 0.35),
-    0 0 11px rgb(var(--ordinary-blue) / 0.16);
-  clip-path: none;
-  isolation: isolate;
-  animation: ordinary-close-lock 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.skin-ordinary .screen-close-button::before {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  z-index: -1;
-  border: 1px dashed rgb(var(--ordinary-cyan) / 0.46);
-  border-radius: 50%;
+    background-color 150ms ease-out,
+    transform 120ms ease-out;
 }
 .skin-ordinary .screen-close-button:hover {
-  color: white;
-  background-color: rgb(9 48 69 / 0.92);
-  background-image: radial-gradient(circle, rgb(var(--ordinary-cyan) / 0.36), rgb(5 29 45 / 0.92) 72%);
-  border-color: rgb(var(--ordinary-ice) / 0.94);
-  box-shadow:
-    inset 0 0 10px rgb(var(--ordinary-cyan) / 0.3),
-    0 4px 11px rgb(0 7 14 / 0.4),
-    0 0 15px rgb(var(--ordinary-cyan) / 0.25);
+  color: rgb(var(--ord-ink));
+  background-color: rgb(255 255 255);
 }
 .skin-ordinary .screen-close-button:active {
   transform: scale(0.92);
@@ -827,65 +1213,76 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   display: none;
 }
 .skin-ordinary .screen-close-icon {
-  width: 11px;
-  height: 11px;
-  stroke-width: 1.75;
+  width: 12px;
+  height: 12px;
+  stroke-width: 2;
 }
-.skin-ordinary .accent-bg,
+.skin-ordinary .accent-bg {
+  color: rgb(var(--ord-ink));
+  background-color: rgb(var(--ord-amber));
+  background-image: none;
+}
 .skin-ordinary .toggle-on {
-  color: rgb(4 28 40);
-  background-color: rgb(var(--ordinary-cyan));
-  background-image: linear-gradient(135deg, rgb(var(--ordinary-ice)), rgb(var(--ordinary-cyan)) 56%, rgb(var(--ordinary-blue)));
+  background-color: rgb(var(--ord-blue));
+  background-image: none;
 }
+.skin-ordinary .accent-bg-soft {
+  color: rgb(var(--ord-ink));
+  background-color: rgb(var(--ord-amber) / 0.4);
+  background-image: none;
+  border-color: rgb(var(--ord-amber));
+  box-shadow: none;
+}
+
+/* Article rows are the information cards: white, high radius, and a single
+   solid amber tab at the top-left instead of the three-segment gradient
+   stripe the first pass used -- that stripe was an invention. */
 .skin-ordinary .entry-card {
   position: relative;
   overflow: hidden;
-  background-color: rgb(7 28 43 / 0.52);
-  background-image: linear-gradient(110deg, rgb(var(--ordinary-cyan) / 0.055), transparent 48%, rgb(var(--ordinary-blue) / 0.075));
-  border-color: rgb(var(--ordinary-cyan) / 0.22);
-  -webkit-backdrop-filter: blur(12px) saturate(1.15);
-  backdrop-filter: blur(12px) saturate(1.15);
+  border-radius: var(--plate-radius);
+  color: rgb(var(--ord-ink));
+  background-color: rgb(255 255 255 / calc(0.95 * var(--float-alpha, 1)));
+  background-image: none;
+  border-color: rgb(255 255 255 / 0.9);
   box-shadow:
-    inset 0 1px 0 rgb(var(--ordinary-ice) / 0.11),
-    inset 0 -1px 0 rgb(var(--ordinary-blue) / 0.12),
-    0 8px 20px rgb(0 7 14 / 0.24);
+    inset 0 1px 0 white,
+    var(--plate-shadow);
   transition:
     transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 150ms ease-out,
     box-shadow 180ms ease-out;
 }
-.skin-ordinary .entry-card::after {
+.skin-ordinary .entry-card::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent 0 44%, rgb(var(--ordinary-cyan) / 0.13) 50%, transparent 56%);
-  opacity: 0;
-  transform: translateX(-75%);
-  transition:
-    opacity 120ms ease-out,
-    transform 360ms cubic-bezier(0.16, 1, 0.3, 1);
+  top: 0;
+  left: 14px;
+  width: 34px;
+  height: 4px;
+  border-radius: 0 0 3px 3px;
+  background-color: rgb(var(--ord-amber));
   pointer-events: none;
 }
+.skin-ordinary .entry-card::after {
+  content: none;
+}
 .skin-ordinary .entry-card:hover {
-  transform: translateY(-1px);
-  border-color: rgb(var(--ordinary-cyan) / 0.52);
+  transform: translateY(-2px);
+  border-color: rgb(255 255 255);
   box-shadow:
-    inset 0 1px 0 rgb(var(--ordinary-ice) / 0.18),
-    0 9px 24px rgb(var(--ordinary-blue) / 0.12);
+    inset 0 1px 0 white,
+    0 0 0 2px rgb(var(--ord-amber)),
+    0 0 18px rgb(var(--ord-amber) / 0.5),
+    0 1px 3px rgb(0 0 0 / 0.18);
 }
-.skin-ordinary .entry-card:hover::after {
-  opacity: 1;
-  transform: translateX(75%);
+.skin-ordinary .entry-card .accent-text {
+  color: rgb(var(--ord-blue));
 }
-.skin-ordinary .accent-bg-soft {
-  color: rgb(var(--ordinary-ice));
-  background-color: rgb(var(--ordinary-blue) / 0.18);
-  background-image: linear-gradient(110deg, rgb(var(--ordinary-cyan) / 0.2), rgb(var(--ordinary-blue) / 0.13));
-  border-color: rgb(var(--ordinary-cyan) / 0.48);
-  box-shadow:
-    inset 0 1px 0 rgb(var(--ordinary-ice) / 0.15),
-    0 0 12px rgb(var(--ordinary-blue) / 0.1);
-}
+
+/* The two hairline arcs. A wide, short ellipse showing only its bottom edge
+   draws a line that sags at the centre and lifts toward the sides, which is
+   the shape in every reference still. The drop-shadow is what keeps them
+   readable over a pale wallpaper -- a bare white hairline vanishes. */
 .ordinary-hud {
   position: absolute;
   inset: 0;
@@ -893,59 +1290,54 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   overflow: hidden;
   pointer-events: none;
 }
-.ordinary-hud::after {
+.ordinary-arc {
+  position: absolute;
+  left: -25%;
+  width: 150%;
+  height: 120px;
+  border: 0 solid rgb(255 255 255 / 0.88);
+  border-radius: 50%;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.45));
+  animation: ordinary-arc-in 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.ordinary-arc-top {
+  top: -76px;
+  border-bottom-width: 1.5px;
+}
+.ordinary-arc-bottom {
+  bottom: 16px;
+  border-bottom-width: 1.5px;
+  animation-delay: 90ms;
+}
+/* Sits at the low point of the upper arc. Its inner ring is broken on one
+   side so the slow rotation actually reads as motion. */
+.ordinary-reticle {
+  position: absolute;
+  top: 33px;
+  left: calc(50% - 11px);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid rgb(255 255 255 / 0.92);
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.5));
+  animation: ordinary-reticle-drift 14s linear infinite;
+}
+.ordinary-reticle::before {
   content: "";
   position: absolute;
-  inset: -12% 0 auto;
-  height: 18%;
-  background: linear-gradient(180deg, transparent, rgb(var(--ordinary-cyan) / 0.075), transparent);
-  transform: translateY(-120%);
-  animation: ordinary-scan-in 1100ms cubic-bezier(0.16, 1, 0.3, 1) 100ms both;
-}
-.ordinary-orbit,
-.ordinary-reticle {
-  position: absolute;
+  inset: 4px;
   border-radius: 50%;
+  border: 1.5px solid rgb(255 255 255 / 0.92);
+  border-right-color: transparent;
 }
-.ordinary-orbit {
-  border: 1px solid rgb(var(--ordinary-cyan) / 0.15);
-  box-shadow: inset 0 0 16px rgb(var(--ordinary-blue) / 0.06);
-  opacity: 0;
-  transform: scale(0.65);
-  animation: ordinary-orbit-in 680ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.ordinary-orbit-a {
-  top: -84px;
-  right: -52px;
-  width: 280px;
-  height: 280px;
-}
-.ordinary-orbit-b {
-  top: -42px;
-  right: -10px;
-  width: 196px;
-  height: 196px;
-  animation-delay: 70ms;
-}
-.ordinary-orbit-c {
-  bottom: -118px;
-  left: -82px;
-  width: 310px;
-  height: 310px;
-  animation-delay: 130ms;
-}
-.ordinary-reticle {
-  top: -64px;
-  right: -32px;
-  width: 236px;
-  height: 236px;
-  border: 1px dashed rgb(var(--ordinary-ice) / 0.16);
-  animation: ordinary-reticle-drift 18s linear infinite;
-}
-@keyframes ordinary-orbit-in {
+@keyframes ordinary-arc-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0.86);
+  }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: scaleX(1);
   }
 }
 @keyframes ordinary-reticle-drift {
@@ -953,119 +1345,520 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
     transform: rotate(360deg);
   }
 }
-@keyframes ordinary-scan-in {
-  0% {
-    opacity: 0;
-    transform: translateY(-120%);
-  }
-  30% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(720%);
-  }
-}
-@keyframes ordinary-close-lock {
-  from {
-    opacity: 0;
-    transform: scale(1.35) rotate(38deg);
-    filter: blur(3px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) rotate(0);
-    filter: blur(0);
-  }
+
+/* No idle decoration of its own. The ring of cyan and coral segments that
+   used to sweep the background here had no counterpart in the source. What
+   is kept is the drift: an AR overlay hangs in the world, so it shifts
+   slightly with the wearer rather than sitting perfectly still. */
+.skin-ordinary .idle-bg::before,
+.skin-ordinary .idle-bg::after {
+  content: none;
 }
 
-.skin-ordinary .idle-bg::before {
-  inset: -24% -14%;
-  width: 128%;
-  height: 148%;
-  border: 1px solid rgb(var(--ordinary-cyan) / 0.22);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 62% 38%, transparent 0 26%, rgb(var(--ordinary-cyan) / 0.11) 26.3% 26.7%, transparent 27%),
-    radial-gradient(circle, rgb(var(--ordinary-blue) / 0.13), transparent 68%);
-  box-shadow: inset 0 0 54px rgb(var(--ordinary-blue) / 0.08);
-  animation: ordinary-vr-field 13s linear infinite;
-}
-.skin-ordinary .idle-bg::after {
-  content: "";
-  position: absolute;
-  inset: 8% 5%;
-  border: 1px solid rgb(var(--ordinary-cyan) / 0.13);
-  border-radius: 50%;
-  background: conic-gradient(from 20deg, transparent 0 18%, rgb(var(--ordinary-cyan) / 0.12) 18.3% 18.65%, transparent 19% 66%, rgb(var(--ordinary-ice) / 0.1) 66.3% 66.6%, transparent 67%);
-  animation: ordinary-vr-reticle 18s linear infinite reverse;
-}
-.skin-ordinary .idle-mode {
-  perspective: 880px;
-  transform-style: preserve-3d;
-}
-.skin-ordinary .idle-mode .entry-card {
-  --ar-x: 3px;
-  --ar-y: -4px;
-  --ar-scale: 1.005;
-  animation: ordinary-card-float 8s ease-in-out infinite alternate;
-}
-.skin-ordinary .idle-mode .entry-card:nth-child(3n + 1) {
-  --ar-x: -3px;
-  --ar-y: -2px;
-  --ar-scale: 0.997;
-}
-.skin-ordinary .idle-mode .entry-card:nth-child(3n + 2) {
-  --ar-x: 2px;
-  --ar-y: -5px;
-  --ar-scale: 1.008;
-}
-.skin-ordinary.app-idle .ordinary-orbit {
-  border-color: rgb(var(--ordinary-cyan) / 0.27);
-  box-shadow: inset 0 0 22px rgb(var(--ordinary-blue) / 0.1);
-  transition: border-color 700ms ease-out, box-shadow 700ms ease-out;
-}
-.skin-ordinary.app-idle .ordinary-reticle {
-  border-color: rgb(var(--ordinary-ice) / 0.25);
-}
-@keyframes ordinary-card-float {
-  from {
-    transform: translate3d(0, 1px, -7px) scale(0.998);
-  }
-  to {
-    transform: translate3d(var(--ar-x), var(--ar-y), 11px) scale(var(--ar-scale));
-  }
-}
-@keyframes ordinary-vr-field {
-  from { opacity: 0.48; transform: rotate(0) scale(0.94); }
-  50% { opacity: 0.95; }
-  to { opacity: 0.48; transform: rotate(360deg) scale(1.04); }
-}
-@keyframes ordinary-vr-reticle {
-  to { transform: rotate(360deg) scale(1.025); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .cardinality-interface span,
-  .skin-cardinality .screen-close-button,
-  .skin-cardinality .idle-bg::before,
-  .skin-cardinality .idle-bg::after,
-  .skin-cardinality .idle-mode .entry-card,
-  .ordinary-hud::after,
-  .ordinary-orbit,
+  .skin-cardinality .idle-mode,
+  .ordinary-arc,
   .ordinary-reticle,
   .skin-ordinary .screen-close-button,
   .skin-ordinary .idle-bg::before,
   .skin-ordinary .idle-bg::after,
-  .skin-ordinary .idle-mode .entry-card {
+  .skin-ordinary .idle-mode {
     animation: none;
   }
-  .ordinary-orbit {
+  /* Its entrance starts at opacity 0, so cancelling the animation has to
+     put it back explicitly. */
+  .ordinary-arc {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
   .skin-cardinality .entry-card:hover,
   .skin-ordinary .entry-card:hover {
     transform: none;
+  }
+}
+
+/* ---- Floating-skin screen transitions -----------------------------------
+
+   The shared overlay slides in from the right and fades (ScreenOverlay.tsx).
+   That is a fine generic transition and it is wrong for both of these
+   themes, whose panels do not travel -- they are drawn into existence where
+   they already are.
+
+   `[inert]` is the state selector: ScreenOverlay sets it on every screen
+   that is not the active one, so `:not([inert])` is "this screen just became
+   the visible one" and applying an `animation` there restarts it on each
+   activation. Exit keeps the shared opacity transition. */
+
+/* Cardinality: the reference chains rail button -> panel -> sub-panel with
+   triangular notches, i.e. panels are *emitted*, not moved. It unfurls from
+   a horizontal line at its own centre, with the line itself visible for the
+   first fifth of the animation.
+   `clip-path` rather than `scaleY` on purpose: scaling squashes every glyph
+   in the panel for the length of the transition, while a clip reveals the
+   panel already at its final size. */
+.skin-cardinality .screen-overlay {
+  transform: none;
+}
+.skin-cardinality .screen-overlay:not([inert]) {
+  animation: cardinality-materialize 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.skin-cardinality .screen-overlay:not([inert])::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background-color: rgb(var(--cardinal-amber));
+  box-shadow: 0 0 9px rgb(var(--cardinal-amber));
+  pointer-events: none;
+  /* `both` is load-bearing, not decoration. Without a fill mode the element
+     reverts to its base style once the animation ends -- which here is a
+     fully opaque amber rule sitting permanently across the middle of the
+     panel. Caught by sampling the panel centre after the animation: exactly
+     rgb(240 160 48) at the midline. */
+  animation: cardinality-materialize-line 320ms ease-out both;
+}
+@keyframes cardinality-materialize {
+  0% {
+    opacity: 0;
+    clip-path: inset(50% 0 50% 0);
+  }
+  20% {
+    opacity: 1;
+    clip-path: inset(49.5% 0 49.5% 0);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes cardinality-materialize-line {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.08);
+  }
+  20% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+/* The pointer only exists while its panel is open, so it should arrive with
+   the panel rather than being there already. */
+.skin-cardinality .icon-button[data-opens-screen].accent-bg-soft::after {
+  animation: cardinality-pointer-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes cardinality-pointer-in {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Ordinary: an AR panel is placed in the world rather than unfurled, so it
+   settles into position from slightly behind. Kept small -- the reference
+   app's panels appear quickly and without ceremony. */
+.skin-ordinary .screen-overlay {
+  transform: none;
+}
+.skin-ordinary .screen-overlay:not([inert]) {
+  animation: ordinary-panel-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes ordinary-panel-in {
+  from {
+    opacity: 0;
+    transform: scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skin-cardinality .screen-overlay:not([inert]),
+  .skin-cardinality .screen-overlay:not([inert])::before,
+  .skin-cardinality .icon-button[data-opens-screen].accent-bg-soft::after,
+  .skin-ordinary .screen-overlay:not([inert]) {
+    animation: none;
+  }
+  /* Starts at opacity 0 for its entrance, so cancelling the animation has to
+     put it back. */
+  .skin-cardinality .icon-button[data-opens-screen].accent-bg-soft::after {
+    opacity: 1;
+    transform: none;
+  }
+  /* Without its animation this pseudo-element would sit on the panel as a
+     permanent amber rule across the middle. */
+  .skin-cardinality .screen-overlay:not([inert])::before {
+    display: none;
+  }
+}
+
+/* ---- Ordinary: motion ---------------------------------------------------
+
+   Most of this skin had no motion of its own beyond the two arcs drawing
+   themselves in (user: noticeable that several parts simply don't animate).
+   The rule applied here: an AR overlay is *placed* into the world, so things
+   arrive by settling into position rather than by sliding in from off-screen,
+   and nothing loops except what the visor itself would be doing.
+
+   Entrance animations sit on elements that mount once, so they play at
+   startup and then stay out of the way. Nothing here is attached to a
+   virtualised list row -- those remount constantly while scrolling and would
+   re-fire their entrance every time. */
+/* Entrance runs off `@starting-style`, not an `animation`, so that the idle
+   sway further down can own the `animation` property on these same
+   elements. Re-declaring `animation` to add a second one restarts the first,
+   which would replay the entrance every time the app went idle -- the same
+   trap already hit with Ordinary's arcs. */
+.skin-ordinary .app-titlebar,
+.skin-ordinary .app-filterbar,
+.skin-ordinary .timeline-toolbar {
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    translate 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.skin-ordinary .app-filterbar {
+  transition-delay: 70ms;
+}
+.skin-ordinary .timeline-toolbar {
+  transition-delay: 140ms;
+}
+@starting-style {
+  .skin-ordinary .app-titlebar,
+  .skin-ordinary .app-filterbar,
+  .skin-ordinary .timeline-toolbar {
+    opacity: 0;
+    translate: 0 -6px;
+  }
+}
+
+/* Selecting a screen snaps its disc to amber; a short ring expanding out of
+   it is the acknowledgement the reference app gives a tapped control. */
+.skin-ordinary .icon-button.accent-bg-soft {
+  position: relative;
+}
+.skin-ordinary .icon-button.accent-bg-soft::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--ord-amber));
+  pointer-events: none;
+  animation: ordinary-tap-ring 520ms ease-out both;
+}
+@keyframes ordinary-tap-ring {
+  from {
+    opacity: 0.85;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+/* The card's role tab extends when the row is pointed at, which is the
+   closest thing this list has to the reference's "this label is the one
+   you're looking at" state. */
+.skin-ordinary .entry-card::before {
+  transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.skin-ordinary .entry-card:hover::before {
+  width: 64px;
+}
+
+/* A cyan edge running across the panel as it lands. Short, once, on open. */
+.skin-ordinary .screen-overlay:not([inert])::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--ordinary-cyan)) 45%,
+    rgb(var(--ordinary-blue)) 55%,
+    transparent
+  );
+  pointer-events: none;
+  animation: ordinary-edge-sweep 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes ordinary-edge-sweep {
+  from {
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* The reticle already turns; give it the slow size drift a visor's focus
+   ring has so it reads as live rather than as a static graphic. */
+.skin-ordinary .ordinary-reticle {
+  animation:
+    ordinary-reticle-drift 14s linear infinite,
+    ordinary-reticle-breathe 6s ease-in-out infinite;
+}
+@keyframes ordinary-reticle-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skin-ordinary .icon-button.accent-bg-soft::after,
+  .skin-ordinary .screen-overlay:not([inert])::after,
+  .skin-ordinary .ordinary-reticle {
+    animation: none;
+  }
+  /* These two exist only for their animation; without it they would sit on
+     the interface permanently. */
+  .skin-ordinary .icon-button.accent-bg-soft::after,
+  .skin-ordinary .screen-overlay:not([inert])::after {
+    display: none;
+  }
+}
+
+/* ---- Floating skins: timeline card motion -------------------------------
+
+   Rows only animate while the scroll container carries `list-reveal`, which
+   EntryList holds for 800ms after a fresh list arrives. Putting the
+   animation on `.entry-card` unconditionally would replay it every time a
+   virtualised row scrolled back into view -- see the long comment in
+   EntryList.tsx.
+
+   The look is "fades in and gradually falls into line" (user), so each row
+   starts both faded and *out of alignment* -- a small horizontal offset that
+   differs by row, resolving to a flush column as the stagger works down the
+   list. Without that variance the rows are aligned from the first frame and
+   only the fade reads, which is not the same thing.
+
+   The fade is the dominant channel and the displacement is deliberately
+   small (a few px, resolved well before the animation ends). A larger
+   offset made it read as rows sliding into place; the ask was for them to
+   fade in while settling, not to travel.
+
+   The stagger is keyed off the row wrapper's `:nth-child`. That maps to
+   visual order because the virtualiser renders its window in order, and
+   after a refresh the list is scrolled to the top, so child 1 really is the
+   first visible row. It also carries the per-row offset, for the same
+   reason the phase groups do further down: `.entry-card` is the only child
+   of its wrapper, so `:nth-child(3n)` on the card itself always matches
+   child 1 and every row would get an identical offset.
+
+   Everything animates `translate`/`scale`, not `transform`. The cards use
+   `transform` for their hover states, and these two must not fight. */
+.skin-floating .list-reveal .entry-card,
+.skin-floating .list-reveal .entry-compact {
+  animation: card-reveal 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.skin-floating .list-reveal > div > div:nth-child(3n + 1) { --reveal-x: -4px; }
+.skin-floating .list-reveal > div > div:nth-child(3n + 2) { --reveal-x: 3px; }
+.skin-floating .list-reveal > div > div:nth-child(3n) { --reveal-x: -2px; }
+.skin-floating .list-reveal > div > div:nth-child(1) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(1) .entry-compact { animation-delay: 0ms; }
+.skin-floating .list-reveal > div > div:nth-child(2) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(2) .entry-compact { animation-delay: 45ms; }
+.skin-floating .list-reveal > div > div:nth-child(3) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(3) .entry-compact { animation-delay: 90ms; }
+.skin-floating .list-reveal > div > div:nth-child(4) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(4) .entry-compact { animation-delay: 135ms; }
+.skin-floating .list-reveal > div > div:nth-child(5) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(5) .entry-compact { animation-delay: 180ms; }
+.skin-floating .list-reveal > div > div:nth-child(6) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(6) .entry-compact { animation-delay: 225ms; }
+.skin-floating .list-reveal > div > div:nth-child(7) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(7) .entry-compact { animation-delay: 270ms; }
+.skin-floating .list-reveal > div > div:nth-child(n + 8) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(n + 8) .entry-compact { animation-delay: 315ms; }
+
+/* Cardinality's rows arrive from above, filling the list downward the way
+   the menu lists in the source do (user: "上からパラパラと流れてくる感じの方が
+   原作っぽい"). */
+.skin-cardinality .list-reveal .entry-card,
+.skin-cardinality .list-reveal .entry-compact {
+  animation-name: card-reveal-drop;
+}
+@keyframes card-reveal-drop {
+  from {
+    opacity: 0;
+    translate: var(--reveal-x, 0) -6px;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+/* Ordinary places each card into the scene instead, settling it forward. */
+@keyframes card-reveal {
+  from {
+    opacity: 0;
+    translate: var(--reveal-x, 0) 4px;
+    scale: 0.995;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+/* ---- Floating skins: idle motion ----------------------------------------
+
+   The idle treatment was `idle-camera-shake`, a ~1px jitter on a 13.7s loop.
+   It reads as camera noise, which is the opposite of what these interfaces
+   are: panels suspended in space (user: wants the idle state to feel like it
+   is floating).
+
+   Kept deliberately small throughout. This is a widget glanced at in the
+   corner of a screen, not a screensaver.
+
+   Going idle first pulls the whole interface back a touch, then the large
+   blocks start drifting at their own rates.
+
+   Per-card bobbing was the first attempt and was wrong: a list of rows each
+   moving independently reads as a wobbling list, not as panels suspended in
+   space (user: wants the big blocks to move as units). The unit here is a
+   plate -- title bar, filter bar, toolbar, the article list -- and giving
+   each an unrelated period is what stops them looking bolted to one sheet.
+
+   Everything below animates the individual `translate`/`rotate`/`scale`
+   properties rather than `transform`. That leaves `transform` free for hover
+   states and entrance transitions on the same elements, which is the whole
+   reason those can coexist with this. */
+.skin-floating.app-idle {
+  scale: 0.985;
+}
+.skin-floating {
+  scale: 1;
+  transition: scale 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* Two groups, not four. The three bars across the top read as one piece of
+   chrome, so they share an animation *and* a phase and drift as a unit; the
+   article list is the other group and runs on an unrelated period so the two
+   separate visibly. They have no common ancestor to animate -- the title and
+   filter bars are root children while the toolbar sits inside the timeline
+   pane -- so "together" is achieved by giving all three identical timing.
+
+   Translation only. An earlier version added a fraction of a degree of
+   rotation and it read as the panel tilting rather than floating (user:
+   up/down/left/right is enough). */
+.skin-floating.app-idle .app-titlebar,
+.skin-floating.app-idle .app-filterbar,
+.skin-floating.app-idle .timeline-toolbar {
+  animation: block-sway-a 23s ease-in-out infinite;
+}
+.skin-floating.app-idle .entry-list-scroll {
+  animation: block-sway-b 31s ease-in-out -11s infinite;
+}
+@keyframes block-sway-a {
+  0% {
+    translate: -3px -2px;
+  }
+  33% {
+    translate: 3px -3px;
+  }
+  66% {
+    translate: 4px 3px;
+  }
+  100% {
+    translate: -3px -2px;
+  }
+}
+@keyframes block-sway-b {
+  0% {
+    translate: 3px 3px;
+  }
+  33% {
+    translate: -4px 1px;
+  }
+  66% {
+    translate: -2px -4px;
+  }
+  100% {
+    translate: 3px 3px;
+  }
+}
+
+/* Ordinary's arcs are world-locked in the source -- the visor moves, the
+   overlay stays put -- so they drift against the panel plane rather than
+   with it.
+   Applied to the HUD container, not to the arcs. Re-declaring `animation` on
+   an arc would restart its entrance animation too, so the arcs would redraw
+   themselves every time the app went idle. */
+.skin-ordinary.app-idle .ordinary-hud {
+  animation: float-counter-drift 26s ease-in-out infinite;
+}
+@keyframes float-counter-drift {
+  0% {
+    transform: translate3d(2px, 1px, 0);
+  }
+  25% {
+    transform: translate3d(-1px, 3px, 0);
+  }
+  50% {
+    transform: translate3d(-3px, -1px, 0);
+  }
+  75% {
+    transform: translate3d(1px, -3px, 0);
+  }
+  100% {
+    transform: translate3d(2px, 1px, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skin-floating .list-reveal .entry-card,
+  .skin-floating .list-reveal .entry-compact,
+  .skin-floating.app-idle .app-titlebar,
+  .skin-floating.app-idle .app-filterbar,
+  .skin-floating.app-idle .timeline-toolbar,
+  .skin-floating.app-idle .entry-list-scroll,
+  .skin-ordinary.app-idle .ordinary-hud {
+    animation: none;
+  }
+  .skin-floating.app-idle {
+    scale: 1;
+  }
+  /* The reveal starts at opacity 0, so cancelling it has to restore the row. */
+  .skin-floating .list-reveal .entry-card,
+  .skin-floating .list-reveal .entry-compact {
+    opacity: 1;
+    translate: none;
+    scale: none;
   }
 }
 
@@ -1234,3 +2027,4 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
     transition-duration: 0.01ms !important;
   }
 }
+
