@@ -165,6 +165,7 @@ pub fn run() {
             commands::update::download_update,
             commands::update::apply_update,
             commands::update::rollback_update,
+            commands::booth_test::test_booth_fetch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
