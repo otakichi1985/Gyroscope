@@ -1,3 +1,4 @@
+pub mod booth_test;
 pub mod entries;
 pub mod feeds;
 pub mod opml;
