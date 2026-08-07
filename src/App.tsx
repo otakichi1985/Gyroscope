@@ -8,6 +8,7 @@ import { SettingsOverlay } from "./components/SettingsOverlay";
 import { TitleBar } from "./components/TitleBar";
 import { TimelineToolbar } from "./components/TimelineToolbar";
 import { TrashOverlay } from "./components/TrashOverlay";
+import { useAutoCheckForUpdate } from "./hooks/useAutoCheckForUpdate";
 import { useFeedsUpdatedListener } from "./hooks/useFeedsUpdatedListener";
 import { useIdleTimer } from "./hooks/useIdleTimer";
 import { useSyncAlwaysOnTop } from "./hooks/useSyncAlwaysOnTop";
@@ -156,6 +157,7 @@ function App() {
   useSyncWindowOpacity(alpha);
   useSyncAlwaysOnTop(alwaysOnTop);
   useSyncMinimizeToTray(minimizeToTray);
+  useAutoCheckForUpdate();
 
   const terminalStyle = skin.visualStyle === "terminal";
   const latinSources = latinFontId
