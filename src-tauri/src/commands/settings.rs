@@ -60,12 +60,17 @@ pub fn set_data_dir(app: AppHandle, db: State<'_, Db>, path: Option<String>) -> 
 /// connection (and everything built on top of it) is only ever resolved
 /// once, at startup.
 #[tauri::command]
-pub fn restart_app(app: AppHandle) -> AppResult<()> {
+pub fn restart_app(app: AppHandle, db: State<'_, Db>) -> AppResult<()> {
     let exe = std::env::current_exe()
         .map_err(|e| AppError::Other(format!("実行ファイルを特定できませんでした: {e}")))?;
     std::process::Command::new(exe)
         .spawn()
         .map_err(|e| AppError::Other(format!("再起動に失敗しました: {e}")))?;
+    // `app.exit()` skips Drop and can land mid-write on another thread (the
+    // background scheduler writes to this same connection every tick) --
+    // taking the lock first rules that out. See commands::update::apply_update
+    // for the incident this mirrors.
+    let _guard = db.0.lock().unwrap();
     app.exit(0);
     Ok(())
 }

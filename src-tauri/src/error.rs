@@ -16,6 +16,8 @@ pub enum AppError {
     #[error("no feed could be found at this address")]
     FeedNotFound,
     #[error("{0}")]
+    Scrape(String),
+    #[error("{0}")]
     Other(String),
 }
 

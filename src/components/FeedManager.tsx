@@ -190,7 +190,8 @@ export function FeedManager() {
       {addError && <p className="text-xs text-red-500">{addError}</p>}
       {error && <p className="text-xs text-red-500">{error}</p>}
       <p className="text-xs opacity-60">
-        記事系サイト以外や、一部サイトからはRSSを取得できない場合があります
+        記事系サイト以外や、一部サイトからはRSSを取得できない場合があります。BOOTHショップのURL（例:
+        https://example.booth.pm/）にも対応しています
       </p>
 
       {/* Genre-first, folder-like organization: create a genre here, then
@@ -224,6 +225,16 @@ export function FeedManager() {
                   </span>
                 )}
                 <span className="truncate font-medium">{feed.custom_title ?? feed.title ?? feed.url}</span>
+                {feed.source_type === "booth" && (
+                  // BOOTH feeds get a longer default refresh interval and a
+                  // different fetch mechanism under the hood (see
+                  // fetch::booth) -- this badge is the only place that's
+                  // visible to the user, so they know why e.g. the interval
+                  // field defaulted to 60 instead of 30.
+                  <span className="accent-bg-soft accent-text shrink-0 rounded px-1 text-[10px] font-medium">
+                    BOOTH
+                  </span>
+                )}
                 {feed.unread_count > 0 && (
                   // tabular-nums so the count keeps a fixed width as it
                   // changes -- otherwise every refresh nudges the row's

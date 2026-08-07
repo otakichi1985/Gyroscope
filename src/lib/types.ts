@@ -15,6 +15,7 @@ export interface Feed {
   created_at: string;
   tags: string[];
   unread_count: number;
+  source_type: "rss" | "booth";
 }
 
 // Mirrors src-tauri/src/db/models.rs::Entry.

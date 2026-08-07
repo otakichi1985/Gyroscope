@@ -13,6 +13,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
+use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::fetch::HttpClient;
 use crate::paths;
@@ -240,7 +241,7 @@ pub async fn download_update(http: State<'_, HttpClient>, pending: State<'_, Pen
 /// place -- so this is the same trick `restart_app` relies on, one step
 /// earlier.
 #[tauri::command]
-pub fn apply_update(app: AppHandle, pending: State<'_, PendingUpdate>) -> AppResult<()> {
+pub fn apply_update(app: AppHandle, db: State<'_, Db>, pending: State<'_, PendingUpdate>) -> AppResult<()> {
     if pending.0.lock().unwrap().is_none() {
         return Err(AppError::Other("先に更新の確認を行ってください".to_string()));
     }
@@ -269,6 +270,13 @@ pub fn apply_update(app: AppHandle, pending: State<'_, PendingUpdate>) -> AppRes
     std::process::Command::new(&exe)
         .spawn()
         .map_err(|e| AppError::Other(format!("再起動に失敗しました: {e}")))?;
+    // `app.exit()` skips Drop (so `Db`'s connection is never closed
+    // cleanly) and can land at any instant relative to other threads --
+    // in particular the background scheduler, which writes to this same
+    // connection every tick. Taking the lock here first means this can
+    // only happen once nothing else is mid-write (see CLAUDE.md's note on
+    // the `database disk image is malformed` incident this mirrors).
+    let _guard = db.0.lock().unwrap();
     app.exit(0);
     Ok(())
 }
@@ -282,7 +290,7 @@ pub fn apply_update(app: AppHandle, pending: State<'_, PendingUpdate>) -> AppRes
 /// CLAUDE.md's note on this command for why a paired DB snapshot was
 /// deliberately left out of scope.
 #[tauri::command]
-pub fn rollback_update(app: AppHandle) -> AppResult<()> {
+pub fn rollback_update(app: AppHandle, db: State<'_, Db>) -> AppResult<()> {
     let exe = exe_path()?;
     let bak = backup_exe_path(&exe);
     if !bak.exists() {
@@ -303,6 +311,8 @@ pub fn rollback_update(app: AppHandle) -> AppResult<()> {
     std::process::Command::new(&exe)
         .spawn()
         .map_err(|e| AppError::Other(format!("再起動に失敗しました: {e}")))?;
+    // See apply_update's identical guard above for why.
+    let _guard = db.0.lock().unwrap();
     app.exit(0);
     Ok(())
 }

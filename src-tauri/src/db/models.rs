@@ -20,11 +20,14 @@ pub struct Feed {
     pub created_at: String,
     pub tags: Vec<String>,
     pub unread_count: i64,
+    // 'rss' (default, existing feeds) or 'booth' (see fetch::booth) --
+    // drives the branch in commands::feeds::refresh_feed_inner.
+    pub source_type: String,
 }
 
 pub const FEED_COLUMNS: &str = "f.id, f.url, f.site_url, f.title, f.custom_title, f.icon_path, \
      f.folder, f.interval_min, f.notify_enabled, f.sort_order, f.last_fetched_at, \
-     f.last_error, f.created_at";
+     f.last_error, f.created_at, f.source_type";
 
 impl Feed {
     /// Maps a row selected with [`FEED_COLUMNS`] (aliased `f`). `tags` and
@@ -47,6 +50,7 @@ impl Feed {
             created_at: row.get(12)?,
             tags: Vec::new(),
             unread_count: 0,
+            source_type: row.get(13)?,
         })
     }
 }

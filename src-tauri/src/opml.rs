@@ -228,6 +228,7 @@ mod tests {
                 created_at: "2026-01-01T00:00:00Z".to_string(),
                 tags: vec![],
                 unread_count: 0,
+                source_type: "rss".to_string(),
             },
             Feed {
                 id: 2,
@@ -245,6 +246,7 @@ mod tests {
                 created_at: "2026-01-01T00:00:00Z".to_string(),
                 tags: vec![],
                 unread_count: 0,
+                source_type: "rss".to_string(),
             },
         ];
 
