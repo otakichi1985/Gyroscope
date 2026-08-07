@@ -45,7 +45,7 @@ const SKIN_GROUPS = [
   { id: "style", label: "スタイル" },
 ] as const;
 
-type SettingsSectionId = "appearance" | "accessibility" | "behavior" | "privacy" | "data" | "update" | "boothTest";
+type SettingsSectionId = "appearance" | "accessibility" | "behavior" | "privacy" | "data" | "update";
 
 const SETTINGS_SECTIONS_STORAGE_KEY = "gyroscope:settings-sections";
 const DEFAULT_OPEN_SECTIONS: Record<SettingsSectionId, boolean> = {
@@ -55,7 +55,6 @@ const DEFAULT_OPEN_SECTIONS: Record<SettingsSectionId, boolean> = {
   privacy: false,
   data: false,
   update: false,
-  boothTest: true,
 };
 
 function loadOpenSections(): Record<SettingsSectionId, boolean> {
@@ -359,48 +358,6 @@ function UpdateSection() {
           </p>
         </div>
       )}
-    </div>
-  );
-}
-
-// 【実験・使い捨て】BOOTHのショップページがCloudflareのJS challengeで弾かれるか、
-// このアプリ自身が持ってる本物のWebView2エンジンで突破できるかを確かめるためだけの
-// テスト。src-tauri/src/commands/booth_test.rs とセットで、結論が出たら
-// （どちらの結果でも）両方まとめて削除する。
-function BoothScrapeTestSection() {
-  const [result, setResult] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const run = async () => {
-    setBusy(true);
-    setError(null);
-    setResult(null);
-    try {
-      const r = await invoke<string>("test_booth_fetch");
-      setResult(r);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs leading-relaxed opacity-70">
-        別ウィンドウでBOOTHのショップページを開き、Cloudflareの確認画面のままか、
-        本物のページまで進めたかを確認します。開いたウィンドウは手動で閉じてください。
-      </p>
-      <button type="button" onClick={run} disabled={busy} className={`${OUTLINE_BUTTON} self-start`}>
-        {busy ? "確認中...(数秒かかります)" : "テスト実行"}
-      </button>
-      {result && (
-        <p className="allow-text-selection rounded bg-black/5 px-2 py-1.5 font-mono text-[11px] dark:bg-white/5">
-          {result}
-        </p>
-      )}
-      {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
   );
 }
@@ -746,14 +703,6 @@ export function SettingsOverlay() {
           onToggle={() => toggleSection("update")}
         >
         <UpdateSection />
-        </SettingsSection>
-
-        <SettingsSection
-          title="[実験] BOOTH取得テスト"
-          open={openSections.boothTest}
-          onToggle={() => toggleSection("boothTest")}
-        >
-        <BoothScrapeTestSection />
         </SettingsSection>
       </div>
     </ScreenOverlay>

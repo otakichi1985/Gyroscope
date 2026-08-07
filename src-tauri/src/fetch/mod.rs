@@ -1,3 +1,4 @@
+pub mod booth;
 pub mod client;
 pub mod discovery;
 pub mod favicon;

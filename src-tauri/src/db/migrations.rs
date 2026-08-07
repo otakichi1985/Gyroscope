@@ -113,6 +113,13 @@ const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE entries ADD COLUMN deleted_at TEXT;
     "#,
+    // v5: BOOTH shop monitoring. `source_type` distinguishes an RSS/Atom
+    // feed from a scraped BOOTH shop -- see fetch::booth and
+    // commands::feeds::refresh_feed_inner's branch on this column. Existing
+    // rows all default to 'rss', so nothing about current feeds changes.
+    r#"
+    ALTER TABLE feeds ADD COLUMN source_type TEXT NOT NULL DEFAULT 'rss';
+    "#,
 ];
 
 pub fn run(conn: &Connection) -> rusqlite::Result<()> {

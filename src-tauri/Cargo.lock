@@ -1578,6 +1578,7 @@ dependencies = [
  "chrono",
  "feed-rs",
  "mediatype",
+ "percent-encoding",
  "quick-xml",
  "raw-window-handle",
  "reqwest",
