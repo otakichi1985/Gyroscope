@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
@@ -159,12 +159,55 @@ export function EntryList() {
 
   const baseSize = viewMode === "card" ? CARD_BASE_SIZE[cardSize] : OTHER_BASE_SIZE[viewMode];
 
+  // Identify a row the way React does -- by article, not by slot. The
+  // virtualizer's default is to key everything by array index, and that
+  // breaks in two separate ways once the list is replaced under it:
+  //
+  //  - Measured heights live in a cache keyed by that index which is never
+  //    invalidated on a data change, so after a refresh slot 7 silently
+  //    reuses whatever height the *previous* article in slot 7 had.
+  //  - `measureElement` unobserves whatever node it had previously cached
+  //    under an index. Rows are keyed by `entry.id` here, so a refresh that
+  //    inserts an article at the top makes React reuse every existing row's
+  //    DOM node and merely rewrite its `data-index` -- the ref is not called
+  //    again, because its identity never changes. The newly mounted top row
+  //    then claims index 0, finds the still-mounted old node cached there,
+  //    and unobserves it. That row is left in the DOM with no ResizeObserver
+  //    and no way back into the cache.
+  //
+  // Together those are the "cards overlap after a refresh and stay that way
+  // until you scroll" bug: the shifted row keeps a wrong height, everything
+  // below it is positioned one row too high, and only scrolling it out of
+  // and back into the window (which remounts it, re-running the ref) repairs
+  // it. Note that the mount path alone cannot repair anything -- when a
+  // cached size exists, `measureElement` returns it instead of reading the
+  // DOM, so the delta is zero. The ResizeObserver is the only corrective
+  // path, which is exactly what gets torn off above.
+  //
+  // Keying by entry id makes both caches follow the row instead of the slot.
+  const getItemKey = useCallback((index: number) => entries[index]?.id ?? index, [entries]);
+
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => baseSize + gap,
+    getItemKey,
     overscan: 8,
   });
+
+  // Row geometry is a function of these three settings, but changing
+  // `estimateSize` invalidates nothing on its own: the measurements memo keys
+  // off count/padding/gap and the size-cache version, never the estimator,
+  // and a cached measurement always beats the estimate. So heights measured
+  // in compact mode would still be driving layout after a switch to card
+  // mode. Now that sizes are keyed by entry id they would follow the article
+  // across that switch rather than being overwritten by the next occupant of
+  // the slot, so the cache has to be dropped explicitly. Layout effect, not
+  // a passive one, so the corrected positions land in the same paint as the
+  // new row heights.
+  useLayoutEffect(() => {
+    virtualizer.measure();
+  }, [virtualizer, viewMode, cardSize, cardGap]);
 
   const virtualItems = virtualizer.getVirtualItems();
 
