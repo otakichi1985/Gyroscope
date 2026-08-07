@@ -14,6 +14,9 @@ dist-portable
 rss-widget-portable.zip
 *.local
 
+# QA確認用に撮ったスクショなどを放り込む場所（フォルダごと無視）
+qa-screenshots
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
