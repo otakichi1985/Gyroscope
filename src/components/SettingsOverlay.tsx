@@ -343,9 +343,6 @@ function UpdateSection() {
           {status?.kind === "unsupported" && (
             <p className="text-xs opacity-60">この配布形態（インストーラ版）では自動更新に対応していません</p>
           )}
-          {status?.kind === "notConfigured" && (
-            <p className="text-xs opacity-60">このビルドでは更新確認が無効になっています</p>
-          )}
         </div>
       )}
       {error && <p className="text-xs text-red-500">{error}</p>}

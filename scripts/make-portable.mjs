@@ -23,39 +23,6 @@ const { version } = JSON.parse(readFileSync(path.join(root, "package.json"), "ut
 const zipPath = path.join(root, `gyroscope-portable-v${version}.zip`);
 const companionFiles = ["README.md", "sample.opml"];
 
-// GYROSCOPE_UPDATE_TOKEN (a fine-grained PAT, Contents: Read-only, scoped
-// to just this repo) has to be present in the environment *when cargo
-// compiles*, not just at runtime -- src-tauri/src/commands/update.rs reads
-// it via `option_env!`, which bakes the value into the binary at build
-// time. It's never committed to source, so it lives in a gitignored
-// `.env.local` here instead and gets loaded into this process's env
-// before the cargo build below (execFileSync inherits process.env by
-// default, so setting it here is enough to reach cargo). No dependency
-// added for this -- the KEY=VALUE format needed is trivial enough that
-// pulling in a full dotenv package would be more code than it saves.
-function loadEnvLocal() {
-  const envPath = path.join(root, ".env.local");
-  if (!existsSync(envPath)) return;
-  for (const line of readFileSync(envPath, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    // A real environment variable set by the caller wins over .env.local.
-    if (process.env[key] === undefined) {
-      process.env[key] = trimmed.slice(eq + 1).trim();
-    }
-  }
-}
-loadEnvLocal();
-if (!process.env.GYROSCOPE_UPDATE_TOKEN) {
-  console.warn(
-    "\n[警告] GYROSCOPE_UPDATE_TOKEN が未設定です。このビルドはアプリ内更新チェックが無効になります" +
-      "（.env.local を確認してください）。\n",
-  );
-}
-
 function run(cmd, args, cwd) {
   console.log(`> ${cmd} ${args.join(" ")}`);
   execFileSync(cmd, args, { cwd, stdio: "inherit" });

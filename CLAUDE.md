@@ -753,19 +753,25 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
     zipには空の`data/`が同梱されておりそのまま展開すると実データを巻き込みかねないため
     （`npm run package:portable`は変わらずzipも作るが、GitHub Releaseにはzipと単体exeの
     **両方**を手動で添付する運用。`scripts/make-portable.mjs`の実行後ログに毎回リマインドを出す）
-  - リポジトリが非公開のため、確認・ダウンロードとも認証が要る。埋め込むのは
-    「このリポジトリだけ・Contents: Read-onlyのfine-grained PAT」で、ソースには書かず
-    ビルド時に環境変数`GYROSCOPE_UPDATE_TOKEN`から`option_env!`で焼き込む（`env!`ではなく
-    `option_env!`なのは、未設定でも`cargo build`/`npm run tauri dev`が普通に通るようにする
-    ため。この場合は`UpdateStatus::NotConfigured`を返して機能が無効になるだけ）。トークン本体は
-    gitignore対象の`.env.local`に保存し、`scripts/make-portable.mjs`がビルド前に読み込んで
-    `process.env`へ流し込む（`execFileSync`は既定で親のenvを子プロセスに継承するので、
-    cargo呼び出し側の変更は不要）
-  - ダウンロードしたアセットはGitHub公開の`browser_download_url`ではなく、
-    `/releases/assets/{id}`のAPIエンドポイントを`Accept: application/octet-stream`付きで
-    叩く方式（非公開リポジトリの`browser_download_url`はトークンなしでは404になるため）。
-    reqwestは既定でクロスオリジンへのリダイレクト時に`Authorization`ヘッダーを引き継がない
-    ため、GitHubがS3の署名付きURLへリダイレクトしてもトークンが漏れずに済む
+  - **【当初の設計を撤回】非公開リポジトリのまま「このリポジトリだけ・Contents: Read-only の
+    fine-grained PAT」をビルド時に焼き込む方式を最初に組んだが、GitHubのトークン設定画面側の
+    不具合で頓挫した。** リポジトリ選択（Only select repositories）をトークン作成時・編集時の
+    どちらで行っても保存されず、新規に作り直しても再現し、API側は終始
+    `GET /repos/{owner}/{repo}`にすら404を返し続けた（`/rate_limit`では200になるため
+    トークン自体は有効、選択だけが反映されない状態）。実際にこの症状はGitHub公式コミュニティで
+    複数報告されている既知の不具合で、fine-grained PATの編集フォームが既存のリポジトリ選択を
+    正しく引き継がない／保存できないことがある
+    （[community discussion #183307](https://github.com/orgs/community/discussions/183307)、
+    [#188472](https://github.com/orgs/community/discussions/188472)、
+    [#171513](https://github.com/orgs/community/discussions/171513)）。ソースは元々「読めなくて
+    構わない」というユーザー判断だったこともあり、**リポジトリをPublicに変更してトークン方式を
+    廃止**する形に切り替えた。トークンが絡む複雑さ（`.env.local`読み込み、`option_env!`での
+    焼き込み、`NotConfigured`状態）は全部削除済み。今後もし非公開に戻す判断をする場合は、
+    フロントで一度トークンの伏せ字入力＋保存UIを作るより先に、まずこの不具合が解消しているか
+    小さく確認するのが得策（同じ壁に当たり直す可能性が高い）
+  - 公開リポジトリなので確認・ダウンロードとも認証不要。最新リリース確認は
+    `GET /repos/{owner}/{repo}/releases/latest`をそのまま叩くだけ、アセットのダウンロードも
+    レスポンスに含まれる`browser_download_url`をそのままGETするだけで済む
   - 適用は「新しいexeをダウンロード→今動いているexeを`.exe.bak`にリネーム→ダウンロード
     したものを本来の名前にリネーム→新プロセスを起動して自分は終了」という、既存の
     `restart_app`（データ保存先変更用）と同じ「リネームで入れ替えてプロセスを差し替える」
