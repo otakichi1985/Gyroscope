@@ -144,7 +144,7 @@ pub fn build_opml(feeds: &[Feed]) -> String {
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
          <opml version=\"2.0\">\n  \
-         <head><title>RSS Widget</title></head>\n  \
+         <head><title>Gyroscope</title></head>\n  \
          <body>\n{body}  </body>\n\
          </opml>\n"
     )

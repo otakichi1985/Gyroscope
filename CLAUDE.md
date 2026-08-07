@@ -23,7 +23,7 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
 
 `package:portable` は実行ファイル、`.portable`、空の `data/` に加え、非技術者向けの
 `README.md` とサンプル購読リスト `sample.opml` も `dist-portable/` へコピーし、同じ内容の
-配布用 `rss-widget-portable.zip` まで生成する。`.portable` をZIPから欠落させないため、tarには
+配布用 `gyroscope-portable-v{version}.zip` まで生成する。`.portable` をZIPから欠落させないため、tarには
 ワイルドカードではなく `dist-portable/` 内の `.` を渡している。
 
 ## ディレクトリ構成
@@ -68,6 +68,28 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
   必ず同じ値にする。フィード情報やfaviconが非同期で届いた後にカードだけ伸びると、仮想リストが
   古い位置へ次行を描いてカード同士が重なるため（実機スクリーンショットで判明）。画像がない場合も
   faviconまたは`ImageOffIcon`の同寸枠を常に描画し、高さと本文幅を変動させない
+- **【最重要・仮想リストの行が更新後に重なる件の真因】仮想リストの行IDは必ず`getItemKey`で
+  記事IDに揃えること（`EntryList.tsx`）。** 上のカード高さ固定を入れた後も「更新するとカードが
+  重なり、スクロールするまで直らない」が再発した（実機報告）。**高さは無実**で、横長サムネイルも
+  無関係（実測: card/medium はサムネイルの縦横比・読み込み前後を問わず常にラッパー104px・
+  カード96px）。真因は`@tanstack/react-virtual`の行IDが既定で**配列インデックス**なのに対し、
+  Reactの`key`が`entry.id`であるという不一致で、これが2つの形で壊れる:
+  - 計測済みの高さはインデックスをキーにしたキャッシュに入り、データ変更では一切破棄されない
+    （`estimateSize`は計測メモの依存に入っていないので、表示モードやカードサイズを変えても
+    無効化されない）。結果、コンパクト表示で測った高さがカード表示に居座り、更新後は
+    「7番目のスロット」が前の記事の高さを流用する
+  - `measureElement`は、あるインデックスに以前キャッシュしていたノードを問答無用で
+    `unobserve`する。更新で先頭に1件増えると、Reactは既存行のDOMノードを（`entry.id`で）
+    再利用して`data-index`だけ書き換える ―― refは同一関数なので**再実行されない** ――
+    ので、新しい先頭行がインデックス0を取った瞬間に、まだ画面にいる旧ノードが監視解除される。
+    しかも**マウント経路では直せない**（キャッシュがあると`measureElement`はDOMを読まずに
+    キャッシュ値を返すため差分0）。唯一の修復経路であるResizeObserverが剥がされるので、
+    ずれたままスクロールで再マウントされるまで直らない＝報告された症状そのもの
+  `getItemKey: (i) => entries[i]?.id ?? i`でキャッシュを「スロット」ではなく「記事」に紐付けて
+  解決。加えて、IDキーにすると今度は表示モード/カードサイズ/間隔を変えたときに古い高さが記事に
+  ついて回るので、この3つが変わったら`useLayoutEffect`で`virtualizer.measure()`を呼び
+  サイズキャッシュを明示的に捨てる（`estimateSize`の変更だけでは何も無効化されないため必須）。
+  **行の見た目や計測まわりを触るときは、この2点を崩していないか毎回確認すること**
 - ネイティブ`<select>`のドロップダウン一覧はページのTailwindクラスをほとんど無視してブラウザ既定
   （ライト）でレンダリングされるが、文字色だけはページから継承されるため、ダークモード時に
   「白背景+白文字」で読めなくなっていた（実機で指摘されて発覚）。`src/styles/index.css`の
@@ -253,7 +275,7 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
     暗い矩形プレートは方向が逆だった。詳細は後述の「オーディナリーを実資料から作り直し」を参照。
     `prefers-reduced-motion`では全テーマ固有アニメーションを止める
   - 設定画面の5区分は個別に折りたためる。初期状態は「見た目」のみ開き、開閉状態を
-    `rss-widget:settings-sections`へ保存する。折りたたんだ内容は`hidden`で非表示にして、
+    `gyroscope:settings-sections`へ保存する。折りたたんだ内容は`hidden`で非表示にして、
     データ保存先などの状態を閉じるたびに失わないようDOMは維持する
   - 通常のUIと記事カードは`user-select: none`にし、ドラッグ操作で文字列を誤選択しない。
     リーダー本文、入力欄、データ保存先（`.allow-text-selection`）だけは選択可能。選択可能領域の
@@ -545,11 +567,11 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
   近いタイミングだったため何らかの競合を疑っているが未確認）。フロント側の変更をbrowserで
   確認する前には、変更を反映したいウィンドウで実際にHMRのログ（`hmr update ...`）が
   流れているか、そもそも`tasklist`で`node.exe`が生きているかを確認する習慣をつけること。
-  Vite側だけが死んでいる分には`rss-widget.exe`（Rust側）・DBには影響しないため、
+  Vite側だけが死んでいる分には`gyroscope.exe`（Rust側）・DBには影響しないため、
   `npm run tauri dev`を再起動するだけで復旧できる（Rust側は再ビルド不要なのでほぼ一瞬で
   戻る）
 - **【開発中に踏んだ罠】** `npm run tauri dev`を起動したまま`npm run package:portable`を
-  実行すると、Viteのファイル監視（chokidar）が`dist-portable/rss-widget.exe`をコピー中に
+  実行すると、Viteのファイル監視（chokidar）が`dist-portable/gyroscope.exe`をコピー中に
   掴もうとして`EBUSY: resource busy or locked`を投げ、`beforeDevCommand`（Vite）ごと
   クラッシュして`tauri dev`全体が落ちる（実機で発生・原因特定）。`vite.config.ts`の
   `server.watch.ignored`に`**/dist-portable/**`を追加して解決（既存の`**/src-tauri/**`
@@ -585,7 +607,7 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
     ビルドを作った時の挙動だけ）。マーカーがある場合のみ既定値が実行ファイルと同じフォルダの
     `data/`サブフォルダになる
   - `npm run package:portable`（`scripts/make-portable.mjs`）が`npm run build`+
-    `cargo build --release`を実行し、`dist-portable/`に`rss-widget.exe`+`.portable`
+    `cargo build --release`を実行し、`dist-portable/`に`gyroscope.exe`+`.portable`
     マーカー+空の`data/`フォルダをまとめる。WebView2ローダーはこのプロジェクトでは静的リンク
     されており（`target/debug`配下に`WebView2Loader.dll`が生成されないことを確認済み）別途
     dllを同梱する必要が無いため、実質「exeをそのまま置くだけ」で成立する。フォルダごと

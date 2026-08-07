@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <opml version="2.0">
-  <head><title>RSS Widget</title></head>
+  <head><title>Gyroscope</title></head>
   <body>
     <outline text="VR">
       <outline type="rss" text="メタカル最前線" title="メタカル最前線" xmlUrl="https://metacul-frontier.com/?feed=rss2" htmlUrl="https://metacul-frontier.com/"/>

@@ -41,7 +41,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
 
     let tray = TrayIconBuilder::new()
         .icon(tauri::include_image!("icons/icon.ico"))
-        .tooltip("RSS Widget")
+        .tooltip("Gyroscope")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "toggle" => toggle_main_window(app),

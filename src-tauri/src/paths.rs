@@ -23,7 +23,7 @@ use tauri::{AppHandle, Manager};
 
 const PORTABLE_MARKER: &str = ".portable";
 const OVERRIDE_POINTER_FILE: &str = "data-dir-override.txt";
-pub const DB_FILENAME: &str = "rss-widget.sqlite3";
+pub const DB_FILENAME: &str = "gyroscope.sqlite3";
 
 fn exe_dir() -> PathBuf {
     std::env::current_exe()

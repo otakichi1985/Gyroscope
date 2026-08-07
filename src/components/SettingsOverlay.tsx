@@ -46,7 +46,7 @@ const SKIN_GROUPS = [
 
 type SettingsSectionId = "appearance" | "accessibility" | "behavior" | "privacy" | "data";
 
-const SETTINGS_SECTIONS_STORAGE_KEY = "rss-widget:settings-sections";
+const SETTINGS_SECTIONS_STORAGE_KEY = "gyroscope:settings-sections";
 const DEFAULT_OPEN_SECTIONS: Record<SettingsSectionId, boolean> = {
   appearance: true,
   accessibility: false,

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    rss_widget_lib::run()
+    gyroscope_lib::run()
 }

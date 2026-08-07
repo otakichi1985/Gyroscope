@@ -9,7 +9,7 @@ export type ThemeMode = "system" | "light" | "dark";
 const CARD_SIZES: CardSize[] = ["small", "medium", "large"];
 const CARD_GAPS: CardGap[] = ["compact", "normal", "relaxed"];
 
-const STORAGE_KEY = "rss-widget:appearance";
+const STORAGE_KEY = "gyroscope:appearance";
 const MIN_OPACITY = 0.5;
 const MAX_OPACITY = 1;
 
