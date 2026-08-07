@@ -682,7 +682,7 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
      The role colours are the kit's own: it puts a blue disc and a red disc
      side by side at the foot of its Alert panel, which fixes this theme's
      semantics as amber = selected, blue = confirm, red = cancel. */
-  --cardinal-amber: 250 186 4;
+  --cardinal-amber: 245 162 0;
   --cardinal-amber-deep: 180 83 9;
   --cardinal-blue: 36 124 234;
   --cardinal-red: 229 58 92;
@@ -737,97 +737,34 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   color: rgb(var(--cardinal-ink));
 }
 
-/* The rail floats. No plate behind it -- the reference hangs its circular
-   buttons directly in the world, and putting a panel under them turns the
-   rail back into an ordinary toolbar (user). The title bar and the timeline
-   toolbar keep their plates; those carry running text, this row does not.
-   Labels get a white halo instead of a surface, since the ink they are drawn
-   in has to survive an unknown wallpaper. */
-.skin-cardinality .app-filterbar {
-  margin-left: 0;
-  margin-right: 0;
-  border: 0;
-  background: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: none;
-}
-/* White with a dark shadow, not the theme's ink. These labels sit directly
-   on the desktop now, so they have to survive both a black wallpaper and a
-   white one -- an ink glyph with a white halo only manages the second. The
-   reference rail carries no captions at all, so anyone who wants that look
-   can switch labels off in settings; this keeps the setting meaningful
-   instead of quietly ignoring it for one theme. */
-.skin-cardinality .app-filterbar .icon-button span {
-  color: rgb(255 255 255);
-  text-shadow:
-    0 1px 3px rgb(0 0 0 / 0.75),
-    0 0 8px rgb(0 0 0 / 0.5);
-}
-.skin-cardinality .app-filterbar > .w-px {
-  background-color: rgb(var(--cardinal-line) / 0.5);
-}
-
-/* Circular rail buttons: steel and quiet at rest, solid amber when the
+/* Circular rail buttons: unfilled and quiet at rest, solid amber when the
    screen they open is the one showing. The disc goes on the glyph rather
    than the button for the same reason it does in Ordinary -- so switching
-   icon labels on keeps a circle with a caption under it.
-
-   Two things follow the reference closely. The glyph is deliberately large
-   relative to its disc (roughly 70% across, against the ~57% an earlier pass
-   used): in the source the glyph is what you read, not the circle around it.
-   And each disc carries a hairline ring standing off its edge, which is what
-   makes a flat filled circle read as a control. */
+   icon labels on keeps a circle with a caption under it. */
 .skin-cardinality .icon-button,
 .skin-cardinality .icon-button:hover,
 .skin-cardinality .icon-button.accent-bg-soft {
   padding: 0;
-  gap: 4px;
+  gap: 3px;
   background-color: transparent;
   color: rgb(var(--cardinal-ink));
 }
-/* Pale disc, GREY glyph -- not the other way round. An earlier pass filled
-   the disc with steel and drew the glyph in white, which is inverted.
-   Measured off the flat asset sheet by sampling an annulus (disc fill) apart
-   from the centre (glyph): fill #C0DDF8, glyph #94A3B3. Only the selected
-   state inverts to a filled disc with a white glyph.
-   The glyph here is darkened from the reference's own #94A3B3, which sits at
-   2.37:1 against the disc; #6C7B8A reaches 4.00:1 and keeps the same read. */
 .skin-cardinality .icon-button > svg {
   box-sizing: content-box;
-  width: 19px;
-  height: 19px;
-  padding: 5px;
+  padding: 6px;
   border-radius: 50%;
-  border: 1px solid rgb(255 255 255 / 0.75);
-  /* Translucent, as in the reference -- the wallpaper reads through the
-     disc rather than being covered by it. 0.78 is the floor: the disc has
-     to stay light enough that a black wallpaper underneath does not drag
-     the glyph's contrast below 3:1. Measured worst case across a white and
-     a black desktop with this glyph: 3.59:1. */
-  background-color: rgb(255 255 255 / 0.78);
-  color: rgb(85 100 114);
-  /* Heavier than the app's usual 1.25 hairline. The reference's glyphs are
-     solid silhouettes, so weight is most of how they read; a thicker stroke
-     is the closest this outline icon set can get to that. */
-  stroke-width: 1.9;
-  box-shadow:
-    0 0 0 2px transparent,
-    0 0 0 3px rgb(var(--cardinal-line) / 0.4);
+  border: 1px solid rgb(255 255 255 / 0.6);
+  background-color: rgb(var(--cardinal-steel) / 0.9);
+  color: rgb(255 255 255);
   transition:
     background-color 150ms ease-out,
     border-color 150ms ease-out,
-    color 150ms ease-out,
     box-shadow 150ms ease-out,
     transform 120ms ease-out;
 }
 .skin-cardinality .icon-button:hover > svg {
-  background-color: rgb(255 255 255 / 0.95);
-  color: rgb(60 72 84);
+  background-color: rgb(var(--cardinal-steel));
   border-color: rgb(255 255 255);
-  box-shadow:
-    0 0 0 2px transparent,
-    0 0 0 3px rgb(var(--cardinal-amber) / 0.8);
 }
 .skin-cardinality .icon-button:active > svg {
   transform: scale(0.92);
@@ -843,11 +780,8 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   border-color: rgb(255 255 255);
   background-color: rgb(var(--cardinal-amber));
   color: rgb(255 255 255);
-  stroke-width: 2.3;
-  box-shadow:
-    0 0 0 2px transparent,
-    0 0 0 3px rgb(var(--cardinal-amber)),
-    0 0 14px rgb(var(--cardinal-amber) / 0.65);
+  stroke-width: 2;
+  box-shadow: 0 0 10px rgb(var(--cardinal-amber) / 0.7);
 }
 /* The pointer is a connector, not an ornament: in the reference it marks
    the edge a submenu grows out of. It used to be drawn as a pair flanking
@@ -907,17 +841,9 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 /* Panels in the reference are not flat white: they run white at the top to
    a light grey at the bottom, which is what stops a large panel reading as
    a plain rectangle. */
-/* Amber outline, restored. This was removed once on the grounds that the
-   warm edge in the VR screenshots was chromatic aberration -- which it partly
-   was, but that conclusion over-reached. A flat screen recording of the same
-   interface (no headset, no lens) shows the focused panel's left edge at
-   R-B = +142 and its TOP edge at R-B = +82: both warm. Aberration produces
-   opposite signs on perpendicular edges, so same-sign warmth on both is a
-   real border. Secondary panels in the same frame carry it far more weakly,
-   so it reads as a focus marker -- which is what the one open overlay is. */
 .skin-cardinality .screen-overlay.panel-bg,
 .dark.skin-cardinality .screen-overlay.panel-bg {
-  border: 1px solid rgb(var(--cardinal-amber) / 0.9);
+  border: 1px solid rgb(var(--cardinal-line) / 0.3);
   background-image: linear-gradient(
     180deg,
     rgb(255 255 255 / 0.5),
@@ -927,7 +853,6 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   color: rgb(var(--cardinal-ink));
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.9),
-    0 0 10px rgb(var(--cardinal-amber) / 0.35),
     0 2px 6px rgb(0 0 0 / 0.2);
 }
 .skin-cardinality .screen-overlay-header {
@@ -1464,27 +1389,62 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
    the visible one" and applying an `animation` there restarts it on each
    activation. Exit keeps the shared opacity transition. */
 
-/* Cardinality panels simply fade up, at full size and in place.
-   An earlier version unfurled them from a horizontal line at their centre,
-   with an amber flash along it. That was invented, and it was flagged as
-   such at the time. Frame-stepping a screen recording of the reference
-   interface settles it: its panels appear at their final size and grow in
-   opacity, and nothing about them travels, scales or clips. The sense of
-   things arriving in sequence comes from the *stagger* between elements,
-   not from motion within any one of them -- which is the same conclusion the
-   timeline rows below reach. */
+/* Cardinality: the reference chains rail button -> panel -> sub-panel with
+   triangular notches, i.e. panels are *emitted*, not moved. It unfurls from
+   a horizontal line at its own centre, with the line itself visible for the
+   first fifth of the animation.
+   `clip-path` rather than `scaleY` on purpose: scaling squashes every glyph
+   in the panel for the length of the transition, while a clip reveals the
+   panel already at its final size. */
 .skin-cardinality .screen-overlay {
   transform: none;
 }
 .skin-cardinality .screen-overlay:not([inert]) {
-  animation: cardinality-materialize 340ms ease-out;
+  animation: cardinality-materialize 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.skin-cardinality .screen-overlay:not([inert])::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background-color: rgb(var(--cardinal-amber));
+  box-shadow: 0 0 9px rgb(var(--cardinal-amber));
+  pointer-events: none;
+  /* `both` is load-bearing, not decoration. Without a fill mode the element
+     reverts to its base style once the animation ends -- which here is a
+     fully opaque amber rule sitting permanently across the middle of the
+     panel. Caught by sampling the panel centre after the animation: exactly
+     rgb(240 160 48) at the midline. */
+  animation: cardinality-materialize-line 320ms ease-out both;
 }
 @keyframes cardinality-materialize {
-  from {
+  0% {
     opacity: 0;
+    clip-path: inset(50% 0 50% 0);
   }
-  to {
+  20% {
     opacity: 1;
+    clip-path: inset(49.5% 0 49.5% 0);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes cardinality-materialize-line {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.08);
+  }
+  20% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
   }
 }
 /* The pointer only exists while its panel is open, so it should arrive with
@@ -1525,6 +1485,7 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 
 @media (prefers-reduced-motion: reduce) {
   .skin-cardinality .screen-overlay:not([inert]),
+  .skin-cardinality .screen-overlay:not([inert])::before,
   .skin-cardinality .icon-button[data-opens-screen].accent-bg-soft::after,
   .skin-ordinary .screen-overlay:not([inert]) {
     animation: none;
@@ -1534,6 +1495,11 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   .skin-cardinality .icon-button[data-opens-screen].accent-bg-soft::after {
     opacity: 1;
     transform: none;
+  }
+  /* Without its animation this pseudo-element would sit on the panel as a
+     permanent amber rule across the middle. */
+  .skin-cardinality .screen-overlay:not([inert])::before {
+    display: none;
   }
 }
 
@@ -1683,8 +1649,7 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 /* ---- Floating skins: timeline card motion -------------------------------
 
    Rows only animate while the scroll container carries `list-reveal`, which
-   EntryList holds for a window long enough to cover the last row's stagger
-   step plus its animation. Keep the two in step when either changes. Putting the
+   EntryList holds for 800ms after a fresh list arrives. Putting the
    animation on `.entry-card` unconditionally would replay it every time a
    virtualised row scrolled back into view -- see the long comment in
    EntryList.tsx.
@@ -1714,25 +1679,25 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 .skin-floating .list-reveal .entry-compact {
   animation: card-reveal 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.skin-floating .list-reveal > div > div:nth-child(3n + 1) { --reveal-x: -5px; }
-.skin-floating .list-reveal > div > div:nth-child(3n + 2) { --reveal-x: 4px; }
+.skin-floating .list-reveal > div > div:nth-child(3n + 1) { --reveal-x: -4px; }
+.skin-floating .list-reveal > div > div:nth-child(3n + 2) { --reveal-x: 3px; }
 .skin-floating .list-reveal > div > div:nth-child(3n) { --reveal-x: -2px; }
 .skin-floating .list-reveal > div > div:nth-child(1) .entry-card,
 .skin-floating .list-reveal > div > div:nth-child(1) .entry-compact { animation-delay: 0ms; }
 .skin-floating .list-reveal > div > div:nth-child(2) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(2) .entry-compact { animation-delay: 60ms; }
+.skin-floating .list-reveal > div > div:nth-child(2) .entry-compact { animation-delay: 45ms; }
 .skin-floating .list-reveal > div > div:nth-child(3) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(3) .entry-compact { animation-delay: 120ms; }
+.skin-floating .list-reveal > div > div:nth-child(3) .entry-compact { animation-delay: 90ms; }
 .skin-floating .list-reveal > div > div:nth-child(4) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(4) .entry-compact { animation-delay: 240ms; }
+.skin-floating .list-reveal > div > div:nth-child(4) .entry-compact { animation-delay: 135ms; }
 .skin-floating .list-reveal > div > div:nth-child(5) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(5) .entry-compact { animation-delay: 240ms; }
+.skin-floating .list-reveal > div > div:nth-child(5) .entry-compact { animation-delay: 180ms; }
 .skin-floating .list-reveal > div > div:nth-child(6) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(6) .entry-compact { animation-delay: 300ms; }
+.skin-floating .list-reveal > div > div:nth-child(6) .entry-compact { animation-delay: 225ms; }
 .skin-floating .list-reveal > div > div:nth-child(7) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(7) .entry-compact { animation-delay: 360ms; }
+.skin-floating .list-reveal > div > div:nth-child(7) .entry-compact { animation-delay: 270ms; }
 .skin-floating .list-reveal > div > div:nth-child(n + 8) .entry-card,
-.skin-floating .list-reveal > div > div:nth-child(n + 8) .entry-compact { animation-delay: 420ms; }
+.skin-floating .list-reveal > div > div:nth-child(n + 8) .entry-compact { animation-delay: 315ms; }
 
 /* Cardinality's rows arrive from above, filling the list downward the way
    the menu lists in the source do (user: "上からパラパラと流れてくる感じの方が
@@ -1741,17 +1706,12 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 .skin-cardinality .list-reveal .entry-compact {
   animation-name: card-reveal-drop;
 }
-/* The travel is small on purpose. Frame-stepping the reference, its menu
-   rows do not slide in at all -- they appear one after another, top to
-   bottom, each just fading up. "Flowing down from above" is what the
-   *sequence* reads as, not what any single row does, so the distance came
-   back down once the stagger was doing the work. */
 @keyframes card-reveal-drop {
   from {
     opacity: 0;
-    translate: var(--reveal-x, 0) -10px;
+    translate: var(--reveal-x, 0) -6px;
   }
-  60% {
+  70% {
     opacity: 1;
   }
   to {
