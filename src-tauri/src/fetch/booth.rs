@@ -325,19 +325,27 @@ pub async fn scrape_shop(app: &AppHandle, shop_url: &str) -> Result<BoothScrapeR
 
     let label = format!("booth-scrape-{}", NEXT_LABEL_ID.fetch_add(1, Ordering::Relaxed));
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::External(url))
-        // Kept genuinely visible (not `.visible(false)`) and just moved off
-        // the virtual desktop -- the Cloudflare bypass was only confirmed
-        // with a visible window, and an invisible one may expose a
-        // different `document.visibilityState` that Cloudflare's check
-        // could react to differently. Safer to keep the proven
-        // configuration and hide it positionally instead.
-        .visible(true)
+        // Built hidden and shown explicitly below, *after* the off-screen
+        // position is set -- building with `.visible(true)` directly (the
+        // first version of this) let the window briefly flash on-screen at
+        // its default position before the `.position()` from the builder
+        // took effect, visible to the user as a browser window popping open
+        // and closing (real report). Still ends up genuinely visible (not
+        // `.visible(false)` for good) by the time any page JS runs and
+        // could check `document.visibilityState` -- the Cloudflare bypass
+        // was only confirmed with a visible window, so that property is
+        // preserved, just with the flash-causing race closed.
+        .visible(false)
         .position(-32000.0, -32000.0)
         .inner_size(1024.0, 800.0)
         .decorations(false)
         .skip_taskbar(true)
         .build()
         .map_err(|e| BoothScrapeError::WindowCreation(e.to_string()))?;
+    window
+        .set_position(tauri::PhysicalPosition::new(-32000, -32000))
+        .map_err(|e| BoothScrapeError::WindowCreation(e.to_string()))?;
+    window.show().map_err(|e| BoothScrapeError::WindowCreation(e.to_string()))?;
 
     let outcome = poll_for_result(&window, &script).await;
     let _ = window.close();
