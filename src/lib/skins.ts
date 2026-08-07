@@ -42,7 +42,7 @@ export interface Skin {
    * the chrome and article cards read as separate plates hanging over the
    * real desktop rather than as contents of a window.
    *
-   * This is what makes the two SAO-derived skins land: their source material
+   * This is what makes the two VR/AR-inspired skins land: their source material
    * is a heads-up display in mid-air, and every amount of decoration applied
    * to a solid panel still reads as a list inside a box. Deliberately tied to
    * the skin instead of exposed as a setting -- the rest of the skins are
@@ -238,8 +238,8 @@ export const SKINS: Skin[] = [
     id: "link-amber",
     label: "カーディナリティ",
     category: "style",
-    description: "直角の白い半透明パネルを橙色一色でまとめた、SAOメニュー風のVR UIテーマ",
-    // Retuned against reference stills of the SAO menu. The accent moved
+    description: "直角の白い半透明パネルを橙色一色でまとめた、VR風UIテーマ",
+    // Retuned against reference stills of the source material's VR menu. The accent moved
     // from gold to an orange-leaning amber, and the whole theme went square
     // -- see the note at the top of `.skin-cardinality` in index.css.
     // #B45309 measures 4.73:1 on the panel and 5.02:1 under white text, so
@@ -259,8 +259,8 @@ export const SKINS: Skin[] = [
     id: "ordinary",
     label: "オーディナリー",
     category: "style",
-    description: "白い円形コントロールと情報パネルを機能色で塗り分けた、オーグマー風のAR UIテーマ",
-    // Rebuilt against reference stills of the Augma interface. Two things
+    description: "白い円形コントロールと情報パネルを機能色で塗り分けた、AR風UIテーマ",
+    // Rebuilt against reference stills of the source material's AR interface. Two things
     // changed from the first pass: it resolves as *light* (the source is
     // predominantly white, not charcoal -- see App.tsx `forcedLight`), and
     // the accent is one of several role colours rather than the only one.
