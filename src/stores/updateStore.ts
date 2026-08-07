@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type UpdateStatus =
   | { kind: "unsupported" }
-  | { kind: "notConfigured" }
   | { kind: "upToDate" }
   | { kind: "available"; version: string; notes: string; publishedAt: string };
 

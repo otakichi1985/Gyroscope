@@ -22,16 +22,6 @@ const REPO_NAME: &str = "Gyroscope";
 const UPDATE_ASSET_NAME: &str = "gyroscope.exe";
 const BACKUP_META_FILENAME: &str = "update-backup.json";
 
-/// Baked in at build time from `GYROSCOPE_UPDATE_TOKEN` (see
-/// scripts/make-portable.mjs, which reads it from a gitignored `.env.local`
-/// and passes it through to `cargo build`). `option_env!` -- not `env!` --
-/// so a plain `cargo build` / `npm run tauri dev` without the variable set
-/// still compiles; update checks are just unavailable in that build.
-/// Fine-grained PAT, scoped to Contents: Read-only on this one repo, so a
-/// leaked build only ever exposes the same read access a collaborator
-/// could already get directly.
-const UPDATE_TOKEN: Option<&str> = option_env!("GYROSCOPE_UPDATE_TOKEN");
-
 /// The release found by the last successful `check_for_update`, if it was
 /// newer than the running build. `download_update`/`apply_update` read
 /// from here rather than re-parsing arguments from the frontend, so there
@@ -53,8 +43,6 @@ pub enum UpdateStatus {
     /// Not a portable build -- exe_dir isn't necessarily writable, and
     /// installed (MSI/NSIS) builds have no distribution channel yet.
     Unsupported,
-    /// Built without GYROSCOPE_UPDATE_TOKEN (e.g. `npm run tauri dev`).
-    NotConfigured,
     UpToDate,
     // `rename_all` on the enum itself only renames variant tags, not the
     // fields of a struct-like variant -- those need their own attribute.
@@ -84,8 +72,8 @@ struct GithubRelease {
 
 #[derive(Deserialize)]
 struct GithubAsset {
-    id: u64,
     name: String,
+    browser_download_url: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -123,10 +111,6 @@ fn write_backup_meta(exe: &Path, version: &str) -> AppResult<()> {
         .map_err(|e| AppError::Other(format!("更新履歴の保存に失敗しました: {e}")))
 }
 
-fn asset_api_url(asset_id: u64) -> String {
-    format!("https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/assets/{asset_id}")
-}
-
 /// No network call, no portable/token requirements -- always answerable,
 /// so Settings can show "現在のバージョン" even before any check runs.
 #[tauri::command]
@@ -162,18 +146,17 @@ pub async fn check_for_update(
             status: UpdateStatus::Unsupported,
         });
     }
-    let Some(token) = UPDATE_TOKEN else {
-        return Ok(UpdateCheckResponse {
-            current_version: current,
-            status: UpdateStatus::NotConfigured,
-        });
-    };
 
+    // Public repo -- no auth needed. (This used to carry a fine-grained
+    // PAT for a private repo, but GitHub's repository-picker UI for
+    // editing/creating those tokens turned out to be unreliable in
+    // practice -- see the community reports linked in CLAUDE.md's note on
+    // this module -- so the repo was made public instead of chasing that
+    // further.)
     let url = format!("https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest");
     let response = http
         .0
         .get(&url)
-        .bearer_auth(token)
         .header(reqwest::header::ACCEPT, "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2022-11-28")
         .send()
@@ -206,7 +189,7 @@ pub async fn check_for_update(
         .ok_or_else(|| AppError::Other("最新リリースに更新用の実行ファイルが添付されていません".to_string()))?;
 
     *pending.0.lock().unwrap() = Some(ReadyUpdate {
-        asset_url: asset_api_url(asset.id),
+        asset_url: asset.browser_download_url.clone(),
     });
 
     Ok(UpdateCheckResponse {
@@ -231,19 +214,10 @@ pub async fn download_update(http: State<'_, HttpClient>, pending: State<'_, Pen
         .unwrap()
         .clone()
         .ok_or_else(|| AppError::Other("先に更新の確認を行ってください".to_string()))?;
-    let token = UPDATE_TOKEN.ok_or_else(|| AppError::Other("更新機能が有効になっていないビルドです".to_string()))?;
 
-    let response = http
-        .0
-        .get(&ready.asset_url)
-        .bearer_auth(token)
-        // Required by the GitHub Releases assets API to get the raw binary
-        // back instead of the asset's JSON metadata.
-        .header(reqwest::header::ACCEPT, "application/octet-stream")
-        .header("X-GitHub-Api-Version", "2022-11-28")
-        .send()
-        .await
-        .map_err(AppError::Network)?;
+    // Public repo -- `browser_download_url` is a plain, unauthenticated
+    // link straight to the asset bytes.
+    let response = http.0.get(&ready.asset_url).send().await.map_err(AppError::Network)?;
 
     if !response.status().is_success() {
         return Err(AppError::Other(format!(
