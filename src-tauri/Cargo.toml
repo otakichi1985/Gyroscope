@@ -1,6 +1,6 @@
 [package]
 name = "gyroscope"
-version = "0.1.0"
+version = "0.2.0"
 description = "Windows 11 desktop RSS/Atom widget"
 authors = ["you"]
 edition = "2021"
@@ -49,6 +49,7 @@ quick-xml = "0.41.0"
 chrono = { version = "0.4.45", features = ["serde"] }
 thiserror = "2.0.19"
 url = "2.5.8"
+semver = "1.0.28"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 window-vibrancy = "0.8.0"

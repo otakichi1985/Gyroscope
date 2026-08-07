@@ -1573,7 +1573,7 @@ dependencies = [
 
 [[package]]
 name = "gyroscope"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "feed-rs",
@@ -1583,6 +1583,7 @@ dependencies = [
  "reqwest",
  "rusqlite",
  "scraper",
+ "semver",
  "serde",
  "serde_json",
  "tauri",
