@@ -5,7 +5,7 @@ import type { Entry } from "../lib/types";
 export type ViewMode = "card" | "list" | "compact";
 
 const PAGE_SIZE = 200;
-const VIEW_MODE_KEY = "rss-widget:view-mode";
+const VIEW_MODE_KEY = "gyroscope:view-mode";
 const SEARCH_DEBOUNCE_MS = 300;
 
 function loadViewMode(): ViewMode {

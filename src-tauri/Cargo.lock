@@ -1572,6 +1572,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "gyroscope"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "feed-rs",
+ "mediatype",
+ "quick-xml",
+ "raw-window-handle",
+ "reqwest",
+ "rusqlite",
+ "scraper",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tauri-plugin-window-state",
+ "thiserror 2.0.19",
+ "tokio",
+ "url",
+ "window-vibrancy 0.8.0",
+ "windows-sys 0.60.2",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3214,33 +3241,6 @@ checksum = "c51c9ae4df8a7fba42103df5c621fa3c37eccf3a3c650879e90fc48b11cc192c"
 dependencies = [
  "hashbrown 0.16.1",
  "thiserror 2.0.19",
-]
-
-[[package]]
-name = "rss-widget"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "feed-rs",
- "mediatype",
- "quick-xml",
- "raw-window-handle",
- "reqwest",
- "rusqlite",
- "scraper",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tauri-plugin-window-state",
- "thiserror 2.0.19",
- "tokio",
- "url",
- "window-vibrancy 0.8.0",
- "windows-sys 0.60.2",
 ]
 
 [[package]]

@@ -11,7 +11,8 @@ node_modules
 dist
 dist-ssr
 dist-portable
-rss-widget-portable.zip
+gyroscope-portable
+gyroscope-portable-v*.zip
 *.local
 
 # QA確認用に撮ったスクショなどを放り込む場所（フォルダごと無視）

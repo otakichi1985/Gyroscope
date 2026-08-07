@@ -6,9 +6,9 @@ use crate::error::{AppError, AppResult};
 
 /// SPEC §2.2: identify the app explicitly to servers we poll.
 pub const USER_AGENT: &str = concat!(
-    "RssWidget/",
+    "Gyroscope/",
     env!("CARGO_PKG_VERSION"),
-    " (+https://github.com/<user>/rss-widget)"
+    " (+https://github.com/<user>/gyroscope)"
 );
 
 const TIMEOUT: Duration = Duration::from_secs(15);
