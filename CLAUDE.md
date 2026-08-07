@@ -745,6 +745,50 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
   なお`transition-all`は`backdrop-filter`まで含めて全プロパティを対象にしてしまうので、
   `transform`が要るだけなら素の`transition`で足りる（Tailwindの既定プロパティ群に
   `transform`は含まれている）
+- アプリ内蔵の自動更新チェック（配布先をGoogle Driveから非公開のGitHubリポジトリ
+  （`github.com/otakichi1985/Gyroscope`）のReleasesへ移した後の追加要望）:
+  - `src-tauri/src/commands/update.rs`が単独で完結。GitHub ReleasesのAPIで最新リリースの
+    `tag_name`（`v`始まり）を取得し`semver`で現在のバージョンと比較、新しければ`gyroscope.exe`
+    という名前のアセットを探して返す。**zipではなく単体exeだけを更新対象にしている**のは、
+    zipには空の`data/`が同梱されておりそのまま展開すると実データを巻き込みかねないため
+    （`npm run package:portable`は変わらずzipも作るが、GitHub Releaseにはzipと単体exeの
+    **両方**を手動で添付する運用。`scripts/make-portable.mjs`の実行後ログに毎回リマインドを出す）
+  - リポジトリが非公開のため、確認・ダウンロードとも認証が要る。埋め込むのは
+    「このリポジトリだけ・Contents: Read-onlyのfine-grained PAT」で、ソースには書かず
+    ビルド時に環境変数`GYROSCOPE_UPDATE_TOKEN`から`option_env!`で焼き込む（`env!`ではなく
+    `option_env!`なのは、未設定でも`cargo build`/`npm run tauri dev`が普通に通るようにする
+    ため。この場合は`UpdateStatus::NotConfigured`を返して機能が無効になるだけ）。トークン本体は
+    gitignore対象の`.env.local`に保存し、`scripts/make-portable.mjs`がビルド前に読み込んで
+    `process.env`へ流し込む（`execFileSync`は既定で親のenvを子プロセスに継承するので、
+    cargo呼び出し側の変更は不要）
+  - ダウンロードしたアセットはGitHub公開の`browser_download_url`ではなく、
+    `/releases/assets/{id}`のAPIエンドポイントを`Accept: application/octet-stream`付きで
+    叩く方式（非公開リポジトリの`browser_download_url`はトークンなしでは404になるため）。
+    reqwestは既定でクロスオリジンへのリダイレクト時に`Authorization`ヘッダーを引き継がない
+    ため、GitHubがS3の署名付きURLへリダイレクトしてもトークンが漏れずに済む
+  - 適用は「新しいexeをダウンロード→今動いているexeを`.exe.bak`にリネーム→ダウンロード
+    したものを本来の名前にリネーム→新プロセスを起動して自分は終了」という、既存の
+    `restart_app`（データ保存先変更用）と同じ「リネームで入れ替えてプロセスを差し替える」
+    パターンの応用。Windowsは実行中のexeファイルを**リネームはできるが上書き・削除はできない**
+    ため、削除ではなく退避を選んでいる。この退避が副産物として1段階分のロールバックになる
+  - ロールバックは`.exe.bak`と現在のexeを入れ替えるだけの単純な操作で、`update-backup.json`
+    （退避した実行ファイルのバージョン番号だけを持つ）を設定画面の表示用に添える。
+    **意図的にトグルではなく1段階のみ**: ロールバック後は`.bak`が消費されて残らないため、
+    「ロールバックを取り消す」には改めて更新を適用し直す必要がある。**exeだけの巻き戻しで、
+    DBは戻らない**（ユーザーとの合意で意図的にスコープ外。新バージョンでのマイグレーション後に
+    古いexeへ戻すと、そのexeが新しいスキーマを理解できない可能性がある。オンラインバックアップ
+    APIで戻す案も検討したが、個人利用の安全網としては実行ファイルの巻き戻しで十分と判断）
+  - 通知は「起動時に1日1回だけ自動で無言チェック→見つかったら設定アイコンに小さいドットを表示
+    ＋設定画面の「アップデート」区分に詳細」という控えめな形。ポップアップやトースト通知は
+    出さず、**適用は必ずユーザーが設定画面でボタンを押した時だけ**（完全自動更新にはしない、
+    という方針をユーザーと合意済み）。オフラインでチェックに失敗した場合もチェック日時は
+    更新する（`localStorage`の`gyroscope:last-update-check`）。そうしないと接続が
+    不安定な環境で毎回の起動時に無駄なリトライが走り続けるため
+  - リリースの切り方（現状は手動、CI/CDは未整備）: `package.json`のバージョンを上げる→
+    `git tag vX.Y.Z`→`npm run package:portable`→GitHub Releaseを作成しzipと
+    `dist-portable/gyroscope.exe`単体の両方を添付、という手順。タグは`v`始まりで
+    `package.json`の値と一致させること（`update.rs`が`tag_name`の先頭の`v`だけを
+    取り除いて`semver`に渡す実装のため、ズレると比較に失敗する）
 
 ## 依存関係の選定理由
 

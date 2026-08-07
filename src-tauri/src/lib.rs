@@ -49,6 +49,7 @@ pub fn run() {
             app.manage(opacity::LastOpacity::default());
             app.manage(vibrancy::FloatingMode::default());
             app.manage(tray::MinimizeToTray::default());
+            app.manage(commands::update::PendingUpdate::default());
 
             // MUST stay a direct call on the main thread. tray-icon creates a
             // real HWND (with its own WNDPROC) on whatever thread calls it,
@@ -158,6 +159,12 @@ pub fn run() {
             commands::settings::restart_app,
             commands::settings::get_read_history_retention,
             commands::settings::set_read_history_retention,
+            commands::update::get_app_version,
+            commands::update::get_update_backup_info,
+            commands::update::check_for_update,
+            commands::update::download_update,
+            commands::update::apply_update,
+            commands::update::rollback_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

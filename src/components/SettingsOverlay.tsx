@@ -11,6 +11,7 @@ import {
   type ThemeMode,
 } from "../stores/appearanceStore";
 import type { DataDirInfo } from "../lib/types";
+import { useUpdateStore } from "../stores/updateStore";
 import { FontPicker } from "./FontPicker";
 import { ScreenOverlay } from "./ScreenOverlay";
 import { ChevronDownIcon } from "./icons";
@@ -44,7 +45,7 @@ const SKIN_GROUPS = [
   { id: "style", label: "スタイル" },
 ] as const;
 
-type SettingsSectionId = "appearance" | "accessibility" | "behavior" | "privacy" | "data";
+type SettingsSectionId = "appearance" | "accessibility" | "behavior" | "privacy" | "data" | "update";
 
 const SETTINGS_SECTIONS_STORAGE_KEY = "gyroscope:settings-sections";
 const DEFAULT_OPEN_SECTIONS: Record<SettingsSectionId, boolean> = {
@@ -53,6 +54,7 @@ const DEFAULT_OPEN_SECTIONS: Record<SettingsSectionId, boolean> = {
   behavior: false,
   privacy: false,
   data: false,
+  update: false,
 };
 
 function loadOpenSections(): Record<SettingsSectionId, boolean> {
@@ -267,6 +269,98 @@ function HistoryRetentionSection() {
         期限を過ぎた閲覧履歴は自動的に削除されます。記事本体やブックマークには影響しません
       </p>
       {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+function formatPublishedAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" });
+  } catch {
+    return iso;
+  }
+}
+
+function UpdateSection() {
+  const { currentVersion, backupVersion, status, phase, error, loadStatic, check, download, apply, rollback } =
+    useUpdateStore();
+
+  useEffect(() => {
+    // `useAutoCheckForUpdate` already runs `loadStatic` once at startup,
+    // but this section can mount before that resolves, and a rollback
+    // performed earlier in the same session wouldn't otherwise refresh
+    // `backupVersion` here.
+    loadStatic();
+    // Only on mount -- `loadStatic` itself is stable (zustand action), and
+    // re-running this on every store update would defeat the point.
+  }, [loadStatic]);
+
+  const busy = phase !== "idle";
+
+  const handleUpdate = async () => {
+    await download();
+    await apply();
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <div className="mb-1.5 text-xs font-medium opacity-70">現在のバージョン</div>
+        <p className="allow-text-selection rounded bg-black/5 px-2 py-1.5 font-mono text-[11px] dark:bg-white/5">
+          {currentVersion ?? "確認中..."}
+        </p>
+      </div>
+
+      {status?.kind === "available" ? (
+        <div className="flex flex-col gap-1.5 rounded border border-black/10 p-2 dark:border-white/10">
+          <p className="text-xs font-medium">
+            新しいバージョン v{status.version} があります（{formatPublishedAt(status.publishedAt)}）
+          </p>
+          {status.notes && (
+            <p className="allow-text-selection max-h-24 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed opacity-70">
+              {status.notes}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleUpdate}
+            disabled={busy}
+            className={`${OUTLINE_BUTTON} accent-border self-start`}
+          >
+            {phase === "downloading"
+              ? "ダウンロード中..."
+              : phase === "applying"
+                ? "再起動しています..."
+                : "更新して再起動"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <button type="button" onClick={check} disabled={busy} className={`${OUTLINE_BUTTON} self-start`}>
+            {phase === "checking" ? "確認中..." : "今すぐ確認"}
+          </button>
+          {status?.kind === "upToDate" && <p className="text-xs opacity-60">最新バージョンです</p>}
+          {status?.kind === "unsupported" && (
+            <p className="text-xs opacity-60">この配布形態（インストーラ版）では自動更新に対応していません</p>
+          )}
+          {status?.kind === "notConfigured" && (
+            <p className="text-xs opacity-60">このビルドでは更新確認が無効になっています</p>
+          )}
+        </div>
+      )}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {backupVersion && (
+        <div className="flex flex-col gap-1.5 border-t border-black/10 pt-3 dark:border-white/10">
+          <p className="text-xs opacity-70">以前のバージョン（v{backupVersion}）に戻せます</p>
+          <button type="button" onClick={rollback} disabled={busy} className={`${OUTLINE_BUTTON} self-start`}>
+            {phase === "rollingBack" ? "戻しています..." : "このバージョンに戻す"}
+          </button>
+          <p className="text-xs leading-relaxed opacity-50">
+            戻るのはアプリ本体のみです。この間にデータの構造が更新されていた場合、データベースの内容までは戻りません
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -604,6 +698,14 @@ export function SettingsOverlay() {
         >
         <HistoryRetentionSection />
         <DataDirSection />
+        </SettingsSection>
+
+        <SettingsSection
+          title="アップデート"
+          open={openSections.update}
+          onToggle={() => toggleSection("update")}
+        >
+        <UpdateSection />
         </SettingsSection>
       </div>
     </ScreenOverlay>

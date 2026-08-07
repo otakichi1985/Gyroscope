@@ -3,6 +3,7 @@ import type { SVGProps } from "react";
 import { useEntriesStore } from "../stores/entriesStore";
 import { useAppearanceStore } from "../stores/appearanceStore";
 import { useUiStore, type Screen } from "../stores/uiStore";
+import { useUpdateStore } from "../stores/updateStore";
 import { ClockIcon, CloseIcon, PaletteIcon, PinIcon, RssIcon, SearchIcon, StarIcon, TrashIcon } from "./icons";
 
 /**
@@ -38,6 +39,7 @@ function IconButton({
   showLabel,
   hue,
   opensScreen,
+  showBadge,
   Icon,
   className = "",
 }: {
@@ -52,6 +54,12 @@ function IconButton({
    * connector to the panel they opened -- see the pointer note in
    * `.skin-cardinality`. */
   opensScreen?: boolean;
+  /** Plain notification dot, currently only used for "an update is
+   * available" on the settings icon. Deliberately just a dot, not a
+   * popup or toast -- the explicit action (checking the details, applying
+   * it) always happens inside Settings, this only marks that there's
+   * something to see there. */
+  showBadge?: boolean;
   Icon: (props: SVGProps<SVGSVGElement>) => React.ReactElement;
   className?: string;
 }) {
@@ -72,7 +80,7 @@ function IconButton({
       // draw their controls as discs rather than flat glyphs (Ordinary, whose
       // reference UI is entirely white circular buttons) need to target these
       // without also catching the segmented text groups next to them.
-      className={`icon-button accent-text flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
+      className={`icon-button accent-text relative flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
         showLabel ? "flex-col gap-0.5 px-1.5 py-1" : "p-1"
       } ${active ? "accent-bg-soft" : "hover:bg-black/5 dark:hover:bg-white/5"} ${className}`}
       aria-label={label}
@@ -80,6 +88,9 @@ function IconButton({
     >
       <Icon className="h-4 w-4" />
       {showLabel && <span className="text-[9px] leading-none">{shortLabel}</span>}
+      {showBadge && (
+        <span className="accent-bg absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full" aria-hidden="true" />
+      )}
     </button>
   );
 }
@@ -97,6 +108,7 @@ export function FilterBar() {
   // clickable so overlays can still be switched/closed.
   const activeScreen = useUiStore((s) => s.activeScreen);
   const isTimeline = activeScreen === "timeline";
+  const updateAvailable = useUpdateStore((s) => s.status?.kind === "available");
   const positionLocked = useAppearanceStore((s) => s.positionLocked);
   const setPositionLocked = useAppearanceStore((s) => s.setPositionLocked);
   const titleBarVisible = useAppearanceStore((s) => s.titleBarVisible);
@@ -211,6 +223,7 @@ export function FilterBar() {
           showLabel={showIconLabels}
           hue={hue}
           opensScreen
+          showBadge={screen === "settings" && updateAvailable}
           Icon={Icon}
         />
       ))}
