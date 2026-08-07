@@ -31,7 +31,12 @@ export default defineConfig(async () => ({
       // it crashed the dev server with EBUSY when that script's file copy
       // and Vite's watcher raced on the same exe (found running both at
       // once during this feature's development).
-      ignored: ["**/src-tauri/**", "**/dist-portable/**"],
+      //
+      // Also ignore `.claude/worktrees` -- background agent sessions check
+      // out separate worktrees under here, and without this Vite's watcher
+      // picks up their file churn too and reloads this dev server for
+      // changes that have nothing to do with it.
+      ignored: ["**/src-tauri/**", "**/dist-portable/**", "**/.claude/worktrees/**"],
     },
   },
 }));
