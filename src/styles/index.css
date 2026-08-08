@@ -1,4 +1,13 @@
 @import "tailwindcss";
+/* The dev-only editor overlay (src/dev-tools, see App.tsx's
+   import.meta.env.DEV gate) is styled entirely with inline styles and uses
+   no Tailwind classes -- but Tailwind scans source *text*, and that file
+   necessarily contains bare CSS property names as string literals
+   ("drop-shadow", "backdrop-blur", ...) because its whole job is inspecting
+   styles. Those got mistaken for class names and emitted real utilities
+   into the production stylesheet, which broke the rule that none of the
+   dev tooling ships. Excluding the directory keeps that guarantee whole. */
+@source not "../dev-tools";
 @custom-variant dark (&:where(.dark, .dark *));
 
 html,
