@@ -1,0 +1,50 @@
+name: Notify Discord on release
+
+# Fires whenever a GitHub Release is published (gh release create, or the
+# web UI) -- not on every push/tag, so this only reacts to an actual
+# release being cut, same as the app's own update check (see
+# src-tauri/src/commands/update.rs, which also only looks at
+# /releases/latest, never at branch history).
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post release notice to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::warning::DISCORD_WEBHOOK_URL secret is not set; skipping Discord notification."
+            exit 0
+          fi
+          # Values come in via env vars (not interpolated directly into this
+          # script) so a release note containing shell/JSON-special
+          # characters can't break the payload -- Python does the escaping.
+          python3 - <<'PY' | curl -sf -X POST "$DISCORD_WEBHOOK_URL" -H "Content-Type: application/json" -d @-
+          import json
+          import os
+
+          title = os.environ.get("RELEASE_NAME") or os.environ.get("RELEASE_TAG") or "New release"
+          body = os.environ.get("RELEASE_BODY") or "(リリースノートなし)"
+          payload = {
+              "embeds": [
+                  {
+                      "title": f"🚀 {title} を公開しました"[:256],
+                      "url": os.environ.get("RELEASE_URL", ""),
+                      # Discord embed description cap is 4096 chars; leave
+                      # headroom rather than trimming right at the edge.
+                      "description": body[:4000],
+                      "color": 5793266,
+                  }
+              ]
+          }
+          print(json.dumps(payload))
+          PY
