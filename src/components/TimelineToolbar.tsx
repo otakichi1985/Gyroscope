@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
 import { FeedPicker } from "./FeedPicker";
-import { RefreshIcon } from "./icons";
+import { RefreshIcon, SortIcon } from "./icons";
 
 const VIEW_MODES: { mode: ViewMode; label: string }[] = [
   { mode: "card", label: "カード" },
@@ -22,8 +22,16 @@ export function TimelineToolbar() {
   const refreshingAll = useFeedsStore((s) => s.refreshingAll);
   const backgroundRefreshing = useFeedsStore((s) => s.backgroundRefreshing);
   const refreshAllFeeds = useFeedsStore((s) => s.refreshAllFeeds);
-  const { filterFeedId, setFilterFeedId, filterFolder, setFilterFolder, viewMode, setViewMode } =
-    useEntriesStore();
+  const {
+    filterFeedId,
+    setFilterFeedId,
+    filterFolder,
+    setFilterFolder,
+    viewMode,
+    setViewMode,
+    sortOrder,
+    setSortOrder,
+  } = useEntriesStore();
   // Transient "更新はありません" toast -- a manual refresh that silently
   // finds nothing new was indistinguishable from a broken/no-op button
   // (user feedback). Only for the manual trigger; the scheduler's silent
@@ -91,6 +99,28 @@ export function TimelineToolbar() {
         onSelectFeed={(id) => setFilterFeedId(id)}
         onSelectFolder={(folder) => setFilterFolder(folder)}
       />
+
+      {/* Text+icon toggle, not icon-only -- an icon-only glyph here got
+          silently swept into the nav rail's circular icon-badge styling
+          (`.icon-button`, shared with FilterBar's bookmark/search/history
+          buttons), which resizes/recolors on hover for an entirely
+          different purpose and had no business on a toolbar action button
+          (user: "ボタンしか使わないのにサイズが可変する変な背景"). Styled
+          like the 記事を更新 button next to it (`pill-button`, no
+          `icon-button`) instead. The label itself flips between 昇順/降順
+          on every click (user: wanted the text to switch, not just the
+          icon) since this is a frequently-used control where the current
+          state should be legible at a glance, not just inferable from a
+          rotated arrow. */}
+      <button
+        type="button"
+        onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+        title={sortOrder === "asc" ? "昇順（クリックで降順に）" : "降順（クリックで昇順に）"}
+        className="pill-button flex min-h-7 shrink-0 items-center gap-1 rounded px-1.5 py-1 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+      >
+        <SortIcon className={`h-3.5 w-3.5 transition-transform duration-150 ${sortOrder === "asc" ? "rotate-180" : ""}`} />
+        {sortOrder === "asc" ? "昇順" : "降順"}
+      </button>
 
       <div className="segmented flex shrink-0 gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
         {VIEW_MODES.map(({ mode, label }) => (

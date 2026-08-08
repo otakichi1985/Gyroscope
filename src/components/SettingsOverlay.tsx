@@ -13,11 +13,6 @@ import {
 import type { DataDirInfo } from "../lib/types";
 import { useUpdateStore } from "../stores/updateStore";
 import { FontPicker } from "./FontPicker";
-// Dev-only usage below (import.meta.env.DEV-gated) -- this import itself is
-// harmless either way, but see App.tsx for how the heavier overlay code
-// stays out of production entirely.
-// eslint-disable-next-line import/order
-import { useDevEditorStore } from "../dev-tools/devEditorStore";
 import { ScreenOverlay } from "./ScreenOverlay";
 import { ChevronDownIcon } from "./icons";
 
@@ -709,22 +704,6 @@ export function SettingsOverlay() {
         >
         <UpdateSection />
         </SettingsSection>
-
-        {/* Dev-only, not part of the persisted openSections shape on
-            purpose -- this section (and the button inside it) is entirely
-            absent from production builds, see dev-tools/EditorOverlay.tsx. */}
-        {import.meta.env.DEV && (
-          <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
-            <div className="text-xs font-medium opacity-70">開発用</div>
-            <button
-              type="button"
-              onClick={() => useDevEditorStore.getState().toggle()}
-              className={OUTLINE_BUTTON}
-            >
-              編集モードを切り替え
-            </button>
-          </div>
-        )}
       </div>
     </ScreenOverlay>
   );

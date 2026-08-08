@@ -1,13 +1,15 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { EntryList } from "./components/EntryList";
 import { FeedManagerOverlay } from "./components/FeedManagerOverlay";
 import { FilterBar } from "./components/FilterBar";
 import { HistoryOverlay } from "./components/HistoryOverlay";
 import { ReaderOverlay } from "./components/ReaderOverlay";
+import { ResizeCornerGuides } from "./components/ResizeCornerGuides";
 import { SettingsOverlay } from "./components/SettingsOverlay";
 import { TitleBar } from "./components/TitleBar";
 import { TimelineToolbar } from "./components/TimelineToolbar";
 import { TrashOverlay } from "./components/TrashOverlay";
+import { DevPointer } from "./dev-tools/DevPointer";
 import { useAutoCheckForUpdate } from "./hooks/useAutoCheckForUpdate";
 import { useFeedsUpdatedListener } from "./hooks/useFeedsUpdatedListener";
 import { useIdleTimer } from "./hooks/useIdleTimer";
@@ -19,15 +21,6 @@ import { useVibrancyMode } from "./hooks/useVibrancyMode";
 import { getSkin } from "./lib/skins";
 import { useAppearanceStore } from "./stores/appearanceStore";
 import { useUiStore } from "./stores/uiStore";
-
-// Gated at the `import.meta.env.DEV` check itself (not just at render), so
-// Vite's dead-code elimination drops the dynamic import -- and therefore
-// the whole dev-tools chunk -- from production builds entirely, not merely
-// leaves it unused. See dev-tools/EditorOverlay.tsx and the plan this was
-// built from.
-const EditorOverlay = import.meta.env.DEV
-  ? lazy(() => import("./dev-tools/EditorOverlay").then((m) => ({ default: m.EditorOverlay })))
-  : null;
 
 // One of these gets picked at random each time idle starts (see the effect
 // below) -- a moving/drifting glow (an earlier version) read as too busy;
@@ -211,11 +204,6 @@ function App() {
     <div
       style={panelStyle}
       onPointerDown={handleRootPointerDown}
-      // Stable hook for the dev-only editor overlay to read/override the
-      // skin CSS custom properties set just above -- see
-      // dev-tools/gyroscopeManifest.ts. Inert in production; costs nothing
-      // to leave present.
-      data-app-root
       // The inset ring reads as a window edge, which is the one thing a
       // floating HUD must not have -- dropped along with the panel fill
       // (the fill itself is cleared in CSS, see .skin-floating).
@@ -252,6 +240,7 @@ function App() {
           <i className="ordinary-reticle" />
         </div>
       )}
+      {floating && <ResizeCornerGuides />}
       {titleBarVisible && <TitleBar />}
       <FilterBar />
       <div className="relative min-h-0 flex-1">
@@ -297,11 +286,11 @@ function App() {
         <ReaderOverlay />
         <SettingsOverlay />
       </div>
-      {EditorOverlay && (
-        <Suspense fallback={null}>
-          <EditorOverlay />
-        </Suspense>
-      )}
+      {/* Dev-only pointing tool (src/dev-tools). `import.meta.env.DEV` is
+          replaced with a literal at build time, so the whole subtree -- and
+          the import above with it -- is dropped from the production bundle;
+          index.css additionally keeps its text out of Tailwind's scan. */}
+      {import.meta.env.DEV && <DevPointer />}
     </div>
   );
 }

@@ -3,14 +3,21 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Entry } from "../lib/types";
 
 export type ViewMode = "card" | "list" | "compact";
+export type SortOrder = "desc" | "asc";
 
 const PAGE_SIZE = 200;
 const VIEW_MODE_KEY = "gyroscope:view-mode";
+const SORT_ORDER_KEY = "gyroscope:sort-order";
 const SEARCH_DEBOUNCE_MS = 300;
 
 function loadViewMode(): ViewMode {
   const stored = localStorage.getItem(VIEW_MODE_KEY);
   return stored === "card" || stored === "list" || stored === "compact" ? stored : "card";
+}
+
+function loadSortOrder(): SortOrder {
+  const stored = localStorage.getItem(SORT_ORDER_KEY);
+  return stored === "asc" ? "asc" : "desc";
 }
 
 let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -29,6 +36,7 @@ interface EntriesState {
   starredOnly: boolean;
   searchQuery: string;
   viewMode: ViewMode;
+  sortOrder: SortOrder;
 
   refresh: () => Promise<void>;
   fetchMore: () => Promise<void>;
@@ -37,6 +45,7 @@ interface EntriesState {
   setStarredOnly: (value: boolean) => Promise<void>;
   setSearchQuery: (query: string) => void;
   setViewMode: (mode: ViewMode) => void;
+  setSortOrder: (order: SortOrder) => Promise<void>;
   markRead: (id: number, isRead: boolean) => Promise<void>;
   toggleStar: (id: number, isStarred: boolean) => Promise<void>;
   deleteEntry: (id: number) => Promise<void>;
@@ -55,6 +64,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   starredOnly: false,
   searchQuery: "",
   viewMode: loadViewMode(),
+  sortOrder: loadSortOrder(),
 
   refresh: async () => {
     const requestId = ++listRequestId;
@@ -69,6 +79,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
           query: get().searchQuery.trim() || null,
           limit: PAGE_SIZE,
           offset: 0,
+          sort_order: get().sortOrder,
         },
       });
       if (requestId !== listRequestId) return;
@@ -93,6 +104,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
           query: get().searchQuery.trim() || null,
           limit: PAGE_SIZE,
           offset: get().entries.length,
+          sort_order: get().sortOrder,
         },
       });
       if (requestId !== listRequestId) return;
@@ -136,6 +148,12 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   setViewMode: (mode: ViewMode) => {
     set({ viewMode: mode });
     localStorage.setItem(VIEW_MODE_KEY, mode);
+  },
+
+  setSortOrder: async (order: SortOrder) => {
+    set({ sortOrder: order });
+    localStorage.setItem(SORT_ORDER_KEY, order);
+    await get().refresh();
   },
 
   markRead: async (id: number, isRead: boolean) => {
