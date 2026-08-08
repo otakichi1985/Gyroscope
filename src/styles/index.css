@@ -1,14 +1,13 @@
 @import "tailwindcss";
-/* The dev-only editor overlay (src/dev-tools, see App.tsx's
-   import.meta.env.DEV gate) is styled entirely with inline styles and uses
-   no Tailwind classes -- but Tailwind scans source *text*, and that file
-   necessarily contains bare CSS property names as string literals
-   ("drop-shadow", "backdrop-blur", ...) because its whole job is inspecting
-   styles. Those got mistaken for class names and emitted real utilities
-   into the production stylesheet, which broke the rule that none of the
-   dev tooling ships. Excluding the directory keeps that guarantee whole. */
-@source not "../dev-tools";
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Keep the dev-only tooling out of the shipped stylesheet. It is styled with
+   inline styles, but Tailwind scans source *text*, and files whose job is
+   inspecting styles are full of bare property names as string literals
+   ("backdrop-filter", "drop-shadow", ...) that get mistaken for class names
+   and emitted as real utilities. Without this the claim "none of the dev
+   tooling ships" is quietly untrue. */
+@source not "../dev-tools";
 
 html,
 body,
@@ -112,7 +111,10 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
    entering/leaving the viewport dissolve rather than clipping flat against
    the edge -- part of the same "scrolling should feel nicer" request.
    `mask-image` composites against transparency, not a solid color, so this
-   works correctly regardless of skin/opacity settings underneath. */
+   reads fine underneath every *opaque* skin -- the fade just blends into
+   the panel colour behind it. Floating skins override this below; the
+   14px top fade here washes out the first card's title against a truly
+   transparent backdrop, which is what that override exists to fix. */
 .entry-list-scroll {
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -122,6 +124,100 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
     transparent 100%
   );
   mask-image: linear-gradient(to bottom, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+}
+
+/* Floating skins: cards should look like they slide *under the toolbar's
+   own glass plate* and dissolve there, not clip flat the instant they cross
+   the scroll container's edge (user feedback, two rounds on this one --
+   first the plain top fade washed out the first card's title at rest
+   (nothing behind it to blend into), then disabling that fade outright for
+   floating skins fixed the title but made scrolled rows clip flat instead
+   of dissolving, which read as cards "suddenly appearing under the toolbar"
+   rather than sinking into it).
+   The fix is geometric, not about when the fade is on: pull the scroll
+   box's own top edge up behind the toolbar (negative margin) and pad the
+   content back down by SINK_PX + 4px (the extra 4px restores the `py-1`
+   top padding every other skin still gets from the base rule above, which
+   this override necessarily replaces -- missing it first-try left the
+   first card sitting flush against the toolbar plate with no breathing
+   room at all, "ビタ付きになってしまってて美しくない" per user report), so
+   the rest position (scrollTop 0) is pixel-identical to every other skin.
+   The first card still starts exactly where it always has, right below
+   the plate with the same small gap. What the SINK_PX part buys is that
+   much genuine travel room *behind* the toolbar before the box's real edge
+   clips anything, and that's exactly the span the mask fades transparent
+   over. Because the first card's top edge sits at (or, with the 4px
+   restored, just past) the gradient's fully-opaque point, it is not faded
+   at all until it actually starts scrolling up into the toolbar's
+   territory -- so no wash-out at rest, and a genuine multi-frame dissolve
+   once it does move, instead of a toggle. The toolbar's own z-index (see
+   its rule above) is what visually keeps it on top of this the whole time;
+   SINK_PX only needs to be at least the toolbar's rendered height, not an
+   exact match -- overshooting just means a card finishes fading a little
+   before it's fully behind the plate, which is invisible since it's
+   already fully transparent by then. */
+.skin-floating .entry-list-scroll {
+  /* `h-full` (Tailwind, height: 100%) is relative to the parent, and a
+     negative margin doesn't change that -- it translates the whole box
+     upward, top AND bottom together, dragging the bottom fade up off the
+     real window edge with it ("下側フェードが持ち上がりすぎてしまっている",
+     user report). `height` has to grow by the same amount the margin pulls
+     the top up, so only the top edge actually moves and the bottom one
+     stays anchored where `h-full` alone would have put it. */
+  height: calc(100% + 64px);
+  margin-top: -64px;
+  padding-top: 68px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 64px,
+    black calc(100% - 14px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, transparent 0, black 64px, black calc(100% - 14px), transparent 100%);
+}
+
+/* ResizeCornerGuides.tsx: a soft L-bracket on whichever window corner the
+   cursor is near, floating skins only (see the component for why corners
+   rather than full edges). `--corner-glow` (0-1) is written per-frame from
+   JS; CSS only turns it into an opacity. `pointer-events: none` throughout
+   -- this never participates in hit-testing, the OS resize drag it's
+   illustrating happens beneath it regardless of what's painted in the DOM. */
+.resize-corner-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.resize-corner-guide {
+  position: absolute;
+  --corner-glow: 0;
+  opacity: var(--corner-glow);
+  border: 0 solid rgb(255 255 255 / 0.85);
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 0.35));
+}
+.resize-corner-guide-tl {
+  top: 0;
+  left: 0;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+.resize-corner-guide-tr {
+  top: 0;
+  right: 0;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+.resize-corner-guide-bl {
+  bottom: 0;
+  left: 0;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+.resize-corner-guide-br {
+  bottom: 0;
+  right: 0;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
 }
 
 /* Fade+scale pop for the custom dropdown popups (FeedPicker.tsx,
@@ -445,6 +541,16 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 .skin-floating .app-filterbar,
 .skin-floating .timeline-toolbar {
   position: relative;
+  /* `backdrop-filter` makes each plate its own stacking context, so its
+     z-index is compared as a whole against siblings like `.entry-list-scroll`
+     (which forms its own stacking context too, via `.timeline-enter`'s
+     `transform`) rather than flattening into the shared ancestor's stack.
+     Without an explicit value here both sit at the z-index:auto layer and
+     paint in DOM order, so the entry list -- which comes after the toolbar
+     in App.tsx -- painted over it, burying the "更新はありません" toast
+     under the article cards (user report, cardinality skin). z-index:1 lifts
+     the whole plate (and its toast) above that layer. */
+  z-index: 1;
   margin: 6px var(--plate-inset) 0;
   border: 1px solid rgb(var(--plate-border) / calc(var(--plate-border-alpha) * var(--float-alpha, 1)));
   border-radius: var(--plate-radius);

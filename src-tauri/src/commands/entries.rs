@@ -17,6 +17,10 @@ pub struct EntriesFilter {
     pub query: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    /// "asc" sorts oldest-first; anything else (including absent) keeps the
+    /// original newest-first order, so old callers/rows with no preference
+    /// saved yet behave exactly as before.
+    pub sort_order: Option<String>,
 }
 
 const DEFAULT_LIMIT: i64 = 200;
@@ -74,7 +78,11 @@ pub fn list_entries(db: State<'_, Db>, filter: EntriesFilter) -> AppResult<Vec<E
     if filter.starred_only.unwrap_or(false) {
         sql.push_str(" AND e.is_starred = 1");
     }
-    sql.push_str(" ORDER BY e.published_at DESC, e.id DESC LIMIT ? OFFSET ?");
+    if filter.sort_order.as_deref() == Some("asc") {
+        sql.push_str(" ORDER BY e.published_at ASC, e.id ASC LIMIT ? OFFSET ?");
+    } else {
+        sql.push_str(" ORDER BY e.published_at DESC, e.id DESC LIMIT ? OFFSET ?");
+    }
     bindings.push(Box::new(filter.limit.unwrap_or(DEFAULT_LIMIT)));
     bindings.push(Box::new(filter.offset.unwrap_or(0)));
 

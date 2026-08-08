@@ -122,6 +122,19 @@ export function WarningIcon(props: IconProps) {
   );
 }
 
+// A single shaft with the arrowhead at one end reads as "this direction,
+// not the other" more clearly than a two-headed up/down glyph would --
+// TimelineToolbar flips it (rotate-180) for the descending state, so one
+// icon covers both, the same way ChevronDownIcon does for expand/collapse.
+export function SortIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <line x1="8" y1="2.5" x2="8" y2="13" />
+      <path d="M4.5 9.5 8 13l3.5-3.5" />
+    </Icon>
+  );
+}
+
 export function ChevronDownIcon(props: IconProps) {
   return (
     <Icon {...props}>
