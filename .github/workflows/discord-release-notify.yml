@@ -3,7 +3,7 @@ name: Notify Discord on release
 # Fires whenever a GitHub Release is published (gh release create, or the
 # web UI) -- not on every push/tag, so this only reacts to an actual
 # release being cut, same as the app's own update check (see
-# src-tauri/src/commands/update.rs, which also only looks at
+# App/src-tauri/src/commands/update.rs, which also only looks at
 # /releases/latest, never at branch history).
 on:
   release:
