@@ -18,6 +18,11 @@ gyroscope-portable-v*.zip
 # Legacy Claude settings may contain local permissions and credential-bearing command history.
 context_archive/.claude/settings.local.json
 
+# Local dev-server launch config for Claude Code's Browser pane preview
+# (see "Tauriウィンドウ実機E2E" in context/VERIFY.md). Machine-local
+# tooling, not project code -- kept intentionally untracked.
+.claude/
+
 # QA確認用に撮ったスクショなどを放り込む場所（フォルダごと無視）
 qa-screenshots
 
