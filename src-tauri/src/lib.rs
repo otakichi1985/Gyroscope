@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod diag;
 mod error;
 mod fetch;
 mod opml;
@@ -30,6 +31,7 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            diag::log(app.handle(), "startup");
             let window = app
                 .get_webview_window("main")
                 .expect("main window must exist");
@@ -108,12 +110,18 @@ pub fn run() {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     let minimize_to_tray = close_app.state::<tray::MinimizeToTray>();
                     if *minimize_to_tray.0.lock().unwrap() {
+                        diag::log(&close_app, "close_requested: prevent_close (tray)");
                         api.prevent_close();
                         let _ = close_window.hide();
+                    } else {
+                        diag::log(&close_app, "close_requested: not prevented (process exit path)");
                     }
                 }
                 tauri::WindowEvent::Resized(_) => {
                     opacity::restore(&resize_app, &resize_window);
+                }
+                tauri::WindowEvent::Destroyed => {
+                    diag::log(&close_app, "main window destroyed");
                 }
                 _ => {}
             });
