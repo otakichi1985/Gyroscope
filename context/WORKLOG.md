@@ -3,6 +3,10 @@
 最近の開発状況をHumanとAIが短時間で復元するための作業記録。
 詳細な履歴はGit / GitHubに任せ、現在に近い情報だけを保持する。
 
+記録を追加する際は、各セクション（Current Work / Uncommitted Archive /
+Recent Commits）に示された書式例に合わせる。コミットしたら該当する
+Current Work の記録を Recent Commits へ圧縮する（末尾の Rotation を参照）。
+
 
 # Current Work
 
@@ -18,25 +22,6 @@
 
 
 <!-- ここから実際の記録 -->
-
-- **[Claude Code / Sonnet]** WebdriverIO実機E2Eで回帰チェック（カーディナリティのトースト位置、オーディナリーでの同バグ再発なし、モノクロ非浮遊スキンへの影響なし）を実施し、4件すべて成功を確認した。
-- **[Claude Code / Sonnet]** 修正後、同じWebdriverIO実機E2Eで「検索アイコンから展開→直後に入力→再クリック→再クリック後も入力→クリックが記事リストに奪われない」を実測し、いずれも成功した（`App/e2e/specs/search-focus.spec.js` 4件成功）。`npm run build`・`cargo test`（53件）も成功。
-- **[Claude Code / Sonnet]** 浮遊スキンの検索欄バグを修正: `App/src/styles/index.css` の `.skin-cardinality > *` と `.skin-ordinary > :not(.ordinary-hud)` が、本来チラム（タイトルバー・フィルターバー・ツールバー）だけに要る `z-index:1` を、ルート直下の全子要素（記事リスト側のラッパーを含む）へ無差別に付与していたのが原因。フィルターバーと記事リストラッパーの`z-index`が1同士で並び、DOM順で後にある記事リストラッパー側（かつ`.entry-list-scroll`はツールバーの下へ潜り込む-64pxの意図的なsink持ち）がフィルターバー内の検索欄より前面に出ていた。`App/src/App.tsx` の該当ラッパーへ `app-content` クラスを付け、両CSSルールから`:not(.app-content)`で除外する最小修正とした。
-- **[Claude Code / Sonnet]** 浮遊スキン（カーディナリティ）の検索欄バグをWebdriverIO実機E2Eで再現し、実測で原因を特定: `.entry-list-scroll`（記事リスト）が検索欄の下端と約14〜19px重なっており、`elementFromPoint`も記事リスト側を返す。ウィンドウは既定サイズ(420x680)に合わせて計測（WebDriverセッションの既定サイズは1114px高と実機と異なり誤解を招くため要注意）。
-- **[Claude Code / Sonnet]** Humanの許可を得てWebdriverIO + `@wdio/tauri-service`（`driverProvider: 'external'`、Rust側無変更）を導入し、`App/e2e/`に実機E2Eの最小ハーネスを追加した。実行にはVite開発サーバー起動が必須（`ERR_CONNECTION_REFUSED`で全滅した実例あり）。詳細は `context/VERIFY.md` の「Tauriウィンドウ実機E2E」を参照。
-- **[Human / Codex]** 共同開発ルールの唯一の正本をルート `AGENTS.md` へ移し、`CLAUDE.md` は `@AGENTS.md` を読む入口へ統一した。
-- **[Human / Codex]** リポジトリ外側のディレクトリ名を `rss-widget` から `Gyroscope` へ変更し、プロダクト名と揃える。
-- **[Codex]** 旧Claude設定内の認証情報がアーカイブと一緒にコミットされないよう、`context_archive/.claude/settings.local.json` だけをGit対象外にした。
-- **[Codex]** `App/` 移動後にフロントビルド、Rust 53テスト、Clippy、ポータブル版とZIP生成がすべて成功した。
-- **[Codex]** 移動前の絶対パスを持つCargoキャッシュが初回テストを妨げたため、再生成可能な `App/src-tauri/target` だけを `cargo clean` し、新パスで再構築した。
-- **[Codex]** Git管理されていたアプリ・旧資料112ファイルが移動前のGit blobと完全一致し、内容変更がないことを確認した。
-- **[Codex]** 旧資料を `context_archive/`、アプリ本体を `App/` へ移し、ルートを共同開発の入口と正本中心に整理した。
-- **[Codex]** GitHubがルート配置を要求する `.github/` と、リポジトリ共通の `.vscode/`・`.gitignore` はルートに維持した。
-- **[Codex]** 実装を変更せず、コード・Git・現在設定を優先して新しい `context/` 正本へ移行した。
-- **[Codex]** `npm run build`、`cargo test`（53件）、`cargo clippy -- -D warnings` の成功を確認した。
-- **[Codex]** 旧 `context_archive/BACKLOG.md` の記事ソート未実装記述が現在のコードと矛盾するため、新正本へ未実装事項として移さなかった。
-- **[Codex]** 作業開始前から `.claude/` が未追跡で、`settings.local.json` に認証情報を含むコマンド履歴があることを確認したが、変更していない。
-- **[Human]** 旧コンテキストを参考資料とし、コード・Git・現在状態を優先し、不明点を推測で埋めない方針を指定した。
 
 
 # Uncommitted Archive
@@ -73,6 +58,26 @@
 
 <!-- ここから実際の記録 -->
 
+## 155ae59 — 2026-08-13
+**環境:** Claude Code / Sonnet
+
+`.claude/launch.json`（Browserペイン用devサーバー起動設定）の再作成方法をVERIFY.mdへ記録し、
+`.gitignore`へ追加してGit管理対象外に固定した。
+
+## c9a0110 — 2026-08-13
+**環境:** Claude Code / Sonnet
+
+浮遊スキン（カーディナリティ/オーディナリー）で、検索欄を開いた直後は入力できるが再クリックすると
+記事リストにクリックを奪われるバグを修正。原因は `.skin-cardinality > *` 等のブランケット
+z-indexルールがタイムラインラッパーまで巻き込み、フィルターバーと同順位で並んでDOM順に負けていたこと。
+WebdriverIO + tauri-driverによる実機E2E（`App/e2e/`）を新規導入し、実測で原因特定・修正確認まで行った。
+
+## 0257a85 — 2026-08-13
+**環境:** Git履歴から移行（Human / Codex）
+
+アプリ本体を `App/` へ、旧資料を `context_archive/` へ移し、`context/` を正本とする
+ディレクトリ再編をコミット。実装変更なし（build / cargo test 53件 / clippy 成功を確認済み）。
+
 ## 25a43b8 — 2026-08-12
 **環境:** Git履歴から移行
 
@@ -82,21 +87,6 @@
 **環境:** Git履歴から移行
 
 作業途中だった別ウィンドウ型GUI編集ツールをrevertし、現行実装から除外。
-
-## cdf69c9 — 2026-08-08
-**環境:** Git履歴から移行
-
-浮遊系スキンのリサイズと記事ソートの操作感を調整し、v0.2.5へ更新。
-
-## 4fd34c4 — 2026-08-08
-**環境:** Git履歴から移行
-
-開発専用ツール由来のTailwind utilityが出荷CSSへ混入しないよう修正。
-
-## d695013 — 2026-08-08
-**環境:** Git履歴から移行
-
-GitHub Release公開時のDiscord通知をCIへ追加。
 
 
 # Rotation
