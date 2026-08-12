@@ -243,7 +243,7 @@ function App() {
       {floating && <ResizeCornerGuides />}
       {titleBarVisible && <TitleBar />}
       <FilterBar />
-      <div className="relative min-h-0 flex-1">
+      <div className="app-content relative min-h-0 flex-1">
         {/* `absolute inset-0` (not `h-full`) matches how the overlay
             siblings below are sized, and gives EntryList's own `h-full` a
             definite-height ancestor to resolve against. Inert while any

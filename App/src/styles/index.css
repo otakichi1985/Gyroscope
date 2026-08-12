@@ -829,7 +829,17 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
      Amber in this theme means *selected*, and nothing else. */
   --glow-rgb: 255 255 255;
 }
-.skin-cardinality > * {
+/* Excludes `.app-content` (the timeline + all screen overlays): it sits
+   below FilterBar in the DOM, and FilterBar already carries its own
+   z-index:1 (see `.skin-floating .app-filterbar` below). Elevating
+   `.app-content` to the same z-index:1 made it tie with FilterBar and win
+   on DOM order, so `.entry-list-scroll`'s deliberate -64px sink under the
+   toolbar (see the SINK_PX comment on `.skin-floating .entry-list-scroll`)
+   was painting over FilterBar's own search input instead of staying behind
+   it -- clicks meant for the input landed on the article list underneath
+   (confirmed via WebdriverIO: `elementFromPoint` on the overlap band
+   returned `.entry-list-scroll`, not the input). */
+.skin-cardinality > :not(.app-content) {
   position: relative;
   z-index: 1;
 }
@@ -1163,7 +1173,9 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   --plate-radius: 14px;
   --glow-rgb: 255 255 255;
 }
-.skin-ordinary > :not(.ordinary-hud) {
+/* Also excludes `.app-content` -- same reasoning as `.skin-cardinality`'s
+   equivalent rule above. */
+.skin-ordinary > :not(.ordinary-hud):not(.app-content) {
   position: relative;
   z-index: 1;
 }
