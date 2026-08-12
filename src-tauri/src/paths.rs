@@ -103,6 +103,17 @@ pub struct DataDirInfo {
     pub fallback_reason: Option<String>,
 }
 
+/// The effective data directory, without `resolve`'s side effects: `resolve`
+/// runs `ensure_writable` (which creates+deletes a `.write-test` probe file)
+/// because the Settings screen needs to know whether a custom dir still works.
+/// The dev-only exit logger (`diag`) only needs a path, so it uses this.
+pub fn effective_data_dir(app: &AppHandle) -> PathBuf {
+    match read_override(app) {
+        Some(custom) => custom,
+        None => default_data_dir(app),
+    }
+}
+
 pub fn resolve(app: &AppHandle) -> DataDirInfo {
     let portable = is_portable();
     let default_dir = default_data_dir(app);

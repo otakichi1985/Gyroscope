@@ -570,6 +570,31 @@ npm run package:portable  # ポータブル版パッケージ生成（dist-porta
   Vite側だけが死んでいる分には`gyroscope.exe`（Rust側）・DBには影響しないため、
   `npm run tauri dev`を再起動するだけで復旧できる（Rust側は再ビルド不要なのでほぼ一瞬で
   戻る）
+- **dev限定の終了経路ログ（`src-tauri/src/diag.rs`）**: ターミナルにエラーも出ず、
+  WER/クラッシュダンプ/イベントログに一切痕跡を残さずに開発版が「消える」ことがあり、
+  調査したところハードクラッシュではなかった（panicならstderr、プロセスクラッシュなら
+  WERに必ず痕跡が残る）。消える経路は全てクリーンなexit（×ボタン＋「タスクトレイに
+  格納」OFFの既定閉鎖、トレイの「終了」、アップデート適用/巻き戻し、データ保存先変更の
+  再起動）か、外部からの強制終了に限られる。切り分けのため、`diag::log(app, ...)`が
+  `<データディレクトリ>/dev-exit.log`にタイムスタンプ付きで1行追記する
+  （`#[cfg(debug_assertions)]`でガードしており、リリースビルドでは何も書かない）。
+  書く場所: 起動時（setup先頭の`startup`）、`CloseRequested`の判定結果（prevent_closeか
+  否か）、`Destroyed`、トレイ「終了」、`apply_update`/`rollback_update`/`restart_app`。
+  読み方: 最終行が`startup`のまま＝外部から殺された（OOM/taskkill/ファイル監視の再起動）、
+  `close_requested: not prevented`＝格納OFFのままウィンドウが閉じた、等。経路を触ったら
+  必ずここに1行足すこと。`paths::effective_data_dir`は`resolve`の`.write-test`副作用なしに
+  データディレクトリを返すだけの純粋関数
+- **【解決済み・`tauri dev`が起動できなくなる件】** 上の「片方だけ死ぬ」は逆向きにも起きる
+  ―― Rust側が落ちてViteだけがポート1420を掴んだまま残る。`vite.config.ts`は
+  `strictPort: true`（`devUrl`が固定URLを指しており、ポートが動くと追従できない）なので、
+  この残骸があると次回の`npm run tauri dev`が「port is already in use」で必ず失敗する。
+  ユーザーからは手の出しようがない状態（実機で複数回報告）。`scripts/dev-clean.mjs`を
+  `npm run dev`（＝Tauriの`beforeDevCommand`）の先頭に挟んで自動で掃除するようにした
+  ので、`npm run tauri dev`のたびに何も意識せず解消される。手動なら`npm run dev:clean`。
+  **意図的に保守的**な実装で、ポートを掴んでいるのが`node`のときだけ落とし、
+  `gyroscope.exe`はこのチェックアウトの`src-tauri/target/debug/`配下のものだけを対象に
+  する（ユーザーがインストール版/ポータブル版を並行して使っている可能性があるため、
+  パスが一致しないプロセスには触らない）。掃除自体が失敗しても起動は止めない
 - **【開発中に踏んだ罠】** `npm run tauri dev`を起動したまま`npm run package:portable`を
   実行すると、Viteのファイル監視（chokidar）が`dist-portable/gyroscope.exe`をコピー中に
   掴もうとして`EBUSY: resource busy or locked`を投げ、`beforeDevCommand`（Vite）ごと

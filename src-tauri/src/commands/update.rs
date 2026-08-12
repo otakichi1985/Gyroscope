@@ -277,6 +277,7 @@ pub fn apply_update(app: AppHandle, db: State<'_, Db>, pending: State<'_, Pendin
     // only happen once nothing else is mid-write (see CLAUDE.md's note on
     // the `database disk image is malformed` incident this mirrors).
     let _guard = db.0.lock().unwrap();
+    crate::diag::log(&app, "exit: apply_update");
     app.exit(0);
     Ok(())
 }
@@ -313,6 +314,7 @@ pub fn rollback_update(app: AppHandle, db: State<'_, Db>) -> AppResult<()> {
         .map_err(|e| AppError::Other(format!("再起動に失敗しました: {e}")))?;
     // See apply_update's identical guard above for why.
     let _guard = db.0.lock().unwrap();
+    crate::diag::log(&app, "exit: rollback_update");
     app.exit(0);
     Ok(())
 }
