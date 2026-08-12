@@ -15,6 +15,9 @@ gyroscope-portable
 gyroscope-portable-v*.zip
 *.local
 
+# Legacy Claude settings may contain local permissions and credential-bearing command history.
+context_archive/.claude/settings.local.json
+
 # QA確認用に撮ったスクショなどを放り込む場所（フォルダごと無視）
 qa-screenshots
 
