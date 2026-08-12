@@ -176,10 +176,17 @@ now available。この経路で同じ検索欄バグを実機上で再現し、�
   `console.log`で状態を記録する観測目的のスペックが中心。
 
 **実行:**  
-1. `App/` で Vite 開発サーバーを起動しておく（`npm run dev`、または既存のプレビュー機構）。
+1. `App/` で Vite 開発サーバーを起動しておく。
    デバッグビルド（`target/debug/`）は `devUrl: http://localhost:1420` を読みに行くため必須。
    Viteを起動せずに実行すると `ERR_CONNECTION_REFUSED` の白画面のまま全テストが失敗する
-   （実際に一度踏んだ失敗）。
+   （実際に一度踏んだ失敗）。起動方法は次のいずれか:
+   - `App/` で `npm run dev`
+   - Claude Codeの場合、リポジトリルートに `.claude/launch.json` を用意済み
+     （`gyroscope-dev`、`npm --prefix App run dev -- --port 1420 --strictPort` を起動し
+     `http://localhost:1420` をBrowserペインへ開く設定）。このファイルは検証専用のローカル
+     ツールでありGit未追跡のまま維持する方針（プロジェクトのコードと無関係、めったに変更しない
+     ため）。`preview_start`に`name: "gyroscope-dev"`を渡せば同じ設定で起動できる。
+     消えていた場合は上記と同じ内容で再作成すればよい。
 2. `App/src-tauri/target/debug/gyroscope.exe` が存在することを確認する
    （なければ `npm run tauri dev` を一度実行してビルドさせる）。
 3. `App/` で `npm run test:e2e -- --spec e2e/specs/<対象スペック>.spec.js`  
