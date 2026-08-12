@@ -19,6 +19,11 @@
 
 <!-- ここから実際の記録 -->
 
+- **[Claude Code / Sonnet]** WebdriverIO実機E2Eで回帰チェック（カーディナリティのトースト位置、オーディナリーでの同バグ再発なし、モノクロ非浮遊スキンへの影響なし）を実施し、4件すべて成功を確認した。
+- **[Claude Code / Sonnet]** 修正後、同じWebdriverIO実機E2Eで「検索アイコンから展開→直後に入力→再クリック→再クリック後も入力→クリックが記事リストに奪われない」を実測し、いずれも成功した（`App/e2e/specs/search-focus.spec.js` 4件成功）。`npm run build`・`cargo test`（53件）も成功。
+- **[Claude Code / Sonnet]** 浮遊スキンの検索欄バグを修正: `App/src/styles/index.css` の `.skin-cardinality > *` と `.skin-ordinary > :not(.ordinary-hud)` が、本来チラム（タイトルバー・フィルターバー・ツールバー）だけに要る `z-index:1` を、ルート直下の全子要素（記事リスト側のラッパーを含む）へ無差別に付与していたのが原因。フィルターバーと記事リストラッパーの`z-index`が1同士で並び、DOM順で後にある記事リストラッパー側（かつ`.entry-list-scroll`はツールバーの下へ潜り込む-64pxの意図的なsink持ち）がフィルターバー内の検索欄より前面に出ていた。`App/src/App.tsx` の該当ラッパーへ `app-content` クラスを付け、両CSSルールから`:not(.app-content)`で除外する最小修正とした。
+- **[Claude Code / Sonnet]** 浮遊スキン（カーディナリティ）の検索欄バグをWebdriverIO実機E2Eで再現し、実測で原因を特定: `.entry-list-scroll`（記事リスト）が検索欄の下端と約14〜19px重なっており、`elementFromPoint`も記事リスト側を返す。ウィンドウは既定サイズ(420x680)に合わせて計測（WebDriverセッションの既定サイズは1114px高と実機と異なり誤解を招くため要注意）。
+- **[Claude Code / Sonnet]** Humanの許可を得てWebdriverIO + `@wdio/tauri-service`（`driverProvider: 'external'`、Rust側無変更）を導入し、`App/e2e/`に実機E2Eの最小ハーネスを追加した。実行にはVite開発サーバー起動が必須（`ERR_CONNECTION_REFUSED`で全滅した実例あり）。詳細は `context/VERIFY.md` の「Tauriウィンドウ実機E2E」を参照。
 - **[Human / Codex]** 共同開発ルールの唯一の正本をルート `AGENTS.md` へ移し、`CLAUDE.md` は `@AGENTS.md` を読む入口へ統一した。
 - **[Human / Codex]** リポジトリ外側のディレクトリ名を `rss-widget` から `Gyroscope` へ変更し、プロダクト名と揃える。
 - **[Codex]** 旧Claude設定内の認証情報がアーカイブと一緒にコミットされないよう、`context_archive/.claude/settings.local.json` だけをGit対象外にした。
