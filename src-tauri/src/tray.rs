@@ -46,7 +46,10 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "toggle" => toggle_main_window(app),
             "refresh" => trigger_refresh_all(app),
-            "quit" => app.exit(0),
+            "quit" => {
+                crate::diag::log(app, "exit: tray quit");
+                app.exit(0);
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

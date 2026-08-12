@@ -71,6 +71,7 @@ pub fn restart_app(app: AppHandle, db: State<'_, Db>) -> AppResult<()> {
     // taking the lock first rules that out. See commands::update::apply_update
     // for the incident this mirrors.
     let _guard = db.0.lock().unwrap();
+    crate::diag::log(&app, "exit: restart_app");
     app.exit(0);
     Ok(())
 }

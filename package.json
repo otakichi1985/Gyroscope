@@ -4,7 +4,8 @@
   "version": "0.2.5",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev-clean.mjs && vite",
+    "dev:clean": "node scripts/dev-clean.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
