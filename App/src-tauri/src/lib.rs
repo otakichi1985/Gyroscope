@@ -165,6 +165,8 @@ pub fn run() {
             commands::opml::import_opml_from_path,
             commands::opml::export_opml_to_path,
             commands::search::search_sources,
+            commands::search::browse_category,
+            commands::search::list_search_categories,
             commands::settings::get_data_dir_info,
             commands::settings::set_data_dir,
             commands::settings::restart_app,

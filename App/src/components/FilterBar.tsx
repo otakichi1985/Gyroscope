@@ -4,7 +4,7 @@ import { useEntriesStore } from "../stores/entriesStore";
 import { useAppearanceStore } from "../stores/appearanceStore";
 import { useUiStore, type Screen } from "../stores/uiStore";
 import { useUpdateStore } from "../stores/updateStore";
-import { ClockIcon, CloseIcon, PaletteIcon, PinIcon, RssIcon, SearchIcon, StarIcon, TrashIcon } from "./icons";
+import { ClockIcon, CloseIcon, CompassIcon, PaletteIcon, PinIcon, RssIcon, SearchIcon, StarIcon, TrashIcon } from "./icons";
 
 /**
  * `hue` names a role colour rather than a literal colour. Only skins whose
@@ -25,6 +25,7 @@ const NAV_ICONS: {
   { screen: "history", label: "既読履歴を開く", shortLabel: "履歴", hue: "teal", Icon: ClockIcon },
   { screen: "trash", label: "ゴミ箱を開く", shortLabel: "ゴミ箱", hue: "pink", Icon: TrashIcon },
   { screen: "feedManager", label: "フィード管理を開く", shortLabel: "フィード", hue: "green", Icon: RssIcon },
+  { screen: "discover", label: "サイトを探す", shortLabel: "探す", hue: "coral", Icon: CompassIcon },
   { screen: "settings", label: "外観設定を開く", shortLabel: "設定", hue: "blue", Icon: PaletteIcon },
 ];
 

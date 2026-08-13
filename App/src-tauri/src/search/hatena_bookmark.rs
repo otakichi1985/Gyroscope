@@ -1,16 +1,19 @@
-//! Search-result source for `commands::search::search_sources`.
+//! Search-result source for `commands::search::search_sources` and
+//! `commands::search::browse_category`.
 //!
 //! Started out as a DuckDuckGo scraper, but DuckDuckGo, SearXNG, and
 //! Marginalia's own web UI all gate scraped/bot-like traffic behind a
 //! CAPTCHA or a rate-limit wall (confirmed by hand against each while
 //! building this) -- unlike `fetch::booth`'s Cloudflare challenge, an
 //! image CAPTCHA has no automated way through, `WebviewWindow` included.
-//! Hatena Bookmark's search RSS (`b.hatena.ne.jp/search/text`) sidesteps
-//! that entirely: it's a plain, robots.txt-permitted RSS endpoint (no key,
-//! no signup, no CAPTCHA), its results are already community-curated by
-//! real bookmark counts rather than SEO ranking, and -- being a standard
-//! feed -- `parse::feed::parse_feed` (already used for every subscribed
-//! feed) parses it directly, no bespoke HTML parser needed.
+//! Hatena Bookmark's RSS endpoints (`b.hatena.ne.jp/search/text` for
+//! keyword search, `b.hatena.ne.jp/hotentry/<category>.rss` for a
+//! category's popular entries) sidestep that entirely: both are plain,
+//! robots.txt-permitted RSS (no key, no signup, no CAPTCHA), their results
+//! are already community-curated by real bookmark counts rather than SEO
+//! ranking, and -- being standard feeds -- `parse::feed::parse_feed`
+//! (already used for every subscribed feed) parses them directly, no
+//! bespoke HTML parser needed.
 //!
 //! Trade-off: Japanese-web-centric results. Acceptable for this app's
 //! primary audience; a second source could be added later if English-web
@@ -21,15 +24,32 @@ use std::collections::HashMap;
 use reqwest::Client;
 use url::Url;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::parse::feed::parse_feed;
 
 const SEARCH_URL: &str = "https://b.hatena.ne.jp/search/text";
+
+/// Category slugs Hatena Bookmark's `/hotentry/<slug>.rss` accepts.
+/// `browse_category` rejects anything outside this list -- the slug ends
+/// up directly in a request URL path, and only known-good values from
+/// Hatena's own category navigation should ever reach that, not arbitrary
+/// frontend input.
+pub const CATEGORIES: &[(&str, &str)] = &[
+    ("it", "IT"),
+    ("game", "ゲーム"),
+    ("economics", "経済"),
+    ("life", "暮らし"),
+    ("knowledge", "学び"),
+    ("entertainment", "エンタメ"),
+    ("fun", "おもしろ"),
+    ("social", "世の中"),
+];
 
 pub struct SearchHit {
     pub title: String,
     pub url: String,
     pub snippet: String,
+    pub thumbnail_url: Option<String>,
     /// How many Hatena users bookmarked this page -- the only popularity
     /// signal this search has, and the main lever for both quality (favor
     /// widely-bookmarked pages over one-off noise) and speed (drop
@@ -38,78 +58,121 @@ pub struct SearchHit {
     /// signal -- this module only extracts it.
     ///
     /// Not exposed by `feed_rs`'s generic `Entry` model (it only reads
-    /// well-known RSS/Atom fields, not Hatena's `hatena:bookmarkcount`
-    /// extension element), so it's pulled separately from the raw response
-    /// body via `extract_bookmark_counts` and merged in by URL. Tried
-    /// `?sort=popular` first (documented on Hatena's own search page as
-    /// the *default* sort) hoping the server would do this reordering for
-    /// free -- confirmed by hand that `mode=rss` ignores `sort` entirely
-    /// and always returns recency order, so it has to happen client-side.
+    /// well-known RSS/Atom fields, not Hatena's `hatena:bookmarkcount` /
+    /// `hatena:imageurl` extension elements), so both are pulled separately
+    /// from the raw response body via `extract_item_meta` and merged in by
+    /// URL. Tried `?sort=popular` first (documented on Hatena's own search
+    /// page as the *default* sort) hoping the server would do this
+    /// reordering for free -- confirmed by hand that `mode=rss` ignores
+    /// `sort` entirely and always returns recency order, so it has to
+    /// happen client-side.
     pub bookmark_count: u32,
 }
 
 pub async fn search(client: &Client, query: &str) -> AppResult<Vec<SearchHit>> {
     let mut url = Url::parse(SEARCH_URL).expect("SEARCH_URL is a valid URL");
     url.query_pairs_mut().append_pair("q", query).append_pair("mode", "rss");
-    let response = client.get(url).send().await?;
-    let body = response.bytes().await?;
-    let counts = extract_bookmark_counts(&String::from_utf8_lossy(&body));
-    let parsed = parse_feed(&body, Some(SEARCH_URL))?;
-    Ok(parsed
-        .entries
-        .into_iter()
-        .filter_map(|entry| entry_to_hit(entry, &counts))
-        .collect())
+    fetch_and_parse(client, url).await
 }
 
-fn entry_to_hit(entry: crate::db::models::NewEntry, counts: &HashMap<String, u32>) -> Option<SearchHit> {
+/// `category` must be one of `CATEGORIES`' slugs -- checked here (not just
+/// trusted from the caller) since it's interpolated into the request URL's
+/// path.
+pub async fn browse_category(client: &Client, category: &str) -> AppResult<Vec<SearchHit>> {
+    if !CATEGORIES.iter().any(|(slug, _)| *slug == category) {
+        return Err(AppError::Other(format!("不明なカテゴリです: {category}")));
+    }
+    let url = Url::parse(&format!("https://b.hatena.ne.jp/hotentry/{category}.rss"))
+        .expect("category is a validated slug, always a valid URL segment");
+    fetch_and_parse(client, url).await
+}
+
+async fn fetch_and_parse(client: &Client, url: Url) -> AppResult<Vec<SearchHit>> {
+    let base = url.as_str().to_string();
+    let response = client.get(url).send().await?;
+    let body = response.bytes().await?;
+    let meta = extract_item_meta(&String::from_utf8_lossy(&body));
+    let parsed = parse_feed(&body, Some(&base))?;
+    Ok(parsed.entries.into_iter().filter_map(|entry| entry_to_hit(entry, &meta)).collect())
+}
+
+#[derive(Default, Clone)]
+struct ItemMeta {
+    bookmark_count: u32,
+    thumbnail_url: Option<String>,
+}
+
+fn entry_to_hit(entry: crate::db::models::NewEntry, meta: &HashMap<String, ItemMeta>) -> Option<SearchHit> {
     let url = entry.link?;
     let title = entry.title.unwrap_or_default();
     if title.is_empty() {
         return None;
     }
-    let bookmark_count = counts.get(&url).copied().unwrap_or(0);
+    let item_meta = meta.get(&url).cloned().unwrap_or_default();
     Some(SearchHit {
         title,
         url,
         snippet: entry.summary.unwrap_or_default(),
-        bookmark_count,
+        thumbnail_url: item_meta.thumbnail_url,
+        bookmark_count: item_meta.bookmark_count,
     })
 }
 
-/// `feed_rs` drops Hatena's `<hatena:bookmarkcount>` extension element
-/// (outside the RSS/Atom/RDF vocabulary it understands), so this does its
-/// own minimal scan of the raw body rather than pulling in a general XML
-/// parser for one field. Deliberately string-scanning, not a `Selector`
-/// query like `fetch::discovery`/`fetch::booth` use for HTML: `scraper`
-/// parses as HTML5, which doesn't reliably round-trip arbitrary
-/// namespaced-XML tag names like `hatena:bookmarkcount`.
+/// `feed_rs` drops Hatena's `<hatena:bookmarkcount>`/`<hatena:imageurl>`
+/// extension elements (outside the RSS/Atom/RDF vocabulary it
+/// understands), so this does its own minimal scan of the raw body rather
+/// than pulling in a general XML parser for two fields. Deliberately
+/// string-scanning, not a `Selector` query like
+/// `fetch::discovery`/`fetch::booth` use for HTML: `scraper` parses as
+/// HTML5, which doesn't reliably round-trip arbitrary namespaced-XML tag
+/// names like `hatena:bookmarkcount`.
 ///
 /// Keyed by the item's own URL (from `rdf:about`) rather than matched by
 /// position -- robust to `feed_rs` ever reordering or dropping entries
 /// relative to the raw document.
-fn extract_bookmark_counts(xml: &str) -> HashMap<String, u32> {
-    let mut counts = HashMap::new();
+fn extract_item_meta(xml: &str) -> HashMap<String, ItemMeta> {
+    let mut meta = HashMap::new();
     let mut rest = xml;
     while let Some(item_start) = rest.find("<item rdf:about=\"") {
         rest = &rest[item_start + "<item rdf:about=\"".len()..];
         let Some(url_end) = rest.find('"') else { break };
-        let url = rest[..url_end].replace("&amp;", "&");
+        let url = unescape_xml_entities(&rest[..url_end]);
 
         // Bounded to this item's own block (up to the next `<item ` or
-        // end of document) so a count never leaks onto the wrong URL.
+        // end of document) so a field never leaks onto the wrong URL.
         let block_end = rest.find("<item rdf:about=\"").unwrap_or(rest.len());
         let block = &rest[..block_end];
-        if let Some(tag_start) = block.find("<hatena:bookmarkcount>") {
-            let after_tag = &block[tag_start + "<hatena:bookmarkcount>".len()..];
-            if let Some(tag_end) = after_tag.find("</hatena:bookmarkcount>") {
-                if let Ok(count) = after_tag[..tag_end].trim().parse() {
-                    counts.insert(url, count);
-                }
-            }
-        }
+
+        let bookmark_count = extract_tag(block, "hatena:bookmarkcount")
+            .and_then(|v| v.trim().parse().ok())
+            .unwrap_or(0);
+        let thumbnail_url = extract_tag(block, "hatena:imageurl").map(|v| unescape_xml_entities(v.trim()));
+
+        meta.insert(url, ItemMeta { bookmark_count, thumbnail_url });
     }
-    counts
+    meta
+}
+
+fn extract_tag<'a>(block: &'a str, tag: &str) -> Option<&'a str> {
+    let open = format!("<{tag}>");
+    let close = format!("</{tag}>");
+    let tag_start = block.find(&open)?;
+    let after_tag = &block[tag_start + open.len()..];
+    let tag_end = after_tag.find(&close)?;
+    Some(&after_tag[..tag_end])
+}
+
+/// Hatena's XML mixes named entities (`&amp;`) and numeric character
+/// references (`&#x26;` / `&#38;`) for the same character depending on the
+/// field -- observed by hand: `hatena:imageurl` values came back with
+/// literal `&#x26;` where a query string needed `&`, which a plain
+/// `&amp;`-only replace left broken (the string `&#x26;` unchanged in the
+/// URL, not a real ampersand). Only `&` itself matters here (the one
+/// character that would otherwise corrupt a URL's query string); other
+/// entities are left as-is since nothing this module extracts needs them
+/// decoded.
+fn unescape_xml_entities(s: &str) -> String {
+    s.replace("&amp;", "&").replace("&#x26;", "&").replace("&#X26;", "&").replace("&#38;", "&")
 }
 
 #[cfg(test)]
@@ -137,6 +200,7 @@ mod tests {
     <description>エラー処理のパターンを整理した</description>
     <dc:date>2026-08-13T08:54:14Z</dc:date>
     <hatena:bookmarkcount>12</hatena:bookmarkcount>
+    <hatena:imageurl>https://example.com/thumb1.png</hatena:imageurl>
     </item>
     <item rdf:about="https://bar.example/entry/2">
     <title>別の記事</title>
@@ -154,31 +218,28 @@ mod tests {
     </rdf:RDF>"#;
 
     #[test]
-    fn parses_rss1_search_results_into_hits_with_bookmark_counts() {
+    fn parses_rss1_search_results_into_hits_with_bookmark_counts_and_thumbnails() {
         let parsed = parse_feed(SAMPLE_RSS1.as_bytes(), Some(SEARCH_URL)).unwrap();
-        let counts = extract_bookmark_counts(SAMPLE_RSS1);
-        let hits: Vec<SearchHit> = parsed
-            .entries
-            .into_iter()
-            .filter_map(|e| entry_to_hit(e, &counts))
-            .collect();
+        let meta = extract_item_meta(SAMPLE_RSS1);
+        let hits: Vec<SearchHit> = parsed.entries.into_iter().filter_map(|e| entry_to_hit(e, &meta)).collect();
         assert_eq!(hits.len(), 3);
         assert_eq!(hits[0].title, "Rustのエラー処理");
         assert_eq!(hits[0].bookmark_count, 12);
+        assert_eq!(hits[0].thumbnail_url.as_deref(), Some("https://example.com/thumb1.png"));
         assert_eq!(hits[1].bookmark_count, 3);
+        assert_eq!(hits[1].thumbnail_url, None);
     }
 
     #[test]
-    fn missing_bookmarkcount_tag_defaults_to_zero_not_leaking_from_a_neighbor() {
-        let counts = extract_bookmark_counts(SAMPLE_RSS1);
-        assert_eq!(counts.get("https://baz.example/entry/3"), None);
+    fn missing_fields_default_to_zero_and_none_not_leaking_from_a_neighbor() {
+        let meta = extract_item_meta(SAMPLE_RSS1);
+        let baz = meta.get("https://baz.example/entry/3").unwrap();
+        assert_eq!(baz.bookmark_count, 0);
+        assert_eq!(baz.thumbnail_url, None);
         let parsed = parse_feed(SAMPLE_RSS1.as_bytes(), Some(SEARCH_URL)).unwrap();
-        let hits: Vec<SearchHit> = parsed
-            .entries
-            .into_iter()
-            .filter_map(|e| entry_to_hit(e, &counts))
-            .collect();
+        let hits: Vec<SearchHit> = parsed.entries.into_iter().filter_map(|e| entry_to_hit(e, &meta)).collect();
         assert_eq!(hits[2].bookmark_count, 0);
+        assert_eq!(hits[2].thumbnail_url, None);
     }
 
     #[test]
@@ -204,7 +265,30 @@ mod tests {
         let xml = r#"<item rdf:about="https://example.com/a?x=1&amp;y=2">
         <hatena:bookmarkcount>42</hatena:bookmarkcount>
         </item>"#;
-        let counts = extract_bookmark_counts(xml);
-        assert_eq!(counts.get("https://example.com/a?x=1&y=2"), Some(&42));
+        let meta = extract_item_meta(xml);
+        let entry = meta.get("https://example.com/a?x=1&y=2").unwrap();
+        assert_eq!(entry.bookmark_count, 42);
+    }
+
+    #[test]
+    fn decodes_numeric_ampersand_entity_in_thumbnail_url() {
+        // Observed by hand against a live response: hatena:imageurl values
+        // come back with `&#x26;` where a query string needs a real `&`,
+        // unlike bookmarkcount/rdf:about which use `&amp;`.
+        let xml = r#"<item rdf:about="https://example.com/a">
+        <hatena:imageurl>https://img.example/x.png?w=1200&#x26;h=630</hatena:imageurl>
+        </item>"#;
+        let meta = extract_item_meta(xml);
+        let entry = meta.get("https://example.com/a").unwrap();
+        assert_eq!(entry.thumbnail_url.as_deref(), Some("https://img.example/x.png?w=1200&h=630"));
+    }
+
+    #[tokio::test]
+    async fn browse_category_rejects_an_unknown_slug() {
+        // No network involved here -- validation happens before the
+        // request is built.
+        let client = Client::new();
+        let result = browse_category(&client, "not-a-real-category").await;
+        assert!(result.is_err());
     }
 }

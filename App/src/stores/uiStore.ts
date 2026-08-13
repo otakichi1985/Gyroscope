@@ -7,7 +7,7 @@ import { create } from "zustand";
 // visible but clicking still opens it". A single field makes overlapping
 // screens structurally impossible, and gives pressing the same icon again
 // an obvious meaning: go back to the timeline (home), not "undo one level".
-export type Screen = "timeline" | "feedManager" | "history" | "settings" | "trash" | "reader";
+export type Screen = "timeline" | "feedManager" | "history" | "settings" | "trash" | "reader" | "discover";
 
 interface UiState {
   activeScreen: Screen;
