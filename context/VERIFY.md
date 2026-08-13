@@ -5,10 +5,9 @@
 
 推測による修正より、直接観測できる方法を優先する。
 
-プリセットを追加・編集する際は、既存プリセットの書式
-（`## 名前` → **対象:** / **用途:** / **実行:** / **確認:** / **限界:**）に合わせる。
-調査経過や特定バグの原因・修正内容など、プリセット自体ではない記録は
-`WORKLOG.md` 側に書く。
+プリセットを追加・編集する際は、既存プリセットの書式と文量
+（`## 名前` → **対象:** / **用途:** / **実行:** / **確認:** / **限界:** 各1〜2文）に合わせる。
+調査経過や特定バグの原因・修正内容など、プリセット自体ではない記録は `WORKLOG.md` に書く。
 
 
 # Verification Presets
@@ -95,37 +94,20 @@
 
 ## Tauriウィンドウ実機E2E（WebdriverIO + tauri-driver）
 
-**対象:** 実際のTauriウィンドウ（WebView2）上でのクリック・フォーカス・入力など、
-プレーンブラウザのDevTools相当の観測では再現できない挙動。
+**対象:** 実際のTauriウィンドウ上でのクリック・フォーカス・入力。DevTools相当の観測では再現できない挙動。
 
-**用途:** フォーカス漏れ、意図しない要素へのクリック奪取、ウィンドウの表示/フォーカス状態に
-依存するタイミング問題など、実機でしか確定できない不具合の再現・観測。
-大規模なE2Eスイートの整備が目的ではなく、個別の不具合を実機上で再現・観測するための最小手段。
+**用途:** フォーカス漏れやクリックの奪取など、実機でしか確定できない不具合の再現・観測。
 
 **実行:**  
-1. `App/` で Vite 開発サーバーを起動する（`npm run dev`、または `.claude/launch.json` の
-   `gyroscope-dev` 設定）。デバッグビルド（`target/debug/`）は `devUrl: http://localhost:1420`
-   を読みに行くため必須。起動していないと `ERR_CONNECTION_REFUSED` の白画面のまま全テストが失敗する。
-2. `App/src-tauri/target/debug/gyroscope.exe` が存在することを確認する
-   （なければ `npm run tauri dev` を一度実行してビルドさせる）。
-3. `App/` で `npm run test:e2e -- --spec e2e/specs/<対象スペック>.spec.js`  
-   （`--spec` 省略で `e2e/specs/**/*.spec.js` 全件）
+`App/` でVite開発サーバーを起動後（`npm run dev`、または`.claude/launch.json`）、
+`npm run test:e2e -- --spec e2e/specs/<対象スペック>.spec.js`
 
 **確認:**  
-`X passing` / `X failing` がコンソールに出る。`App/e2e/specs/` の観測用スペックは
-アサーションで合否を決め切らず、`console.log` で出力される状態
-（フォーカス先、要素の矩形、`elementFromPoint` の結果など）を読んで判断するものが中心。
+`X passing`/`X failing`に加え、観測用スペックは`console.log`の出力内容で判断する。
 
 **限界:**  
-- 初回はtauri-driverのcargo installとmsedgedriverの取得が走るため数分かかる。
-- テスト対象はデバッグビルド固定（`target/debug/gyroscope.exe`）。リリースビルドを検証したい場合は
-  `wdio.conf.js`の`appBinaryPath`/`application`を`target/release/...`に変更し、
-  事前に`npm run tauri build`（または`cargo build --release`）が必要。
-- `@wdio/tauri-plugin`（Rust側プラグイン）を入れていないため、`browser.tauri.execute()`などの
-  Tauriコマンド実行・モックAPIは使えない。
-- 実行のたびに`tauri-driver.exe`・`msedgedriver.exe`が新しいポートで起動し、テストランナー終了時に
-  必ずしも全て終了しない。長時間放置せず、
-  `Get-Process tauri-driver,msedgedriver | Stop-Process -Force`などで随時後片付けする。
+デバッグビルド固定。初回はtauri-driver/msedgedriverの取得に数分かかる。
+`tauri-driver.exe`・`msedgedriver.exe`は終了後に残るため都度後片付けが必要。
 
 
 <!-- ここから実際の検証プリセット -->

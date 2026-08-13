@@ -3,9 +3,8 @@
 最近の開発状況をHumanとAIが短時間で復元するための作業記録。
 詳細な履歴はGit / GitHubに任せ、現在に近い情報だけを保持する。
 
-記録を追加する際は、各セクション（Current Work / Uncommitted Archive /
-Recent Commits）に示された書式例に合わせる。コミットしたら該当する
-Current Work の記録を Recent Commits へ圧縮する（末尾の Rotation を参照）。
+記録を追加する際は、各セクションの書式例と文量に合わせる。
+コミットしたら該当するCurrent Workの記録をRecent Commitsへ圧縮する（末尾のRotationを参照）。
 
 
 # Current Work
@@ -61,22 +60,18 @@ Current Work の記録を Recent Commits へ圧縮する（末尾の Rotation �
 ## 155ae59 — 2026-08-13
 **環境:** Claude Code / Sonnet
 
-`.claude/launch.json`（Browserペイン用devサーバー起動設定）の再作成方法をVERIFY.mdへ記録し、
-`.gitignore`へ追加してGit管理対象外に固定した。
+`.claude/launch.json`の再作成方法をVERIFY.mdへ記録し、`.gitignore`へ追加した。
 
 ## c9a0110 — 2026-08-13
 **環境:** Claude Code / Sonnet
 
-浮遊スキン（カーディナリティ/オーディナリー）で、検索欄を開いた直後は入力できるが再クリックすると
-記事リストにクリックを奪われるバグを修正。原因は `.skin-cardinality > *` 等のブランケット
-z-indexルールがタイムラインラッパーまで巻き込み、フィルターバーと同順位で並んでDOM順に負けていたこと。
-WebdriverIO + tauri-driverによる実機E2E（`App/e2e/`）を新規導入し、実測で原因特定・修正確認まで行った。
+浮遊スキンで検索欄を再クリックすると記事リストにクリックを奪われるバグを修正。
+WebdriverIO実機E2E（`App/e2e/`）を新規導入し、原因特定・修正確認に使った。
 
 ## 0257a85 — 2026-08-13
 **環境:** Git履歴から移行（Human / Codex）
 
-アプリ本体を `App/` へ、旧資料を `context_archive/` へ移し、`context/` を正本とする
-ディレクトリ再編をコミット。実装変更なし（build / cargo test 53件 / clippy 成功を確認済み）。
+アプリ本体を `App/` へ、旧資料を `context_archive/` へ移すディレクトリ再編をコミット。
 
 ## 25a43b8 — 2026-08-12
 **環境:** Git履歴から移行
