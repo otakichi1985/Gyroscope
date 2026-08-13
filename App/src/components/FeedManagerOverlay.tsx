@@ -23,9 +23,7 @@ export function FeedManagerOverlay() {
 
   return (
     <ScreenOverlay screen="feedManager" title="フィード管理">
-      <div className="min-h-0 flex-1 overflow-hidden">
-        <FeedManager />
-      </div>
+      <FeedManager />
     </ScreenOverlay>
   );
 }
