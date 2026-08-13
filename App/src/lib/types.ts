@@ -57,9 +57,16 @@ export interface ScoredSource {
   url: string;
   domain: string;
   snippet: string;
+  thumbnail_url: string | null;
   bookmark_count: number;
   score: number;
   reasons: string[];
+}
+
+// Mirrors src-tauri/src/commands/search.rs::SearchCategory.
+export interface SearchCategory {
+  slug: string;
+  label: string;
 }
 
 // Mirrors src-tauri/src/paths.rs::DataDirInfo.

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { DiscoverOverlay } from "./components/DiscoverOverlay";
 import { EntryList } from "./components/EntryList";
 import { FeedManagerOverlay } from "./components/FeedManagerOverlay";
 import { FilterBar } from "./components/FilterBar";
@@ -281,6 +282,7 @@ function App() {
             replacing each other, and guarantees only one screen is ever
             interactive at a time -- see each overlay's own isActive logic. */}
         <FeedManagerOverlay />
+        <DiscoverOverlay />
         <HistoryOverlay />
         <TrashOverlay />
         <ReaderOverlay />

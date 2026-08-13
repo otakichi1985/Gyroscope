@@ -179,6 +179,18 @@ export function PinIcon(props: IconProps) {
   );
 }
 
+// A compass -- used for the "探す" tab (DiscoverOverlay.tsx), distinct from
+// SearchIcon (the in-timeline article search) since this opens a whole
+// screen for finding new *sites*, not filtering the current one.
+export function CompassIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M10.2 5.8 8.9 8.9 5.8 10.2 7.1 7.1 10.2 5.8Z" />
+    </Icon>
+  );
+}
+
 export function StarIcon({ filled, ...props }: IconProps & { filled?: boolean }) {
   return (
     <Icon {...props} fill={filled ? "currentColor" : "none"}>

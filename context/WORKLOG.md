@@ -23,6 +23,10 @@
 <!-- ここから実際の記録 -->
 - **[Claude Code / Sonnet]** フィード管理画面のスクロール不可バグを修正：`FeedManagerOverlay`が`overflow-hidden`で`FeedManager`を包み内側の`overflow-y-auto`を無効化していたため、他画面と同じ「直下の子に`min-h-0 flex-1 overflow-y-auto`」構造に統一。
 - **[Claude Code / Sonnet]** 検索速度対策として`hatena:bookmarkcount`（feed-rsが読まない拡張タグ、生XMLから自前抽出）でドメイン重複排除・候補の事前絞り込み・フィード発見を並列化（`tokio::sync::Semaphore`、同時5件）、実測で1クエリ約2〜2.5秒に短縮。`?sort=popular`はRSS版で無視される（実機確認済み）ため並び替えは全てクライアント側。ブックマーク数を`policy::bookmark_boost`でスコアへ反映済み。
+- **[Claude Code / Sonnet]** サイト検索を「フィード」タブから独立した「探す」タブに分離し、キーワード検索に加えてはてなブックマークのカテゴリ（IT/ゲーム/経済等）を眺めて拾う受動的発見モードを追加。各候補はクリックでプレビュー展開（サムネイル拡大・全文スニペット・「元記事を開く」）してから登録するか選べるようにした。`hatena:imageurl`のサムネイルURLに数値文字参照（`&#x26;`）が使われておりバグとして検出・修正。アプリ内ブラウザでの記事プレビューはHumanの申告どおり将来ニーズとして`IDEAS_AND_HYPOTHESES.md`へ記録し今回は実装しない。
+
+
+# Uncommitted Archive
 
 大規模な未コミット作業があり、Current Workを圧縮する必要がある場合のみ使用する。
 まずコミットを提案し、まだコミットしない場合に意味のある変更単位でここへ退避する。
