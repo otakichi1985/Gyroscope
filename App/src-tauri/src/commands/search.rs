@@ -18,7 +18,7 @@ use crate::search::{hatena_bookmark, policy};
 /// pre-sorted by bookmark count (see `rank_hits`) before this cut, so a
 /// broad query loses its least-bookmarked hits first, not an arbitrary
 /// subset.
-const MAX_CANDIDATES: usize = 15;
+const MAX_CANDIDATES: usize = 30;
 
 /// How many feed-discovery requests (each a real network round-trip to a
 /// candidate site) run at once. `discovery::discover` itself already

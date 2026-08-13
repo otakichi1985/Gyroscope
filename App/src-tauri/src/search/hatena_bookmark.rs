@@ -34,10 +34,16 @@ const SEARCH_URL: &str = "https://b.hatena.ne.jp/search/text";
 /// up directly in a request URL path, and only known-good values from
 /// Hatena's own category navigation should ever reach that, not arbitrary
 /// frontend input.
+// Labels match Hatena's own category titles exactly (verified by hand
+// against each category's RSS `<title>`) rather than a shorter guess --
+// "ゲーム" alone (an earlier version of this list) reads as game-only, but
+// the slug's actual content is anime *and* game news mixed together, which
+// looked like a bug ("why is manga showing up under Game?") until the real
+// category name made it clear that's simply what the category is.
 pub const CATEGORIES: &[(&str, &str)] = &[
-    ("it", "IT"),
-    ("game", "ゲーム"),
-    ("economics", "経済"),
+    ("it", "テクノロジー"),
+    ("game", "アニメ・ゲーム"),
+    ("economics", "政治と経済"),
     ("life", "暮らし"),
     ("knowledge", "学び"),
     ("entertainment", "エンタメ"),
