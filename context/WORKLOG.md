@@ -57,6 +57,12 @@
 
 <!-- ここから実際の記録 -->
 
+## c7f7855 — 2026-08-14
+**環境:** Claude Code / Sonnet
+
+v0.2.6としてリリース（`package.json`/`tauri.conf.json`/`Cargo.toml`のバージョン更新、ロックファイル同期）。
+ポータブル版をビルドし、GitHub Releaseに`gyroscope-portable-v0.2.6.zip`と単体`gyroscope.exe`を添付して公開。
+
 ## fea7436 — 2026-08-14
 **環境:** Claude Code / Sonnet
 
@@ -81,11 +87,6 @@
 サイト検索登録機能を追加。当初DuckDuckGo案は実機検証で画像CAPTCHAブロックを確認（SearXNG・Marginalia Web UIも同様に不採用）、
 はてなブックマーク検索RSSへ切替（キー不要・robots.txt許可・コミュニティ選別済み）。
 フィード発見を通過したドメインのみ独自ポリシーでスコアリングして表示し、既存のadd_feed経路で登録する。
-
-## 155ae59 — 2026-08-13
-**環境:** Claude Code / Sonnet
-
-`.claude/launch.json`の再作成方法をVERIFY.mdへ記録し、`.gitignore`へ追加した。
 
 
 # Rotation
