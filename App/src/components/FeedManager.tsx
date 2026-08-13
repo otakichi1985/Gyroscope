@@ -153,7 +153,7 @@ export function FeedManager() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm">
       <div className="flex gap-1">
         <button
           type="button"

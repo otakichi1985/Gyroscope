@@ -67,6 +67,29 @@ const AFFILIATE_URL_PATTERNS: &[&str] = &["utm_source=affiliate", "/pr/", "/spon
 const BOOST_SCORE: i32 = 2;
 const AFFILIATE_PENALTY: i32 = 1;
 
+/// Hits with fewer bookmarks than this are dropped before feed discovery
+/// even runs (see `commands::search::run_search`) -- Hatena's search RSS
+/// only supports recency order (`?sort=popular` is silently ignored on
+/// this endpoint, confirmed by hand), so without this cut a broad query
+/// spends a feed-discovery network round-trip on every barely-bookmarked
+/// hit just because it's recent. Chosen low deliberately: this is a floor
+/// against near-zero-signal noise, not a quality bar -- `bookmark_boost`
+/// below does the actual ranking among what's left.
+pub const MIN_BOOKMARK_COUNT: u32 = 2;
+
+/// Tiered rather than proportional (e.g. `count / 10`) so one viral post
+/// doesn't swamp every domain-based signal in `score` -- being
+/// "well-bookmarked" matters more as a threshold than as a magnitude once
+/// a hit is clearly popular.
+pub fn bookmark_boost(count: u32) -> (i32, Option<String>) {
+    match count {
+        0..=4 => (0, None),
+        5..=19 => (1, Some(format!("{count}users以上ブックマーク"))),
+        20..=49 => (2, Some(format!("{count}users以上ブックマーク"))),
+        _ => (3, Some(format!("{count}users以上ブックマーク"))),
+    }
+}
+
 pub struct PolicyResult {
     pub score: i32,
     pub reasons: Vec<String>,
@@ -175,5 +198,18 @@ mod tests {
         // suffix but is not a subdomain of it -- domain_matches must reject
         // this via the leading dot, not a bare `ends_with`.
         assert_eq!(score("notehatenablog.com", "https://notehatenablog.com/x").score, 0);
+    }
+
+    #[test]
+    fn bookmark_boost_is_zero_below_the_lowest_tier() {
+        assert_eq!(bookmark_boost(4), (0, None));
+    }
+
+    #[test]
+    fn bookmark_boost_increases_through_tiers() {
+        assert_eq!(bookmark_boost(5).0, 1);
+        assert_eq!(bookmark_boost(20).0, 2);
+        assert_eq!(bookmark_boost(50).0, 3);
+        assert!(bookmark_boost(5).1.is_some());
     }
 }

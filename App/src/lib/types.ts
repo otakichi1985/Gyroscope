@@ -57,6 +57,7 @@ export interface ScoredSource {
   url: string;
   domain: string;
   snippet: string;
+  bookmark_count: number;
   score: number;
   reasons: string[];
 }

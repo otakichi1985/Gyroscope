@@ -21,11 +21,8 @@
 
 
 <!-- ここから実際の記録 -->
-- **[Claude Code / Sonnet]** サイト検索登録機能を追加：当初DuckDuckGo HTML版を想定したが実機検証で画像CAPTCHAブロックを確認（自動突破不可）、SearXNG公開インスタンス・Marginalia Web UIも同様にボット対策で不採用、はてなブックマーク検索RSS（`b.hatena.ne.jp/search/text`、キー不要・robots.txt許可・コミュニティ選別済み）に切替。フィード発見を通過したドメインのみ独自ポリシーでスコアリング・表示（`search/hatena_bookmark.rs`, `search/policy.rs`, `commands/search.rs`, `SourceSearch.tsx`）。`cargo test`/`clippy`/`npm run build`通過、実ネットワークへの疎通も`run_search`を直接呼ぶ一時テストで確認済み（確認後削除）。実機Tauriウィンドウでの検索〜登録の見た目・操作感はHuman確認が必要（Browser previewはTauriコンテキスト外のためTitleBar.tsxが例外送出し検証不可、既知の制約）。
-- **[Claude Code / Sonnet]** DISCOVERY.mdの議論で「単発記事ではなくフィードを持つサイトの発見」に要求を収束、企業ブログ等の自動除外は判定精度の懸念から一旦見送りと決定。
-
-
-# Uncommitted Archive
+- **[Claude Code / Sonnet]** フィード管理画面のスクロール不可バグを修正：`FeedManagerOverlay`が`overflow-hidden`で`FeedManager`を包み内側の`overflow-y-auto`を無効化していたため、他画面と同じ「直下の子に`min-h-0 flex-1 overflow-y-auto`」構造に統一。
+- **[Claude Code / Sonnet]** 検索速度対策として`hatena:bookmarkcount`（feed-rsが読まない拡張タグ、生XMLから自前抽出）でドメイン重複排除・候補の事前絞り込み・フィード発見を並列化（`tokio::sync::Semaphore`、同時5件）、実測で1クエリ約2〜2.5秒に短縮。`?sort=popular`はRSS版で無視される（実機確認済み）ため並び替えは全てクライアント側。ブックマーク数を`policy::bookmark_boost`でスコアへ反映済み。
 
 大規模な未コミット作業があり、Current Workを圧縮する必要がある場合のみ使用する。
 まずコミットを提案し、まだコミットしない場合に意味のある変更単位でここへ退避する。
@@ -59,6 +56,13 @@
 
 <!-- ここから実際の記録 -->
 
+## bdac41a — 2026-08-13
+**環境:** Claude Code / Sonnet
+
+サイト検索登録機能を追加。当初DuckDuckGo案は実機検証で画像CAPTCHAブロックを確認（SearXNG・Marginalia Web UIも同様に不採用）、
+はてなブックマーク検索RSSへ切替（キー不要・robots.txt許可・コミュニティ選別済み）。
+フィード発見を通過したドメインのみ独自ポリシーでスコアリングして表示し、既存のadd_feed経路で登録する。
+
 ## 155ae59 — 2026-08-13
 **環境:** Claude Code / Sonnet
 
@@ -79,11 +83,6 @@ WebdriverIO実機E2E（`App/e2e/`）を新規導入し、原因特定・修正�
 **環境:** Git履歴から移行
 
 開発時の終了経路をログへ残し、残留した開発ポートを起動前に整理する処理を追加。
-
-## 302c8ea — 2026-08-12
-**環境:** Git履歴から移行
-
-作業途中だった別ウィンドウ型GUI編集ツールをrevertし、現行実装から除外。
 
 
 # Rotation
