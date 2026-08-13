@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "package:portable": "node scripts/make-portable.mjs",
-    "test:e2e": "wdio run e2e/wdio.conf.js"
+    "test:e2e": "node scripts/run-e2e.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "3.14.9",
