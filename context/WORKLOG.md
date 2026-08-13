@@ -57,6 +57,12 @@
 
 <!-- ここから実際の記録 -->
 
+## 6805aba — 2026-08-14
+**環境:** Claude Code / Sonnet
+
+改善ループAを実施：UNKNOWN_DOMAIN.mdの「Observability」に、外部サイト/APIの挙動は実装前にcurl等で直接確認する旨を追記し、正本`human-ai-foundation`側にも手動で反映。
+将来ニーズとして「workflowsの自動反映の仕組み」「開発版起動時に自分用TLのDBが壊れる件」を`IDEAS_AND_HYPOTHESES.md`へ記録。
+
 ## 189a55c — 2026-08-14
 **環境:** Claude Code / Sonnet
 
@@ -80,12 +86,6 @@ v0.2.6としてリリース（`package.json`/`tauri.conf.json`/`Cargo.toml`の�
 
 「ゲーム」タブに漫画記事が混ざる件を調査、Hatenaの`game`スラッグの公式タイトルが「アニメとゲーム」と判明しラベルを修正（`economics`も同様）。
 検索結果が少ない件を段階別に計測し独自ポリシーの足切りはほぼ影響なしと確認、主因のMAX_CANDIDATES上限を15→30へ引き上げ。
-
-## e4d5d3a — 2026-08-13
-**環境:** Claude Code / Sonnet
-
-サイト検索を「フィード」から独立した「探す」タブへ分離し、キーワード検索に加えてはてなブックマークのカテゴリを眺める受動的発見モードを追加。
-各候補はプレビュー展開（サムネイル・全文スニペット・「元記事を開く」）してから登録するか選べる。`hatena:imageurl`の数値文字参照未デコードのバグを修正。
 
 
 # Rotation
