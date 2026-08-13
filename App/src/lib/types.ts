@@ -51,6 +51,16 @@ export interface ReadHistoryEntry {
   read_at: string;
 }
 
+// Mirrors src-tauri/src/commands/search.rs::ScoredSource.
+export interface ScoredSource {
+  title: string;
+  url: string;
+  domain: string;
+  snippet: string;
+  score: number;
+  reasons: string[];
+}
+
 // Mirrors src-tauri/src/paths.rs::DataDirInfo.
 export interface DataDirInfo {
   path: string;

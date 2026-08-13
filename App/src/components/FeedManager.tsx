@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { useFeedsStore } from "../stores/feedsStore";
 import { BellIcon, BellOffIcon, CloseIcon, RefreshIcon, TrashIcon, WarningIcon } from "./icons";
+import { SourceSearch } from "./SourceSearch";
 
 const OPML_FILTER = [{ name: "OPML", extensions: ["opml", "xml"] }];
 
@@ -201,6 +202,7 @@ export function FeedManager() {
           stray space) silently created a separate genre instead of joining
           the existing one (user feedback). */}
       <GenreManager />
+      <SourceSearch />
 
       {loading && feeds.length === 0 ? (
         <p className="opacity-60">読み込み中...</p>

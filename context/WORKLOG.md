@@ -21,6 +21,8 @@
 
 
 <!-- ここから実際の記録 -->
+- **[Claude Code / Sonnet]** サイト検索登録機能を追加：当初DuckDuckGo HTML版を想定したが実機検証で画像CAPTCHAブロックを確認（自動突破不可）、SearXNG公開インスタンス・Marginalia Web UIも同様にボット対策で不採用、はてなブックマーク検索RSS（`b.hatena.ne.jp/search/text`、キー不要・robots.txt許可・コミュニティ選別済み）に切替。フィード発見を通過したドメインのみ独自ポリシーでスコアリング・表示（`search/hatena_bookmark.rs`, `search/policy.rs`, `commands/search.rs`, `SourceSearch.tsx`）。`cargo test`/`clippy`/`npm run build`通過、実ネットワークへの疎通も`run_search`を直接呼ぶ一時テストで確認済み（確認後削除）。実機Tauriウィンドウでの検索〜登録の見た目・操作感はHuman確認が必要（Browser previewはTauriコンテキスト外のためTitleBar.tsxが例外送出し検証不可、既知の制約）。
+- **[Claude Code / Sonnet]** DISCOVERY.mdの議論で「単発記事ではなくフィードを持つサイトの発見」に要求を収束、企業ブログ等の自動除外は判定精度の懸念から一旦見送りと決定。
 
 
 # Uncommitted Archive
