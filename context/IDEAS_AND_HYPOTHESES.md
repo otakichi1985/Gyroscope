@@ -42,17 +42,17 @@
 
 **状態:** 未検討
 
-## context/workflowsのhuman-ai-foundation正本への自動反映
+## context/workflowsのプロジェクト間共有
 
-**種類:** 将来ニーズ
+**種類:** 完了
 
 **内容:**
-Gyroscope内の`context/workflows/`（および関連するcontext文書）に加えた変更を、正本である`C:\Users\chika\human-ai-foundation`配下の同名ファイルへ自動的に反映する仕組みを作る。現状は手動でファイルを突き合わせてコピーしている。
+`C:\Users\chika\Projects\_shared\workflows`を共通本体とし、Gyroscopeとhuman-ai-foundationの`context/workflows`から同じ内容を参照する。その他のcontext文書は各プロジェクト固有のまま維持する。
 
 **きっかけ:**
 このセッションでUNKNOWN_DOMAIN.mdへ加えた変更をhuman-ai-foundation側にも反映する際、Humanから「自動反映の仕組みも作りたいが今はまだ」との意向表明。`human-ai-foundation`はgit管理下にないプレーンなフォルダなので、単純なgit運用の変更だけでは済まない可能性がある。
 
-**状態:** 未検討
+**状態:** 2026-08-14にジャンクション方式で対応済み
 
 ## 開発版起動時に自分用TLのDBが壊れる
 
