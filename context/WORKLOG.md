@@ -22,11 +22,6 @@
 
 <!-- ここから実際の記録 -->
 
-> - **[opencode]** 開発基盤の改善チェック(振り返り)で提示した改善候補A〜Dを適用した。
->   1. **A**: `VERIFY.md`へ「GitHub Release 実行」プリセットを追加。v0.2.7で`gh release create`がmain未pushのため古いコミット(87a0a67)へタグを張った事故を再発させないため、公開前に`HEAD`==`origin/main`、公開後に`ls-remote`のタグ位置を確認する手順を明文化。
->   2. **B**: 恒久回帰テスト`zz-temp-unified-bookmarks.spec.js`を`bookmark-store.spec.js`へ改名(ラベル/ログも統一)。診断用の一時スペック`zz-temp-discover-probe.spec.js`・`zz-temp-startup-trace.spec.js`を削除。「残す回帰テストは恒久名、`zz-temp-`は使い捨てで確認後に削除」をVERIFY.mdのE2Eプリセットへ追記。
->   3. **C**: 共有ワークフロー`IMPLEMENTATION.md`(#1 Understand)へ「変更対象のUI要素・表示場所が曖昧な依頼は解釈を決め打ちせずHumanへ確認してから実装」を追記(ジャンクション経由で`human-ai-foundation`側の共通本体へ反映)。
->   4. **D**: `paths.rs`の`effective_data_dir`(diag専用)へ`#[cfg(debug_assertions)]`を付与し、releaseビルドの`dead_code`警告を解消。`cargo check --release`で警告なし、E2Eフルスイート7件通過を確認。
 > - **[opencode]** 探す画面の提供元URL可視化と全テーマでの見た目統一。カードの提供元ドメインをタイムラインと同じ`accent-text`強調(10px/opacity55→text-xs/無減光)へ。色の不整合(amberハードコード)をアクセント基調へ統一 — ☆・「記事を保存」・チェックボックス(`checkbox-input`新設)・検索欄のfocusリングを撤去。検索ボタンを`accent-bg accent-text`(ライトモードで同色=ほぼ不可視のバグ)から正規プライマリCTA(`accent-bg`+白文字)へ修正。「候補の状態」チップも兄弟チップと同じ`accent-bg-soft`へ。カードを`entry-card`化(タイムラインのガラスカードと同じ背景/ホバー/`active:scale-[0.98]`押下)し、フローティング/スタイル系スキン(カーディナリティ・オーディナリー等)でも見た目が統一されるようにした。配置は不変。RSSバッジの緑(成功=既読✓と同じセマンティック色)と提供元注記は維持。`npm run build`成功、E2E(`bookmark-store.spec.js`)通過。
 > - **[opencode]** 探すタブのブックマーク保存をタイムラインのブックマーク一覧と統合。ユーザー要望4点を実装した。
 >   1. **提供元の明示**: 検索画面下部に「検索結果は「はてなブックマーク」のデータを使用しています」を追加。
@@ -127,6 +122,12 @@
 
 <!-- ここから実際の記録 -->
 
+## 4df6e05 — 2026-08-14
+**環境:** opencode
+
+開発基盤の改善チェック候補A〜Dを適用。A: `VERIFY.md`へ「GitHub Release 実行」プリセットを追加（v0.2.7でタグが古いコミットに張られた事故の再発防止）。B: 恒久回帰テストを`bookmark-store.spec.js`へ改名、診断用`zz-temp-`スペックを削除し「使い捨て=zz-temp名・残す回帰テストは恒久名」をE2Eプリセットへ追記。C: 共有`IMPLEMENTATION.md`(#1 Understand)へ「曖昧なUI要望はHumanへ確認してから実装」を追記。D: `effective_data_dir`を`#[cfg(debug_assertions)]`限定にしreleaseビルドの`dead_code`警告を解消。
+`cargo check --release`で警告なし、E2Eフルスイート7件通過。
+
 ## 191d72c — 2026-08-14
 **環境:** opencode
 
@@ -153,18 +154,6 @@ WORKLOG振り返りから改善ループを実施。GUI変更が毎回Human確�
 
 v0.2.6のリリースノートに前回リリース以降の全変更を反映し忘れていた件（`c9a0110`のクリック奪取バグ修正が漏れ、開発環境限定の変更2件が誤って記載）をHumanの指摘で修正。
 `gh release edit`でノートを訂正し、再発防止のプリセットを`VERIFY.md`へ追加。
-
-## c7f7855 — 2026-08-14
-**環境:** Claude Code / Sonnet
-
-v0.2.6としてリリース（`package.json`/`tauri.conf.json`/`Cargo.toml`のバージョン更新、ロックファイル同期）。
-ポータブル版をビルドし、GitHub Releaseに`gyroscope-portable-v0.2.6.zip`と単体`gyroscope.exe`を添付して公開。
-
-## fea7436 — 2026-08-14
-**環境:** Claude Code / Sonnet
-
-「ゲーム」タブに漫画記事が混ざる件を調査、Hatenaの`game`スラッグの公式タイトルが「アニメとゲーム」と判明しラベルを修正（`economics`も同様）。
-検索結果が少ない件を段階別に計測し独自ポリシーの足切りはほぼ影響なしと確認、主因のMAX_CANDIDATES上限を15→30へ引き上げ。
 
 
 # Rotation
