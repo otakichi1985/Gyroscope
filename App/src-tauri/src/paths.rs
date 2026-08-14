@@ -13,6 +13,11 @@
 //!   pointer file (just the chosen path as text) so it survives restarts.
 //!   In portable mode the pointer file itself lives next to the exe, so a
 //!   portable package with a custom path stays self-contained when moved.
+//! - **Env override (`GYROSCOPE_DATA_DIR`)**: takes precedence over both of
+//!   the above. Not surfaced in the UI; exists so the E2E harness
+//!   (`scripts/run-e2e.mjs`) can launch a debug build against its own
+//!   throwaway database instead of the human's real one, which would
+//!   otherwise be written to by two processes at once.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -57,6 +62,15 @@ pub fn default_data_dir(app: &AppHandle) -> PathBuf {
 
 fn override_pointer_path(app: &AppHandle) -> PathBuf {
     config_dir(app).join(OVERRIDE_POINTER_FILE)
+}
+
+/// Highest-priority data directory override (see the module docs): set via
+/// the `GYROSCOPE_DATA_DIR` environment variable. Used by the E2E harness to
+/// keep a debug build on its own throwaway database.
+fn env_override() -> Option<PathBuf> {
+    std::env::var_os("GYROSCOPE_DATA_DIR")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
 }
 
 fn read_override(app: &AppHandle) -> Option<PathBuf> {
@@ -108,6 +122,9 @@ pub struct DataDirInfo {
 /// because the Settings screen needs to know whether a custom dir still works.
 /// The dev-only exit logger (`diag`) only needs a path, so it uses this.
 pub fn effective_data_dir(app: &AppHandle) -> PathBuf {
+    if let Some(dir) = env_override() {
+        return dir;
+    }
     match read_override(app) {
         Some(custom) => custom,
         None => default_data_dir(app),
@@ -115,6 +132,16 @@ pub fn effective_data_dir(app: &AppHandle) -> PathBuf {
 }
 
 pub fn resolve(app: &AppHandle) -> DataDirInfo {
+    if let Some(dir) = env_override() {
+        return DataDirInfo {
+            path: dir.display().to_string(),
+            is_portable: is_portable(),
+            is_custom: true,
+            default_path: default_data_dir(app).display().to_string(),
+            fallback_reason: None,
+        };
+    }
+
     let portable = is_portable();
     let default_dir = default_data_dir(app);
 

@@ -115,9 +115,11 @@
 **用途:** GUI変更（フォーカス漏れ、クリックの奪取、スクロール、z-index等）の既定の検証手段。Human確認へ回す前にまずこれで再現・観測を試みる。
 
 **実行:**  
-`App/` でVite開発サーバーを起動後（`npm run dev`、または`.claude/launch.json`）、
-`npm run test:e2e -- --spec e2e/specs/<対象スペック>.spec.js`
-（`scripts/run-e2e.mjs`がtauri-driver/msedgedriverの残留プロセスを実行前後で自動終了するため、後片付けは不要）
+`App/` で `npm run test:e2e -- --spec e2e/specs/<対象スペック>.spec.js`
+（`scripts/run-e2e.mjs`が、devサーバー(vite, port 1420)を未配信なら自動起動・実行後に自動終了し、配信済みなら再利用。tauri-driver/msedgedriverの残留プロセスも実行前後で自動終了するため、devサーバーやドライバの起動・後片付けは不要）
+
+**データ分離:**  
+E2Eが起動するアプリは `GYROSCOPE_DATA_DIR`（`%TEMP%\gyroscope-e2e-data`）の専用DBを使用する（`src-tauri/src/paths.rs`）。人間の実データ（`%APPDATA%\com.noxrss.gyroscope`）は読み書きされないため、手動で開発版やポータブル版を同時に使っても競合しない。タイムラインに人間の記事が現れないのはこの分離の正常な結果。専用DBを初期化したい場合は `%TEMP%\gyroscope-e2e-data` を削除する。
 
 **確認:**  
 `X passing`/`X failing`に加え、観測用スペックは`console.log`の出力内容で判断する。
