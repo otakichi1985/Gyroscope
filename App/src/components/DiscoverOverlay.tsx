@@ -1,16 +1,61 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useFeedsStore } from "../stores/feedsStore";
+import { useUiStore } from "../stores/uiStore";
 import type { ScoredSource, SearchCategory } from "../lib/types";
 import { ScreenOverlay } from "./ScreenOverlay";
 import { ImageOffIcon, StarIcon } from "./icons";
 
-type Mode = "all" | "category";
 type ResultSort = "recommended" | "newest" | "oldest";
 type ResultSize = "compact" | "standard" | "large";
 type ResultKind = "all" | "personal" | "technical" | "academic" | "qa" | "developer";
-type ResultAvailability = "all" | "feed" | "article" | "noFeed";
+type ResultAvailability = "all" | "feed" | "noFeed";
+
+const SORTS: [ResultSort, string][] = [
+  ["recommended", "おすすめ"],
+  ["newest", "新着"],
+  ["oldest", "古い"],
+];
+
+const SIZES: [ResultSize, string][] = [
+  ["compact", "小"],
+  ["standard", "標準"],
+  ["large", "大"],
+];
+
+const KINDS: [ResultKind, string][] = [
+  ["all", "すべて"],
+  ["personal", "個人ブログ基盤"],
+  ["technical", "技術記事"],
+  ["academic", "学術・論文"],
+  ["qa", "技術Q&A"],
+  ["developer", "開発者一次情報"],
+];
+
+const AVAILABILITIES: [ResultAvailability, string][] = [
+  ["all", "すべて"],
+  ["feed", "RSS登録可"],
+  ["noFeed", "RSSなし"],
+];
+
+// "〇〇users以上ブックマーク" reasons are the raw popularity signal behind
+// the bookmark_count sort -- shown by the count already, so don't repeat it
+// as a per-card tag.
+const NOISE_REASON = /users以上ブックマーク$/;
+
+// Feeds are stored by their *feed* URL (e.g. foo.example/feed) while search
+// hits carry the *article* URL (e.g. foo.example/entry/1) -- two URLs for
+// the same site that never string-match. Compare by host (minus an optional
+// leading "www.") so a site already subscribed to is actually recognized as
+// registered.
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
 
 /**
  * "探す" screen: finds candidate *sites* to subscribe to, as a discovery
@@ -21,20 +66,20 @@ type ResultAvailability = "all" | "feed" | "article" | "noFeed";
  * specific in mind, or browsing one of Hatena Bookmark's fixed categories
  * for passive, serendipitous discovery.
  *
- * Every result is already confirmed to have a discoverable feed
- * (backend-gated), so "登録" always succeeds via the same `add_feed` path
- * used everywhere else -- but registering directly off a one-line snippet
- * isn't enough to judge a site by (user feedback), so a result has to be
- * expanded into its preview (thumbnail, full snippet, a link to open the
- * actual article) before the register button appears. An in-app article
- * viewer was considered for this preview step but deferred -- see
- * `IDEAS_AND_HYPOTHESES.md` -- so "元記事を開く" hands off to the system
- * browser instead of embedding one.
+ * The keyword input and the genre chips stay visible together: typing and
+ * pressing Enter (or the 検索 button) runs a fresh keyword search, clicking a
+ * genre browses that category, and once results are on screen the input
+ * acts as a live in-result filter either way. Every result is confirmed to
+ * have a discoverable feed or not, so registration ("登録") is gated on the
+ * RSS badge. A result has to be expanded into its preview (thumbnail, full
+ * snippet, a link to open the actual article) before the register button
+ * appears. An in-app article viewer was considered for this preview step
+ * but deferred -- see `IDEAS_AND_HYPOTHESES.md` -- so "元記事を開く" hands off
+ * to the system browser instead of embedding one.
  */
 export function DiscoverOverlay() {
   const { addFeed, feeds } = useFeedsStore();
 
-  const [mode, setMode] = useState<Mode>("category");
   const [query, setQuery] = useState("");
   const [categories, setCategories] = useState<SearchCategory[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -44,50 +89,52 @@ export function DiscoverOverlay() {
   const [error, setError] = useState<string | null>(null);
   const [expandedUrl, setExpandedUrl] = useState<string | null>(null);
   const [registering, setRegistering] = useState<string | null>(null);
-  const [registeredUrls, setRegisteredUrls] = useState<Set<string>>(new Set());
-  const [savedUrls, setSavedUrls] = useState<Set<string>>(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem("gyroscope:discovered-bookmarks") ?? "[]"));
-    } catch {
-      return new Set();
-    }
-  });
-  const [starredUrls, setStarredUrls] = useState<Set<string>>(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem("gyroscope:discovered-stars") ?? "[]"));
-    } catch {
-      return new Set();
-    }
-  });
+  const [registeredHosts, setRegisteredHosts] = useState<Set<string>>(new Set());
+  // URLs of articles saved to the real bookmark store (commands::saved) --
+  // painted as filled ☆ on the cards. Kept as a Set on this screen purely so
+  // re-rendering doesn't refetch; the source of truth is the DB.
+  const [savedUrls, setSavedUrls] = useState<Set<string>>(new Set());
+  // Transient feedback for a successful feed registration (the card
+  // disappears right after by default -- "登録済みを隠す" is on -- so
+  // without this it looks like the action silently failed).
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<number | null>(null);
   const [resultSort, setResultSort] = useState<ResultSort>("newest");
   const [hideRegistered, setHideRegistered] = useState(true);
   const [resultSize, setResultSize] = useState<ResultSize>("standard");
   const [resultKind, setResultKind] = useState<ResultKind>("all");
   const [resultAvailability, setResultAvailability] = useState<ResultAvailability>("all");
 
-  const existingUrls = new Set(feeds.map((f) => f.url));
+  const existingHosts = new Set(
+    feeds.flatMap((f) => [f.url, f.site_url ?? ""]).map(hostOf).filter(Boolean),
+  );
+
+  const isRegistered = (source: ScoredSource) => {
+    const host = hostOf(source.url);
+    return existingHosts.has(host) || registeredHosts.has(host);
+  };
 
   const visibleResults = useMemo(() => {
     if (!results) return null;
-    const registered = (source: ScoredSource) =>
-      existingUrls.has(source.url) || registeredUrls.has(source.url);
-    const filtered = results.filter(
-      (source) =>
-        (!activeCategory || !query.trim() ||
-          `${source.title} ${source.snippet} ${source.domain}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) &&
-        (!hideRegistered || !registered(source)) &&
-        (resultAvailability === "all" ||
-          (resultAvailability === "feed" && source.feed_available) ||
-          (resultAvailability === "article") ||
-          (resultAvailability === "noFeed" && !source.feed_available)) &&
-        (resultKind === "all" ||
+    const q = query.trim().toLocaleLowerCase();
+    const filtered = results.filter((source) => {
+      if (hideRegistered && isRegistered(source)) return false;
+      if (q && !`${source.title} ${source.snippet} ${source.domain}`.toLocaleLowerCase().includes(q))
+        return false;
+      if (resultAvailability === "feed" && !source.feed_available) return false;
+      if (resultAvailability === "noFeed" && source.feed_available) return false;
+      if (resultKind !== "all") {
+        const kindMatch =
           (resultKind === "personal" && source.reasons.includes("個人ブログ基盤")) ||
           (resultKind === "technical" && source.reasons.includes("技術記事プラットフォーム")) ||
           (resultKind === "academic" &&
             (source.reasons.includes("学術機関") || source.reasons.includes("論文"))) ||
           (resultKind === "qa" && source.reasons.includes("技術Q&A掲示板")) ||
-          (resultKind === "developer" && source.reasons.includes("開発者一次情報"))),
-    );
+          (resultKind === "developer" && source.reasons.includes("開発者一次情報"));
+        if (!kindMatch) return false;
+      }
+      return true;
+    });
     return [...filtered].sort((a, b) => {
       if (resultSort === "newest" || resultSort === "oldest") {
         const direction = resultSort === "newest" ? -1 : 1;
@@ -97,7 +144,7 @@ export function DiscoverOverlay() {
       }
       return b.score - a.score || b.bookmark_count - a.bookmark_count;
     });
-  }, [results, resultSort, hideRegistered, resultKind, resultAvailability, activeCategory, query, feeds, registeredUrls]);
+  }, [results, query, resultSort, hideRegistered, resultKind, resultAvailability, feeds, registeredHosts]);
 
   useEffect(() => {
     if (categories.length > 0) return;
@@ -105,7 +152,7 @@ export function DiscoverOverlay() {
       .then(setCategories)
       .catch(() => {
         // Non-fatal: the category picker just stays empty and keyword
-        // search (the default mode) is unaffected.
+        // search is unaffected.
       });
   }, [categories.length]);
 
@@ -120,6 +167,15 @@ export function DiscoverOverlay() {
     if (loading) return;
     setActiveCategory(slug);
     await runSearch(() => invoke<ScoredSource[]>("browse_category", { category: slug }));
+  }
+
+  // "すべて" = no genre selected: back to the bare keyword-search state.
+  function handleReset() {
+    setActiveCategory(null);
+    setQuery("");
+    setResults(null);
+    setExpandedUrl(null);
+    setError(null);
   }
 
   async function runSearch(run: () => Promise<ScoredSource[]>) {
@@ -142,7 +198,10 @@ export function DiscoverOverlay() {
     setError(null);
     try {
       await addFeed(source.url);
-      setRegisteredUrls((prev) => new Set(prev).add(source.url));
+      setRegisteredHosts((prev) => new Set(prev).add(hostOf(source.url)));
+      setNotice(`「${source.title}」をフィードに追加しました`);
+      if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
+      noticeTimer.current = window.setTimeout(() => setNotice(null), 3000);
     } catch (err) {
       setError(String(err));
     } finally {
@@ -150,146 +209,258 @@ export function DiscoverOverlay() {
     }
   }
 
-  function handleSaveArticle(source: ScoredSource) {
+  async function loadSavedUrls() {
+    try {
+      const urls = await invoke<string[]>("list_saved_article_urls");
+      setSavedUrls(new Set(urls));
+    } catch {
+      // Non-fatal: cards just render unstarred until a successful load.
+    }
+  }
+
+  const activeScreen = useUiStore((s) => s.activeScreen);
+  // Saved-bookmark state can change from the timeline's bookmark view (unstar
+  // / delete), so re-sync the cards' ☆ every time this screen becomes active.
+  useEffect(() => {
+    if (activeScreen === "discover") {
+      loadSavedUrls();
+    }
+  }, [activeScreen]);
+
+  // One-time migration: before the unified bookmark store existed, "記事を保存"
+  // and ☆ wrote only to localStorage. Fold whatever survived there into the
+  // real store (title/domain included where the old format had them), then
+  // drop the legacy keys. Guarded so it never re-runs for a later mount.
+  const legacyMigrated = useRef(false);
+  useEffect(() => {
+    if (legacyMigrated.current) return;
+    legacyMigrated.current = true;
+    const legacy: { url: string; title: string; domain: string }[] = [];
+    for (const key of ["gyroscope:discovered-bookmarks", "gyroscope:discovered-stars"]) {
+      try {
+        const raw = JSON.parse(localStorage.getItem(key) ?? "[]");
+        if (!Array.isArray(raw)) continue;
+        for (const item of raw) {
+          const url = typeof item === "string" ? item : item?.url;
+          if (!url || legacy.some((l) => l.url === url)) continue;
+          legacy.push({
+            url,
+            title: typeof item === "object" && item ? item.title ?? "" : "",
+            domain: typeof item === "object" && item ? item.domain ?? "" : "",
+          });
+        }
+      } catch {
+        // Malformed legacy value -- ignored, it gets cleared below anyway.
+      }
+      localStorage.removeItem(key);
+    }
+    (async () => {
+      for (const save of legacy) {
+        try {
+          await invoke("save_article", {
+            url: save.url,
+            title: save.title,
+            domain: save.domain,
+            snippet: "",
+            thumbnailUrl: null,
+          });
+        } catch {
+          // Per-item non-fatal.
+        }
+      }
+      if (legacy.length > 0) await loadSavedUrls();
+    })();
+  }, []);
+
+  // Toggles an article's bookmark via the real store (commands::saved) --
+  // "記事を保存", the card ☆, and the timeline's bookmark view all write to
+  // the same place now. Un-saving soft-deletes into the bookmark trash, so
+  // the article stays recoverable from ゴミ箱 like any other bookmark.
+  async function handleSaveArticle(source: ScoredSource) {
+    const isSaved = savedUrls.has(source.url);
     const next = new Set(savedUrls);
-    if (next.has(source.url)) next.delete(source.url);
+    if (isSaved) next.delete(source.url);
     else next.add(source.url);
     setSavedUrls(next);
-    localStorage.setItem("gyroscope:discovered-bookmarks", JSON.stringify([...next]));
-  }
-
-  function handleToggleStar(source: ScoredSource) {
-    const next = new Set(starredUrls);
-    if (next.has(source.url)) next.delete(source.url);
-    else next.add(source.url);
-    setStarredUrls(next);
-    localStorage.setItem("gyroscope:discovered-stars", JSON.stringify([...next]));
-  }
-
-  function cycleSort() {
-    const orders: ResultSort[] = ["recommended", "newest", "oldest"];
-    setResultSort(orders[(orders.indexOf(resultSort) + 1) % orders.length]);
-  }
-
-  function cycleSize() {
-    const sizes: ResultSize[] = ["standard", "compact", "large"];
-    setResultSize(sizes[(sizes.indexOf(resultSize) + 1) % sizes.length]);
+    try {
+      if (isSaved) {
+        await invoke("unsave_article", { url: source.url });
+      } else {
+        await invoke("save_article", {
+          url: source.url,
+          title: source.title,
+          domain: source.domain,
+          snippet: source.snippet ?? "",
+          thumbnailUrl: source.thumbnail_url ?? null,
+        });
+      }
+    } catch (err) {
+      setSavedUrls(savedUrls);
+      setError(String(err));
+    }
   }
 
   return (
     <ScreenOverlay screen="discover" title="サイトを探す">
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm">
-        <section>
-          <div className="flex flex-col gap-1.5">
-        {mode === "all" ? (
+        {/* 検索 */}
+        <section className="flex flex-col gap-1.5">
           <form onSubmit={handleSearch} className="flex min-w-0 gap-1">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="キーワードで検索"
-              className="min-w-0 flex-1 rounded border border-black/15 bg-white/80 px-2 py-1.5 text-xs outline-none transition-shadow placeholder:opacity-50 focus:border-transparent focus:ring-2 focus:ring-amber-400/60 dark:border-white/15 dark:bg-white/10"
+              aria-label="キーワードで検索"
+              className="min-w-0 flex-1 rounded border border-black/10 bg-black/5 px-2 py-1.5 text-xs outline-none placeholder:opacity-50 dark:border-white/10 dark:bg-white/5"
             />
             <button
               type="submit"
               disabled={loading || !query.trim()}
-              className="accent-bg accent-text rounded px-3 py-1.5 text-xs font-medium transition-opacity duration-150 hover:opacity-90 active:opacity-75 disabled:opacity-50"
+              className="accent-bg rounded px-3 py-1.5 text-xs font-medium text-white transition-opacity duration-150 hover:opacity-90 active:opacity-80 disabled:opacity-50"
             >
               {loading ? "検索中..." : "検索"}
             </button>
-            {results !== null && <button type="button" onClick={cycleSort} className="rounded p-1.5 text-xs opacity-60 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/5" title="並び順を変更" aria-label="並び順を変更">↕</button>}
-            <button type="button" onClick={cycleSize} className="rounded p-1.5 text-xs opacity-60 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/5" title="表示サイズを変更" aria-label="表示サイズを変更">▦</button>
           </form>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex min-w-0 gap-1">
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="このジャンルをキーワードで絞り込み"
-                className="min-w-0 flex-1 rounded border border-black/15 bg-white/80 px-2 py-1.5 text-xs outline-none transition-shadow placeholder:opacity-50 focus:border-transparent focus:ring-2 focus:ring-amber-400/60 dark:border-white/15 dark:bg-white/10"
-                aria-label="ジャンル内キーワード検索"
-              />
-              {results !== null && <button type="button" onClick={cycleSort} className="rounded p-1.5 text-xs opacity-60 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/5" title="並び順を変更" aria-label="並び順を変更">↕</button>}
-              <button type="button" onClick={cycleSize} className="rounded p-1.5 text-xs opacity-60 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/5" title="表示サイズを変更" aria-label="表示サイズを変更">▦</button>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              <button type="button" onClick={() => setMode("all")} className="rounded-full bg-black/5 px-2.5 py-1 text-xs transition-colors hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10">すべて</button>
-              {categories.map((c) => (
-                <button
-                  key={c.slug}
-                  type="button"
-                  onClick={() => handleBrowseCategory(c.slug)}
-                  disabled={loading}
-                  className={`rounded-full px-2.5 py-1 text-xs transition-colors duration-150 disabled:opacity-50 ${
-                    activeCategory === c.slug
-                      ? "accent-bg-soft accent-text"
-                      : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
-                  }`}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={handleReset}
+              className={`rounded-full px-2.5 py-1 text-xs transition-colors duration-150 ${
+                activeCategory === null
+                  ? "accent-bg-soft accent-text font-medium"
+                  : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
+              }`}
+            >
+              すべて
+            </button>
+            {categories.map((c) => (
+              <button
+                key={c.slug}
+                type="button"
+                onClick={() => handleBrowseCategory(c.slug)}
+                disabled={loading}
+                className={`rounded-full px-2.5 py-1 text-xs transition-colors duration-150 disabled:opacity-50 ${
+                  activeCategory === c.slug
+                    ? "accent-bg-soft accent-text font-medium"
+                    : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
           </div>
         </section>
 
-        <section className="flex flex-col gap-1.5">
-          <div className="flex flex-col gap-1.5">
-        <div className="rounded bg-black/[0.025] p-1.5 text-[10px] dark:bg-white/[0.025]">
-          <div className="mb-1 opacity-60">記事の種類</div>
-          <div className="flex flex-wrap gap-1">
-            {([["all", "すべて"], ["personal", "個人ブログ基盤"], ["technical", "技術記事"], ["academic", "学術・論文"], ["qa", "技術Q&A"], ["developer", "開発者一次情報"]] as [ResultKind, string][]).map(([value, label]) => (
-              <button key={value} type="button" onClick={() => setResultKind(value)} className={`rounded-full px-2 py-1 transition-colors ${resultKind === value ? "accent-bg-soft accent-text" : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"}`} aria-pressed={resultKind === value}>{label}</button>
-            ))}
-          </div>
-        </div>
-        <div className="rounded bg-black/[0.025] p-1.5 text-[10px] dark:bg-white/[0.025]">
-          <div className="mb-1 opacity-60">候補の状態</div>
-          <div className="flex flex-wrap gap-1">
-            {([["all", "すべて"], ["feed", "RSS登録可"], ["article", "記事保存可"], ["noFeed", "RSSなし"]] as [ResultAvailability, string][]).map(([value, label]) => (
-              <button key={value} type="button" onClick={() => setResultAvailability(value)} className={`rounded-full px-2 py-1 transition-colors ${resultAvailability === value ? value === "feed" ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300" : value === "noFeed" ? "bg-neutral-600/30 text-neutral-900 ring-1 ring-neutral-500/60 dark:bg-neutral-300/25 dark:text-neutral-100 dark:ring-neutral-300/60" : value === "article" ? "bg-amber-500/20 text-amber-700 dark:text-amber-300" : "accent-bg-soft accent-text" : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"}`} aria-pressed={resultAvailability === value}>{label}</button>
-            ))}
-          </div>
-        </div>
-          </div>
-        </section>
-
-        {error && <p className="text-xs text-red-500">{error}</p>}
-        {loading && <p className="text-xs opacity-60">読み込み中...</p>}
-
-        {results !== null &&
-          !loading &&
-          <>
-            <section className="hidden">
-              <div className="flex min-w-0 flex-wrap items-center gap-1.5 rounded border border-black/10 bg-black/[0.025] p-1.5 text-[10px] dark:border-white/10 dark:bg-white/[0.025]">
-              <span className="shrink-0 px-1 opacity-60">
-                {visibleResults?.length ?? 0}件 / 全{results.length}件
-              </span>
-              <div className="flex shrink-0 items-center gap-1 rounded bg-black/5 px-1.5 py-1 dark:bg-white/5">
-                <span className="opacity-60" title="並び順" aria-label="並び順">↕</span>
-                {([["recommended", "おすすめ"], ["newest", "新着"], ["oldest", "古い"]] as [ResultSort, string][]).map(([value, label]) => (
-                  <button key={value} type="button" onClick={() => setResultSort(value)} className={`rounded-full px-1.5 py-0.5 font-medium ${resultSort === value ? "accent-bg-soft accent-text" : "hover:bg-black/10 dark:hover:bg-white/10"}`} aria-pressed={resultSort === value}>{label}</button>
+        {/* 結果ツールバー */}
+        {results !== null && !loading && (
+          <section className="flex flex-col gap-1.5 rounded bg-black/[0.025] p-2 dark:bg-white/[0.025]">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-[10px] opacity-60">並び順</span>
+              <div className="segmented flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
+                {SORTS.map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setResultSort(value)}
+                    aria-pressed={resultSort === value}
+                    className={`rounded px-1.5 py-0.5 text-xs transition-colors duration-150 ${
+                      resultSort === value ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
-              <label className="flex shrink-0 items-center gap-1 rounded bg-black/5 px-1.5 py-1 dark:bg-white/5">
+              <span className="text-[10px] opacity-60">サイズ</span>
+              <div className="segmented flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
+                {SIZES.map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setResultSize(value)}
+                    aria-pressed={resultSize === value}
+                    className={`rounded px-1.5 py-0.5 text-xs transition-colors duration-150 ${
+                      resultSize === value ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <label className="flex shrink-0 items-center gap-1 text-[10px] opacity-70">
                 <input
                   type="checkbox"
                   checked={hideRegistered}
                   onChange={(e) => setHideRegistered(e.target.checked)}
+                  className="checkbox-input h-3 w-3"
                 />
                 登録済みを隠す
               </label>
-              <div className="flex shrink-0 items-center gap-1 rounded bg-black/5 px-1.5 py-1 dark:bg-white/5">
-                <span className="opacity-60" title="表示サイズ" aria-label="表示サイズ">▦</span>
-                {([["compact", "小"], ["standard", "標準"], ["large", "大"]] as [ResultSize, string][]).map(([value, label]) => (
-                  <button key={value} type="button" onClick={() => setResultSize(value)} className={`rounded-full px-1.5 py-0.5 font-medium ${resultSize === value ? "accent-bg-soft accent-text" : "hover:bg-black/10 dark:hover:bg-white/10"}`} aria-pressed={resultSize === value}>{label}</button>
-                ))}
-              </div>
-              </div>
-            </section>
-            {(visibleResults?.length ?? 0) === 0 ? (
+              <span className="ml-auto shrink-0 text-[10px] opacity-60">
+                {visibleResults?.length ?? 0}件 / 全{results.length}件
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-[10px] opacity-60">記事の種類</span>
+              {KINDS.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setResultKind(value)}
+                  aria-pressed={resultKind === value}
+                  className={`rounded-full px-2 py-1 text-xs transition-colors ${
+                    resultKind === value
+                      ? "accent-bg-soft accent-text font-medium"
+                      : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-[10px] opacity-60">候補の状態</span>
+              {AVAILABILITIES.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setResultAvailability(value)}
+                  aria-pressed={resultAvailability === value}
+                  className={`rounded-full px-2 py-1 text-xs transition-colors ${
+                    resultAvailability === value
+                      ? "accent-bg-soft accent-text font-medium"
+                      : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        {notice && (
+          <p
+            className="rounded bg-emerald-500/15 px-3 py-2 text-xs font-medium text-emerald-800 dark:text-emerald-300"
+            role="status"
+          >
+            {notice}
+          </p>
+        )}
+        {loading && <p className="text-xs opacity-60">読み込み中...</p>}
+
+        {results === null && !loading && (
+          <p className="rounded border border-dashed border-black/15 px-3 py-8 text-center text-xs opacity-50 dark:border-white/15">
+            キーワードを入力するか、ジャンルを選ぶとサイトを探せます
+          </p>
+        )}
+
+        {results !== null &&
+          !loading &&
+          ((visibleResults?.length ?? 0) === 0 ? (
             <p className="rounded border border-dashed border-black/15 px-3 py-6 text-center text-xs opacity-50 dark:border-white/15">
               {results.length === 0
                 ? "フィードを持つサイトが見つかりませんでした"
@@ -298,62 +469,81 @@ export function DiscoverOverlay() {
           ) : (
             <ul className="flex flex-col gap-1">
               {visibleResults?.map((source) => {
-                const already = existingUrls.has(source.url) || registeredUrls.has(source.url);
+                const already = isRegistered(source);
                 const expanded = expandedUrl === source.url;
+                const thumbSize =
+                  resultSize === "compact" ? "h-8 w-8" : resultSize === "large" ? "h-14 w-14" : "h-10 w-10";
                 return (
                   <li
                     key={source.url}
-                    className="flex flex-col overflow-hidden rounded-lg border border-black/5 bg-white/25 p-0.5 transition-colors duration-150 hover:border-black/15 hover:bg-white/40 dark:border-white/5 dark:bg-white/[0.025] dark:hover:border-white/15 dark:hover:bg-white/[0.05]"
+                    className="entry-card flex flex-col overflow-hidden rounded-lg border border-black/5 bg-black/[0.03] transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10"
                   >
-                    <button
-                      type="button"
+                    {/* A single outer <button> would nest the star <button>
+                        inside it (invalid HTML, unreliable click targeting) --
+                        use a div with button semantics instead, as EntryRow does. */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={expanded}
                       onClick={() => setExpandedUrl(expanded ? null : source.url)}
-                      className={`flex w-full items-start gap-2 rounded px-2 text-left transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5 ${
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setExpandedUrl(expanded ? null : source.url);
+                        }
+                      }}
+                      className={`flex w-full cursor-pointer items-start gap-2 rounded px-2 text-left ${
                         resultSize === "compact" ? "py-1" : resultSize === "large" ? "py-2.5" : "py-1.5"
                       }`}
-                      aria-expanded={expanded}
                     >
                       {source.thumbnail_url ? (
                         <img
                           src={source.thumbnail_url}
                           alt=""
-                          className={`shrink-0 rounded object-cover ${
-                            resultSize === "compact" ? "h-8 w-8" : resultSize === "large" ? "h-14 w-14" : "h-10 w-10"
-                          }`}
+                          className={`${thumbSize} shrink-0 rounded object-cover`}
                         />
                       ) : (
-                        <div className={`flex shrink-0 items-center justify-center rounded bg-black/5 dark:bg-white/5 ${
-                          resultSize === "compact" ? "h-8 w-8" : resultSize === "large" ? "h-14 w-14" : "h-10 w-10"
-                        }`}>
+                        <div className={`${thumbSize} flex shrink-0 items-center justify-center rounded bg-black/5 dark:bg-white/5`}>
                           <ImageOffIcon className="h-1/2 w-1/2 opacity-40" />
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wide opacity-50">
-                          記事
+                        <div
+                          className={`truncate font-medium leading-snug ${
+                            resultSize === "compact" ? "text-xs" : resultSize === "large" ? "text-base" : "text-sm"
+                          }`}
+                        >
+                          {source.title}
                         </div>
-                        <div className="truncate text-sm font-medium leading-snug">{source.title}</div>
-                        <div className="mt-1 truncate text-[10px] opacity-55">
-                          提供元: <span className="font-medium">{source.domain}</span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          <span className={`rounded px-1 text-[10px] font-medium ${source.feed_available ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-neutral-500/15 text-neutral-600 dark:text-neutral-300"}`}>
+                        {/* The provider site gets the same accent-colored,
+                            undimmed source emphasis the timeline gives its
+                            feed titles (see EntryRow's meta), so "where did
+                            this article come from" reads at a glance. */}
+                        <div className="accent-text mt-0.5 truncate text-xs">{source.domain}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                          <span
+                            className={`rounded px-1 text-[10px] font-medium ${
+                              source.feed_available
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                : "bg-neutral-500/15 text-neutral-600 dark:text-neutral-300"
+                            }`}
+                          >
                             {source.feed_available ? "RSS登録可" : "RSSなし"}
                           </span>
-                          <span className="rounded bg-amber-500/15 px-1 text-[10px] font-medium text-amber-700 dark:text-amber-300">
-                            {savedUrls.has(source.url) ? "記事保存済み" : "記事保存可"}
-                          </span>
+                          {already && <span className="text-[10px] opacity-50">登録済み</span>}
                         </div>
-                        {source.reasons.filter((reason) => !/users以上ブックマーク$/.test(reason)).length > 0 && (
-                          <div className="mt-0.5 flex flex-wrap gap-1">
-                            {source.reasons.filter((reason) => !/users以上ブックマーク$/.test(reason)).map((reason) => (
-                              <span
-                                key={reason}
-                                className="accent-bg-soft accent-text rounded px-1 text-[10px] font-medium opacity-80"
-                              >
-                                {reason}
-                              </span>
-                            ))}
+                        {source.reasons.filter((reason) => !NOISE_REASON.test(reason)).length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {source.reasons
+                              .filter((reason) => !NOISE_REASON.test(reason))
+                              .map((reason) => (
+                                <span
+                                  key={reason}
+                                  className="accent-bg-soft accent-text rounded px-1 text-[10px] font-medium opacity-80"
+                                >
+                                  {reason}
+                                </span>
+                              ))}
                           </div>
                         )}
                       </div>
@@ -361,20 +551,19 @@ export function DiscoverOverlay() {
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          handleToggleStar(source);
+                          handleSaveArticle(source);
                         }}
-                        className={`shrink-0 rounded p-1 transition-colors ${
-                          starredUrls.has(source.url)
-                            ? "text-amber-500"
+                        className={`shrink-0 rounded p-1 transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
+                          savedUrls.has(source.url)
+                            ? "accent-text"
                             : "opacity-50 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/5"
                         }`}
-                        aria-label={starredUrls.has(source.url) ? "ブックマークを外す" : "ブックマークする"}
-                        aria-pressed={starredUrls.has(source.url)}
+                        aria-label={savedUrls.has(source.url) ? "ブックマークを外す" : "ブックマークする"}
+                        aria-pressed={savedUrls.has(source.url)}
                       >
-                        <StarIcon filled={starredUrls.has(source.url)} className="h-4 w-4" />
+                        <StarIcon filled={savedUrls.has(source.url)} className="h-4 w-4" />
                       </button>
-                      {already && <span className="shrink-0 text-[10px] opacity-50">登録済み</span>}
-                    </button>
+                    </div>
 
                     {expanded && (
                       <div className="flex flex-col gap-2 border-t border-black/10 px-2 py-2 dark:border-white/10">
@@ -400,12 +589,18 @@ export function DiscoverOverlay() {
                             disabled={!source.feed_available || already || registering === source.url}
                             className="flex-1 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 disabled:opacity-50 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
                           >
-                            {!source.feed_available ? "RSSなし" : already ? "登録済み" : registering === source.url ? "..." : "フィード登録"}
+                            {!source.feed_available
+                              ? "RSSなし"
+                              : already
+                                ? "登録済み"
+                                : registering === source.url
+                                  ? "..."
+                                  : "フィード登録"}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleSaveArticle(source)}
-                            className="flex-1 rounded bg-amber-500/15 px-2 py-1 text-xs text-amber-800 transition-colors duration-150 hover:bg-amber-500/25 active:bg-amber-500/30 dark:text-amber-200"
+                            className="accent-bg-soft accent-text flex-1 rounded px-2 py-1 text-xs transition-opacity duration-150 hover:opacity-80 active:opacity-60"
                           >
                             {savedUrls.has(source.url) ? "保存を解除" : "記事を保存"}
                           </button>
@@ -416,9 +611,11 @@ export function DiscoverOverlay() {
                 );
               })}
             </ul>
-          )}
-          </>
-        }
+          ))}
+        {/* 提供元 */}
+        <p className="text-center text-[10px] opacity-40">
+          検索結果は「はてなブックマーク」のデータを使用しています
+        </p>
       </div>
     </ScreenOverlay>
   );

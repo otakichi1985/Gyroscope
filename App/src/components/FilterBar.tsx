@@ -100,6 +100,7 @@ export function FilterBar() {
   const { starredOnly, setStarredOnly, searchQuery, setSearchQuery, markAllRead, markAllUnread } =
     useEntriesStore();
   const toggleScreen = useUiStore((s) => s.toggleScreen);
+  const goHome = useUiStore((s) => s.goHome);
   // Settings/History/FeedManager/Trash are full-screen overlays drawn *over*
   // EntryList only (see App.tsx) -- FilterBar itself sits above all of them
   // and was never disabled while one was open, so "全既読" or the search box
@@ -184,9 +185,21 @@ export function FilterBar() {
           すべて未読
         </button>
       </div>
+      </div>
 
+      {/* Deliberately NOT inside the timeline-only inert group above: the
+          bookmark toggle is also the one-tap jump from "探す" back to the
+          bookmark view (discover-saved articles live there now), so it stays
+          active on the discover screen. From there -- or any other screen --
+          clicking it opens the timeline and flips the filter in one gesture. */}
+      <div className="contents" inert={!isTimeline && activeScreen !== "discover"}>
       <IconButton
-        onClick={() => setStarredOnly(!starredOnly)}
+        onClick={() => {
+          if (!isTimeline) {
+            goHome();
+          }
+          setStarredOnly(!starredOnly);
+        }}
         active={starredOnly}
         className="ml-auto"
         label={starredOnly ? "ブックマークの絞り込みを解除" : "ブックマークのみ表示"}
@@ -195,6 +208,9 @@ export function FilterBar() {
         hue="coral"
         Icon={(props) => <StarIcon filled={starredOnly} {...props} />}
       />
+      </div>
+
+      <div className="contents" inert={!isTimeline}>
       <IconButton
         onClick={toggleSearch}
         active={searchOpen || searchQuery.length > 0}

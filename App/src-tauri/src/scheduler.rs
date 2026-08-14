@@ -55,6 +55,11 @@ fn cleanup_deleted_entries(db: &Db) -> AppResult<()> {
         "DELETE FROM entries WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', ?1)",
         params![format!("-{BOOKMARK_TRASH_RETENTION_DAYS} days")],
     )?;
+    // Discover-saved bookmarks (commands::saved) ride the same trash window.
+    conn.execute(
+        "DELETE FROM saved_articles WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', ?1)",
+        params![format!("-{BOOKMARK_TRASH_RETENTION_DAYS} days")],
+    )?;
     Ok(())
 }
 

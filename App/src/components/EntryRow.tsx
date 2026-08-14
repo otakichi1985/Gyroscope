@@ -67,6 +67,14 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
   useEffect(() => setFeedIconFailed(false), [feedIconUrl]);
 
   async function handleOpen() {
+    // Saved-article bookmarks carry a synthetic negative id with no reader
+    // row or read state -- open them straight in the system browser.
+    if (entry.id < 0) {
+      if (entry.link && HTTP_LINK_RE.test(entry.link)) {
+        await openUrl(entry.link);
+      }
+      return;
+    }
     if (!entry.is_read) markRead(entry.id, true);
     if (clickBehavior === "reader") {
       useUiStore.getState().openReader(entry.id);

@@ -432,6 +432,15 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 .dark .range-input {
   accent-color: rgb(var(--accent-rgb-dark));
 }
+/* Native checkboxes expose only `accent-color` too, so they follow the
+   skin's accent instead of a fixed browser/utility colour (DiscoverOverlay's
+   "登録済みを隠す" checkbox used to be pinned amber). */
+.checkbox-input {
+  accent-color: rgb(var(--accent-rgb-light));
+}
+.dark .checkbox-input {
+  accent-color: rgb(var(--accent-rgb-dark));
+}
 .dark .accent-text {
   color: rgb(var(--accent-rgb-dark));
 }

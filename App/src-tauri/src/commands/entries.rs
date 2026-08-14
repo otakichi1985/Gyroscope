@@ -25,6 +25,17 @@ pub struct EntriesFilter {
 
 const DEFAULT_LIMIT: i64 = 200;
 
+/// Synthetic entries for discover-saved bookmarks (commands::saved): each
+/// saved_articles row is exposed to the timeline as a fake entry with a
+/// negative id (-saved_articles.id), feed_id 0, the article URL as both guid
+/// and link, and is_read/is_starred pinned to 1 (a saved article is by
+/// definition a starred bookmark that's already "seen"). Column order matches
+/// ENTRY_COLUMNS so Entry::from_row maps it unchanged. The frontend branches
+/// on `id < 0` to open such rows in the system browser (no reader entry
+/// exists for them).
+const SAVED_ARTICLE_ENTRY_COLUMNS: &str = "-s.id, 0, s.url, s.title, NULL, s.url, s.snippet, NULL, \
+     s.thumbnail_url, s.saved_at, s.saved_at, 1, 1, s.deleted_at";
+
 /// Turns free-text user input into a safe FTS5 `MATCH` query. Passing raw
 /// input straight to `MATCH` can throw a syntax error (quotes, colons,
 /// hyphens, etc. are all FTS5 query-language punctuation) -- instead, each
@@ -57,32 +68,63 @@ pub fn list_entries(db: State<'_, Db>, filter: EntriesFilter) -> AppResult<Vec<E
     // Soft-deleted (bookmark trash, see delete_entry) entries never show up
     // in any filter of the normal timeline -- only list_deleted_entries
     // reaches them.
-    let mut sql = format!("SELECT {ENTRY_COLUMNS} FROM entries e WHERE e.deleted_at IS NULL");
+    let mut parts: Vec<String> = Vec::new();
     let mut bindings: Vec<Box<dyn ToSql>> = Vec::new();
 
+    let mut base = format!("SELECT {ENTRY_COLUMNS} FROM entries e WHERE e.deleted_at IS NULL");
+
     if let Some(fts) = &fts_query {
-        sql.push_str(" AND e.id IN (SELECT rowid FROM entries_fts WHERE entries_fts MATCH ?)");
+        base.push_str(" AND e.id IN (SELECT rowid FROM entries_fts WHERE entries_fts MATCH ?)");
         bindings.push(Box::new(fts.clone()));
     }
     if let Some(feed_id) = filter.feed_id {
-        sql.push_str(" AND e.feed_id = ?");
+        base.push_str(" AND e.feed_id = ?");
         bindings.push(Box::new(feed_id));
     }
     if let Some(folder) = &filter.folder {
-        sql.push_str(" AND e.feed_id IN (SELECT id FROM feeds WHERE folder = ?)");
+        base.push_str(" AND e.feed_id IN (SELECT id FROM feeds WHERE folder = ?)");
         bindings.push(Box::new(folder.clone()));
     }
     if filter.unread_only.unwrap_or(false) {
-        sql.push_str(" AND e.is_read = 0");
+        base.push_str(" AND e.is_read = 0");
     }
     if filter.starred_only.unwrap_or(false) {
-        sql.push_str(" AND e.is_starred = 1");
+        base.push_str(" AND e.is_starred = 1");
     }
-    if filter.sort_order.as_deref() == Some("asc") {
-        sql.push_str(" ORDER BY e.published_at ASC, e.id ASC LIMIT ? OFFSET ?");
+    parts.push(base);
+
+    // Discover-saved bookmarks (commands::saved) are only ever visible in the
+    // bookmarked view, and only when it isn't scoped to a feed or folder
+    // (they belong to no feed). They're always "read", so an unread-only
+    // filter drops them too. A plain LIKE match stands in for FTS here --
+    // saved_articles has no FTS index, and its volume is tiny.
+    if filter.starred_only.unwrap_or(false)
+        && filter.feed_id.is_none()
+        && filter.folder.is_none()
+        && !filter.unread_only.unwrap_or(false)
+    {
+        let mut saved = format!(
+            "SELECT {SAVED_ARTICLE_ENTRY_COLUMNS} FROM saved_articles s WHERE s.deleted_at IS NULL"
+        );
+        if let Some(raw) = filter.query.as_deref().filter(|q| !q.trim().is_empty()) {
+            saved.push_str(" AND (s.title LIKE ?1 OR s.url LIKE ?2 OR s.domain LIKE ?3)");
+            let like = format!("%{}%", raw.trim());
+            bindings.push(Box::new(like.clone()));
+            bindings.push(Box::new(like.clone()));
+            bindings.push(Box::new(like));
+        }
+        parts.push(saved);
+    }
+
+    // The ORDER BY runs over the union, so it has to use the bare result
+    // column names from the first SELECT (no `e.` prefix -- `e` doesn't
+    // exist at this level).
+    let order = if filter.sort_order.as_deref() == Some("asc") {
+        "published_at ASC, id ASC"
     } else {
-        sql.push_str(" ORDER BY e.published_at DESC, e.id DESC LIMIT ? OFFSET ?");
-    }
+        "published_at DESC, id DESC"
+    };
+    let sql = format!("{} ORDER BY {order} LIMIT ? OFFSET ?", parts.join(" UNION ALL "));
     bindings.push(Box::new(filter.limit.unwrap_or(DEFAULT_LIMIT)));
     bindings.push(Box::new(filter.offset.unwrap_or(0)));
 
@@ -115,6 +157,12 @@ fn record_read_history(conn: &Connection, entry_id: i64) -> AppResult<()> {
 #[tauri::command]
 pub fn mark_entry_read(db: State<'_, Db>, id: i64, is_read: bool) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
+    // Saved-article synthetic rows (negative ids) have no read state -- the
+    // UPDATE below would simply match nothing, but skip early to avoid the
+    // pointless record_read_history call.
+    if id < 0 {
+        return Ok(());
+    }
     conn.execute("UPDATE entries SET is_read = ?1 WHERE id = ?2", params![is_read, id])?;
     if is_read {
         record_read_history(&conn, id)?;
@@ -125,6 +173,21 @@ pub fn mark_entry_read(db: State<'_, Db>, id: i64, is_read: bool) -> AppResult<(
 #[tauri::command]
 pub fn toggle_star(db: State<'_, Db>, id: i64, is_starred: bool) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
+    if id < 0 {
+        // A saved-article synthetic row: starring/unstarring maps onto the
+        // save/unsave lifecycle -- unstarring soft-deletes it into the trash
+        // (same 30-day window as delete_entry), re-starring restores it.
+        if is_starred {
+            conn.execute("UPDATE saved_articles SET deleted_at = NULL WHERE id = ?1", params![-id])?;
+        } else {
+            conn.execute(
+                "UPDATE saved_articles SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
+                 WHERE id = ?1 AND deleted_at IS NULL",
+                params![-id],
+            )?;
+        }
+        return Ok(());
+    }
     conn.execute(
         "UPDATE entries SET is_starred = ?1 WHERE id = ?2",
         params![is_starred, id],
@@ -137,10 +200,19 @@ pub fn toggle_star(db: State<'_, Db>, id: i64, is_starred: bool) -> AppResult<()
 /// `scheduler::BOOKMARK_TRASH_RETENTION_DAYS` days via `restore_entry`
 /// before `scheduler::cleanup_deleted_entries` purges it for good). The
 /// command itself is generic (not restricted to starred entries); the UI
-/// only exposes it from the bookmark-filtered view.
+/// only exposes it from the bookmark-filtered view. Negative ids route to
+/// discover-saved bookmarks, which ride the same trash window.
 #[tauri::command]
 pub fn delete_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
+    if id < 0 {
+        conn.execute(
+            "UPDATE saved_articles SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
+             WHERE id = ?1 AND deleted_at IS NULL",
+            params![-id],
+        )?;
+        return Ok(());
+    }
     conn.execute(
         "UPDATE entries SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?1",
         params![id],
@@ -151,6 +223,10 @@ pub fn delete_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
 #[tauri::command]
 pub fn restore_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
+    if id < 0 {
+        conn.execute("UPDATE saved_articles SET deleted_at = NULL WHERE id = ?1", params![-id])?;
+        return Ok(());
+    }
     conn.execute("UPDATE entries SET deleted_at = NULL WHERE id = ?1", params![id])?;
     Ok(())
 }
@@ -158,7 +234,12 @@ pub fn restore_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
 #[tauri::command]
 pub fn list_deleted_entries(db: State<'_, Db>) -> AppResult<Vec<Entry>> {
     let conn = db.0.lock().unwrap();
-    let sql = format!("SELECT {ENTRY_COLUMNS} FROM entries WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC");
+    let sql = format!(
+        "SELECT {ENTRY_COLUMNS} FROM entries WHERE deleted_at IS NOT NULL \
+         UNION ALL \
+         SELECT {SAVED_ARTICLE_ENTRY_COLUMNS} FROM saved_articles s WHERE s.deleted_at IS NOT NULL \
+         ORDER BY deleted_at DESC"
+    );
     let mut stmt = conn.prepare(&sql)?;
     let entries: Result<Vec<_>, _> = stmt.query_map([], Entry::from_row)?.collect();
     Ok(entries?)
