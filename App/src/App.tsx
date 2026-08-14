@@ -21,6 +21,7 @@ import { useSyncWindowOpacity } from "./hooks/useSyncWindowOpacity";
 import { useVibrancyMode } from "./hooks/useVibrancyMode";
 import { getSkin } from "./lib/skins";
 import { useAppearanceStore } from "./stores/appearanceStore";
+import { useFeedsStore } from "./stores/feedsStore";
 import { useUiStore } from "./stores/uiStore";
 
 // One of these gets picked at random each time idle starts (see the effect
@@ -80,7 +81,25 @@ function App() {
   } = useAppearanceStore();
   const isTimeline = useUiStore((s) => s.activeScreen === "timeline");
   useFeedsUpdatedListener();
+  const refreshFeeds = useFeedsStore((s) => s.refresh);
+  const refreshGenres = useFeedsStore((s) => s.refreshGenres);
   const isIdle = useIdleTimer();
+
+  useEffect(() => {
+    // The feed manager used to be the only place that loaded the feed list.
+    // That left the timeline with a stale/empty in-memory list when a
+    // portable update or another process changed the database while the app
+    // was already running. Load the navigation data at app start and resync
+    // it when the window becomes active again.
+    const syncFeeds = () => {
+      void refreshFeeds();
+      void refreshGenres();
+    };
+
+    syncFeeds();
+    window.addEventListener("focus", syncFeeds);
+    return () => window.removeEventListener("focus", syncFeeds);
+  }, [refreshFeeds, refreshGenres]);
 
   const [idlePattern, setIdlePattern] = useState(IDLE_PATTERNS[0]);
   const [systemDark, setSystemDark] = useState(
