@@ -120,7 +120,10 @@ pub struct DataDirInfo {
 /// The effective data directory, without `resolve`'s side effects: `resolve`
 /// runs `ensure_writable` (which creates+deletes a `.write-test` probe file)
 /// because the Settings screen needs to know whether a custom dir still works.
-/// The dev-only exit logger (`diag`) only needs a path, so it uses this.
+/// The dev-only exit logger (`diag`) is the only caller, so it is gated to
+/// debug builds like `diag` itself (keeps release builds free of a dead_code
+/// warning, since nothing outside `#[cfg(debug_assertions)]` references it).
+#[cfg(debug_assertions)]
 pub fn effective_data_dir(app: &AppHandle) -> PathBuf {
     if let Some(dir) = env_override() {
         return dir;
