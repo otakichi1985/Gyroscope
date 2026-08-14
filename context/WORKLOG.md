@@ -22,14 +22,19 @@
 
 <!-- ここから実際の記録 -->
 
-> - **[opencode]** 探す画面の提供元URL可視化と全テーマでの見た目統一。カードの提供元ドメインをタイムラインと同じ`accent-text`強調(10px/opacity55→text-xs/無減光)へ。色の不整合(amberハードコード)をアクセント基調へ統一 — ☆・「記事を保存」・チェックボックス(`checkbox-input`新設)・検索欄のfocusリングを撤去。検索ボタンを`accent-bg accent-text`(ライトモードで同色=ほぼ不可視のバグ)から正規プライマリCTA(`accent-bg`+白文字)へ修正。「候補の状態」チップも兄弟チップと同じ`accent-bg-soft`へ。カードを`entry-card`化(タイムラインのガラスカードと同じ背景/ホバー/`active:scale-[0.98]`押下)し、フローティング/スタイル系スキン(カーディナリティ・オーディナリー等)でも見た目が統一されるようにした。配置は不変。RSSバッジの緑(成功=既読✓と同じセマンティック色)と提供元注記は維持。`npm run build`成功、E2E(`zz-temp-unified-bookmarks.spec.js`)通過。
+> - **[opencode]** 開発基盤の改善チェック(振り返り)で提示した改善候補A〜Dを適用した。
+>   1. **A**: `VERIFY.md`へ「GitHub Release 実行」プリセットを追加。v0.2.7で`gh release create`がmain未pushのため古いコミット(87a0a67)へタグを張った事故を再発させないため、公開前に`HEAD`==`origin/main`、公開後に`ls-remote`のタグ位置を確認する手順を明文化。
+>   2. **B**: 恒久回帰テスト`zz-temp-unified-bookmarks.spec.js`を`bookmark-store.spec.js`へ改名(ラベル/ログも統一)。診断用の一時スペック`zz-temp-discover-probe.spec.js`・`zz-temp-startup-trace.spec.js`を削除。「残す回帰テストは恒久名、`zz-temp-`は使い捨てで確認後に削除」をVERIFY.mdのE2Eプリセットへ追記。
+>   3. **C**: 共有ワークフロー`IMPLEMENTATION.md`(#1 Understand)へ「変更対象のUI要素・表示場所が曖昧な依頼は解釈を決め打ちせずHumanへ確認してから実装」を追記(ジャンクション経由で`human-ai-foundation`側の共通本体へ反映)。
+>   4. **D**: `paths.rs`の`effective_data_dir`(diag専用)へ`#[cfg(debug_assertions)]`を付与し、releaseビルドの`dead_code`警告を解消。`cargo check --release`で警告なし、E2Eフルスイート7件通過を確認。
+> - **[opencode]** 探す画面の提供元URL可視化と全テーマでの見た目統一。カードの提供元ドメインをタイムラインと同じ`accent-text`強調(10px/opacity55→text-xs/無減光)へ。色の不整合(amberハードコード)をアクセント基調へ統一 — ☆・「記事を保存」・チェックボックス(`checkbox-input`新設)・検索欄のfocusリングを撤去。検索ボタンを`accent-bg accent-text`(ライトモードで同色=ほぼ不可視のバグ)から正規プライマリCTA(`accent-bg`+白文字)へ修正。「候補の状態」チップも兄弟チップと同じ`accent-bg-soft`へ。カードを`entry-card`化(タイムラインのガラスカードと同じ背景/ホバー/`active:scale-[0.98]`押下)し、フローティング/スタイル系スキン(カーディナリティ・オーディナリー等)でも見た目が統一されるようにした。配置は不変。RSSバッジの緑(成功=既読✓と同じセマンティック色)と提供元注記は維持。`npm run build`成功、E2E(`bookmark-store.spec.js`)通過。
 > - **[opencode]** 探すタブのブックマーク保存をタイムラインのブックマーク一覧と統合。ユーザー要望4点を実装した。
 >   1. **提供元の明示**: 検索画面下部に「検索結果は「はてなブックマーク」のデータを使用しています」を追加。
 >   2. **保存場所の統一**: 新規 `saved_articles` テーブル(migration v6)に保存し、`list_entries`(ブックマーク絞り込み時)と`list_deleted_entries`へ**負のID**(`-saved_articles.id`)の合成Entryとしてマージ。負IDは`delete_entry`/`restore_entry`/`toggle_star`/`mark_entry_read`でsaved_articlesへルーティングし、ゴミ箱(30日保持)も通常ブックマークと同一経路。DiscoverOverlayの「記事を保存」と☆を`save_article`/`unsave_article`(URLでupsert、unsaveはゴミ箱へsoft delete)に統一し、旧localStorage保存(`gyroscope:discovered-bookmarks`/`discovered-stars`)は初回マウント時にDBへ移行して削除。探すタブ内の保存一覧ビューはタイムラインのブックマーク一覧が役割を担うため撤去。
 >   3. **☆アイコンの探す画面からの直クリック**: FilterBarの星をdiscover画面でも有効化し、クリックで`goHome()`+ブックマーク絞り込みON。
 >   4. **☆が機能しない問題**: カードの☆を保存トグルへ接続(2と同一動作)。
 >   フロントは負ID(`id < 0`)で分岐 — EntryRowはリーダーではなくシステムブラウザで開き、EntryListはソース表示を「保存した記事」に。
->   `cargo build`/`npm run build` 成功。E2E(`zz-temp-unified-bookmarks.spec.js`): 保存→星アイコンでブックマーク一覧へ移動→保存記事表示→☆状態の永続→カード☆解除→ゴミ箱→復元→一覧へ復帰を実機確認。フルスイート9件通過。壊れていた一時診断スペック`zz-temp-discover-shot.spec.js`(predicateが常にfalseを返す)を削除。
+>   `cargo build`/`npm run build` 成功。E2E(`bookmark-store.spec.js`): 保存→星アイコンでブックマーク一覧へ移動→保存記事表示→☆状態の永続→カード☆解除→ゴミ箱→復元→一覧へ復帰を実機確認。フルスイート9件通過。壊れていた一時診断スペック`zz-temp-discover-shot.spec.js`(predicateが常にfalseを返す)を削除。
 > - **[opencode]** 「サイトを探す」の検索を見直し、見落とし3件を修正・実機E2E検証済み。
 >   1. **登録済み判定の不具合**: 探すタブの結果は記事URL、登録済みはフィードURLで保持されており一致せず、「登録済みを隠す」や「登録済み」バッジが機能していなかった。ホスト名(www除去)照合に変更(`DiscoverOverlay.tsx`の`hostOf`)。
 >   2. **「記事を保存」の行き止まり**: localStorageに保存するだけで閲覧場所がなかった。オーバーレイ内に保存済み記事一覧ビューを新設(ヘッダーの「保存済み記事 (N)」トグル、タイトル/ドメイン/保存日時/元記事を開く/削除)。保存形式は旧形式のURL列とも互換(読込時に正規化)。

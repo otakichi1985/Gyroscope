@@ -78,12 +78,12 @@ function dump(label, extra = {}) {
       };
     })
     .then((s) => {
-      writeFileSync(`${shotDir}/unified-bookmarks-${label}.json`, JSON.stringify({ ...s, ...extra }, null, 2), "utf8");
+      writeFileSync(`${shotDir}/bookmark-store-${label}.json`, JSON.stringify({ ...s, ...extra }, null, 2), "utf8");
       return s;
     });
 }
 
-describe("temp unified-bookmarks verify (discover saves merge into bookmark view + trash)", () => {
+describe("bookmark-store verify (discover saves merge into bookmark view + trash)", () => {
   it("saves from discover, navigates via the star icon, trashes and restores", async () => {
     try {
       await browser.setWindowSize(420, 680);
@@ -146,7 +146,7 @@ describe("temp unified-bookmarks verify (discover saves merge into bookmark view
       timeout: 20000,
       interval: 500,
     });
-    await browser.saveScreenshot(`${shotDir}/unified-bookmarks-view.png`);
+    await browser.saveScreenshot(`${shotDir}/bookmark-store-view.png`);
 
     // 3. Toggle the filter back off -- the saved article leaves the list
     // (it only lives in the bookmark view).
@@ -173,7 +173,7 @@ describe("temp unified-bookmarks verify (discover saves merge into bookmark view
       interval: 500,
     });
     if (!(await browser.execute(S.hasRestore))) throw new Error("no restore button in trash");
-    await browser.saveScreenshot(`${shotDir}/unified-bookmarks-trash.png`);
+    await browser.saveScreenshot(`${shotDir}/bookmark-store-trash.png`);
     await browser.execute(S.clickRestoreFor(title));
     await browser.waitUntil(async () => (await browser.execute(S.trashHas(title))) === false, {
       timeout: 10000,
@@ -191,9 +191,9 @@ describe("temp unified-bookmarks verify (discover saves merge into bookmark view
       timeout: 20000,
       interval: 500,
     });
-    await browser.saveScreenshot(`${shotDir}/unified-bookmarks-restored.png`);
+    await browser.saveScreenshot(`${shotDir}/bookmark-store-restored.png`);
 
     await dump("final", { title });
-    console.log("[unified-bookmarks] OK title=", JSON.stringify(title));
+    console.log("[bookmark-store] OK title=", JSON.stringify(title));
   });
 });

@@ -92,6 +92,22 @@
 `WORKLOG.md`のRecent Commitsは直近5件までしか保持しないため、リリース間隔が空いた場合は`git log`側の全件確認が必須。
 
 
+## GitHub Release 実行
+
+**対象:** `gh release create`でタグ・Releaseを公開する手順。
+
+**用途:** タグが実際のリリースコミットを指すことを保証する。`main`未pushのまま`gh release create`すると、GitHubは存在しないタグをリモートのデフォルトブランチ先端（古いコミット）へ張ってしまう（v0.2.7で実発生日→手動でタグを付け直した）。
+
+**実行:**  
+リリース前に `git status --short` が空であることと、`git rev-parse HEAD` と `git rev-parse origin/main` が一致していること（一致しなければ先に `git push origin main`）を確認してから `gh release create` する。公開後、`git ls-remote --tags origin <タグ>` が `HEAD` と一致することを確認する。
+
+**確認:**  
+公開されたReleaseの`targetCommitish`（＝タグの指すコミット）が、ビルド元の`HEAD`と一致していること。
+
+**限界:**  
+タグ位置の取り違えを検知できるだけで自動では直せない。外れていた場合は`git tag <タグ> <正しいコミット>` → `git push --force origin <タグ>`で付け直す（Release本体とDiscord通知は再発火しない）。
+
+
 ## Git Working Tree Inspection
 
 **対象:** 今回の変更範囲、未追跡ファイル、意図しない変更。
@@ -123,6 +139,7 @@ E2Eが起動するアプリは `GYROSCOPE_DATA_DIR`（`%TEMP%\gyroscope-e2e-data
 
 **確認:**  
 `X passing`/`X failing`に加え、観測用スペックは`console.log`の出力内容で判断する。
+回帰テストとして残すスペックは恒久名（`zz-temp-`プレフィックスを付けない）で置き、診断用の一時スペック（`zz-temp-`）は確認が終わったら削除する。
 
 **限界:**  
 デバッグビルド固定。初回はtauri-driver/msedgedriverの取得に数分かかる。
