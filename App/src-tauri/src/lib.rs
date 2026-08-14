@@ -87,7 +87,7 @@ pub fn run() {
             // inline here -- SPEC §7 requires startup to stay under 2s.
             let favicon_app = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                commands::feeds::backfill_favicons(&favicon_app).await;
+                commands::feed_maintenance::backfill_favicons(&favicon_app).await;
             });
 
             // By default (MinimizeToTray = true), closing the main window
@@ -138,18 +138,18 @@ pub fn run() {
             fonts::list_system_fonts,
             commands::feeds::add_feed,
             commands::feeds::list_feeds,
-            commands::feeds::delete_feed,
-            commands::feeds::rename_feed,
-            commands::feeds::set_feed_folder,
-            commands::feeds::list_genres,
-            commands::feeds::create_genre,
-            commands::feeds::delete_genre,
-            commands::feeds::set_feed_interval,
-            commands::feeds::set_feed_notify,
-            commands::feeds::reorder_feeds,
-            commands::feeds::set_feed_tags,
-            commands::feeds::refresh_feed,
-            commands::feeds::refresh_all_feeds,
+            commands::feed_settings::delete_feed,
+            commands::feed_settings::rename_feed,
+            commands::feed_settings::set_feed_folder,
+            commands::feed_genres::list_genres,
+            commands::feed_genres::create_genre,
+            commands::feed_genres::delete_genre,
+            commands::feed_settings::set_feed_interval,
+            commands::feed_settings::set_feed_notify,
+            commands::feed_settings::reorder_feeds,
+            commands::feed_settings::set_feed_tags,
+            commands::feed_refresh::refresh_feed,
+            commands::feed_refresh::refresh_all_feeds,
             commands::entries::list_entries,
             commands::entries::mark_entry_read,
             commands::entries::toggle_star,

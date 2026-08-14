@@ -1,4 +1,10 @@
 pub mod entries;
+pub mod feed_genres;
+pub mod feed_maintenance;
+mod feed_queries;
+pub mod feed_refresh;
+pub mod feed_settings;
+mod feed_source;
 pub mod feeds;
 pub mod opml;
 pub mod search;
