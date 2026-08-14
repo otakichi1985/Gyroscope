@@ -22,6 +22,24 @@
 
 <!-- ここから実際の記録 -->
 
+> - **[Codex]** portable版でDB更新後のフィード一覧が古いままになる原因を確認。`App.tsx`で起動時とウィンドウ再フォーカス時にフィード・ジャンルを再取得するよう修正し、`npm run build` 成功。
+> - **[Codex]** `context/workflows` を `human-ai-foundation` 側の共通本体へつながるジャンクションに切り替えた。プロジェクト固有のcontext文書は従来どおり独立管理。
+> - **[Codex]** `App/src-tauri/src/commands/feeds.rs` からURL検証とBOOTHショップ判定を `commands/feed_source.rs` へ分離。入力ルーティングの責務を独立させた。`cargo test` 70件成功。初回は移動前パスを残したtargetが原因で失敗したため、`src-tauri/target`のみ`cargo clean`して再検証。
+> - **[Codex]** フィードの削除・名称・ジャンル・間隔・通知・並び順・タグ変更を `commands/feed_settings.rs` へ分離。Tauri登録先を新モジュールへ変更し、`cargo check` 成功。
+> - **[Codex]** 起動時のfavicon補完処理を `commands/feed_maintenance.rs` へ分離。通常のフィード更新と起動時メンテナンスの責務を分け、`cargo check` 成功。
+> - **[Codex]** 更新IPCの入口（単体更新・全体更新）を `commands/feed_refresh.rs` へ分離。内部更新エンジンはschedulerからも使うため `feeds.rs` に残し、IPCと内部処理の境界を明確化した。
+> - **[Codex]** フィード一覧のDB参照ヘルパーを `commands/feed_queries.rs` へ分離。`feeds.rs` の登録・更新フローと読み取り整形の責務を分け、`cargo check` で確認。
+> - **[Codex]** `feeds.rs` からジャンル管理を `commands/feed_genres.rs` へ分離。Tauriコマンドマクロは再エクスポート経由で登録できなかったため、`lib.rs`の登録先を新モジュールへ直接変更した。
+> - **[Codex]** `App/src/components/SettingsOverlay.tsx` の設定状態・副作用（Zustand、テーマ判定、セクション開閉、システムフォント取得）を `useSettingsController.ts` へ分離。設定画面の描画責務と状態管理責務の境界を明確化した。`npm run build` 成功。既存の未コミット変更は保持。
+
+# Unreleased Changes
+
+現行版に対するバグ修正・新機能追加を、リリースノートへ反映するまで保持する。
+コミット済みでも削除せず、リリースノート作成後にリリース済み項目だけ削除する。削除前の内容はGitに残る。
+
+
+<!-- ここから実際の記録 -->
+
 
 # Uncommitted Archive
 
@@ -39,6 +57,8 @@
 
 
 <!-- ここから実際の記録 -->
+
+> - **[Codex]** `App/src/components/SettingsOverlay.tsx` の設定状態・副作用（Zustand、テーマ判定、セクション開閉、システムフォント取得）を `useSettingsController.ts` へ分離。設定画面の描画責務と状態管理責務の境界を明確化した。`npm run build` 成功。既存の未コミット変更は保持。
 
 
 
@@ -92,6 +112,8 @@ v0.2.6としてリリース（`package.json`/`tauri.conf.json`/`Cargo.toml`の�
 
 - `Current Work` が肥大化 → まずHumanへコミットを提案
 - まだコミットしない → 古い部分を `Uncommitted Archive` へ圧縮
-- コミット → 該当する未コミット記録を `Recent Commits` へ圧縮
+- 現行版のバグ修正・新機能追加 → `Unreleased Changes` に記録し、コミット後もリリースまで残す
+- リリース → リリースノートへ転記してから、リリース済み項目を `Unreleased Changes` から削除
+- その他の一時的な作業記録をコミット → 該当する記録を `Recent Commits` へ圧縮
 - `Recent Commits` → 最大5件
 - それ以前 → Git / GitHubを参照
