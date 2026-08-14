@@ -55,6 +55,7 @@ pub struct SearchHit {
     pub title: String,
     pub url: String,
     pub snippet: String,
+    pub published_at: Option<String>,
     pub thumbnail_url: Option<String>,
     /// How many Hatena users bookmarked this page -- the only popularity
     /// signal this search has, and the main lever for both quality (favor
@@ -119,6 +120,7 @@ fn entry_to_hit(entry: crate::db::models::NewEntry, meta: &HashMap<String, ItemM
         title,
         url,
         snippet: entry.summary.unwrap_or_default(),
+        published_at: entry.published_at,
         thumbnail_url: item_meta.thumbnail_url,
         bookmark_count: item_meta.bookmark_count,
     })

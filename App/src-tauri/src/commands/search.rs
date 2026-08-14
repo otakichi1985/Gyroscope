@@ -33,6 +33,8 @@ pub struct ScoredSource {
     pub url: String,
     pub domain: String,
     pub snippet: String,
+    pub published_at: Option<String>,
+    pub feed_available: bool,
     pub thumbnail_url: Option<String>,
     pub bookmark_count: u32,
     pub score: i32,
@@ -140,9 +142,6 @@ async fn rank_hits(client: &Client, hits: Vec<hatena_bookmark::SearchHit>) -> Ap
     let mut results = Vec::with_capacity(handles.len());
     for handle in handles {
         let Ok((domain, hit, found)) = handle.await else { continue };
-        if !found {
-            continue;
-        }
         let policy_result = policy::score(&domain, &hit.url);
         let (bookmark_score, bookmark_reason) = policy::bookmark_boost(hit.bookmark_count);
         let mut reasons = policy_result.reasons;
@@ -152,6 +151,8 @@ async fn rank_hits(client: &Client, hits: Vec<hatena_bookmark::SearchHit>) -> Ap
             url: hit.url,
             domain,
             snippet: hit.snippet,
+            published_at: hit.published_at,
+            feed_available: found,
             thumbnail_url: hit.thumbnail_url,
             bookmark_count: hit.bookmark_count,
             score: policy_result.score + bookmark_score,
@@ -168,6 +169,7 @@ fn clone_hit(hit: &hatena_bookmark::SearchHit) -> hatena_bookmark::SearchHit {
         title: hit.title.clone(),
         url: hit.url.clone(),
         snippet: hit.snippet.clone(),
+        published_at: hit.published_at.clone(),
         thumbnail_url: hit.thumbnail_url.clone(),
         bookmark_count: hit.bookmark_count,
     }
