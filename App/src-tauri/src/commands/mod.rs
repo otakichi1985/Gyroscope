@@ -7,6 +7,7 @@ pub mod feed_settings;
 mod feed_source;
 pub mod feeds;
 pub mod opml;
+pub mod saved;
 pub mod search;
 pub mod settings;
 pub mod update;

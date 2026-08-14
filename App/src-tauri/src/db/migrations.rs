@@ -120,6 +120,25 @@ const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE feeds ADD COLUMN source_type TEXT NOT NULL DEFAULT 'rss';
     "#,
+    // v6: bookmarks saved from the discover ("探す") screen. Unified with the
+    // timeline's starred-entry bookmarks: rows live here and are surfaced as
+    // synthetic entries with negative ids (see commands::entries) so the
+    // starred view and the trash treat them exactly like a normal starred
+    // entry. `url` is the identity -- re-saving the same article upserts
+    // rather than duplicating, and re-saving a trashed article restores it.
+    // `deleted_at` feeds the same 30-day trash retention as delete_entry.
+    r#"
+    CREATE TABLE saved_articles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        url TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        domain TEXT NOT NULL,
+        snippet TEXT NOT NULL,
+        thumbnail_url TEXT,
+        saved_at TEXT NOT NULL,
+        deleted_at TEXT
+    );
+    "#,
 ];
 
 pub fn run(conn: &Connection) -> rusqlite::Result<()> {

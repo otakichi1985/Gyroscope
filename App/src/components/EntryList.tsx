@@ -279,8 +279,11 @@ export function EntryList() {
               <EntryRow
                 entry={entry}
                 mode={viewMode}
-                feedTitle={feedTitleById.get(entry.feed_id) ?? ""}
-                feedIconUrl={feedIconById.get(entry.feed_id) ?? null}
+                // Discover-saved bookmarks are synthesized with feed_id 0
+                // (see commands::entries) and belong to no real feed -- label
+                // them as such instead of showing a blank source.
+                feedTitle={entry.feed_id === 0 ? "保存した記事" : (feedTitleById.get(entry.feed_id) ?? "")}
+                feedIconUrl={entry.feed_id === 0 ? null : (feedIconById.get(entry.feed_id) ?? null)}
                 cardSize={cardSize}
                 showDelete={starredOnly}
               />
