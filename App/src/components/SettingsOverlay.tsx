@@ -1,20 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { type CardGap, type CardSize, type ClickBehavior, type ThemeMode } from "../stores/appearanceStore";
 import { SKINS } from "../lib/skins";
-import { useVibrancyMode } from "../hooks/useVibrancyMode";
-import {
-  useAppearanceStore,
-  type CardGap,
-  type CardSize,
-  type ClickBehavior,
-  type ThemeMode,
-} from "../stores/appearanceStore";
 import type { DataDirInfo } from "../lib/types";
 import { useUpdateStore } from "../stores/updateStore";
 import { FontPicker } from "./FontPicker";
 import { ScreenOverlay } from "./ScreenOverlay";
 import { ChevronDownIcon } from "./icons";
+import { useSettingsController } from "./useSettingsController";
 
 const CARD_SIZES: { id: CardSize; label: string }[] = [
   { id: "small", label: "小" },
@@ -44,29 +38,6 @@ const SKIN_GROUPS = [
   { id: "contrast", label: "コントラスト" },
   { id: "style", label: "スタイル" },
 ] as const;
-
-type SettingsSectionId = "appearance" | "accessibility" | "behavior" | "privacy" | "data" | "update";
-
-const SETTINGS_SECTIONS_STORAGE_KEY = "gyroscope:settings-sections";
-const DEFAULT_OPEN_SECTIONS: Record<SettingsSectionId, boolean> = {
-  appearance: true,
-  accessibility: false,
-  behavior: false,
-  privacy: false,
-  data: false,
-  update: false,
-};
-
-function loadOpenSections(): Record<SettingsSectionId, boolean> {
-  try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_SECTIONS_STORAGE_KEY) ?? "null") as
-      | Partial<Record<SettingsSectionId, boolean>>
-      | null;
-    return saved ? { ...DEFAULT_OPEN_SECTIONS, ...saved } : DEFAULT_OPEN_SECTIONS;
-  } catch {
-    return DEFAULT_OPEN_SECTIONS;
-  }
-}
 
 function SettingsSection({
   title,
@@ -378,7 +349,6 @@ export function SettingsOverlay() {
     clickBehavior,
     showIconLabels,
     titleMarquee,
-    themeMode,
     setOpacity,
     setSkin,
     setCardSize,
@@ -394,32 +364,17 @@ export function SettingsOverlay() {
     setShowIconLabels,
     setTitleMarquee,
     setThemeMode,
-  } = useAppearanceStore();
-  const vibrancy = useVibrancyMode();
-  const opacityDisabled = vibrancy === "none";
-  const selectedSkin = SKINS.find((skin) => skin.id === skinId) ?? SKINS[0];
-  const terminalSelected = selectedSkin.visualStyle === "terminal";
-  const cardinalitySelected = selectedSkin.visualStyle === "cardinality";
-  const ordinarySelected = selectedSkin.visualStyle === "ordinary";
-  const themeModeLocked = terminalSelected || cardinalitySelected || ordinarySelected;
-  const displayedThemeMode: ThemeMode =
-    terminalSelected || ordinarySelected ? "dark" : cardinalitySelected ? "light" : themeMode;
-  const [openSections, setOpenSections] = useState(loadOpenSections);
-
-  const toggleSection = (id: SettingsSectionId) => {
-    setOpenSections((current) => {
-      const next = { ...current, [id]: !current[id] };
-      localStorage.setItem(SETTINGS_SECTIONS_STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  };
-
-  const [systemFonts, setSystemFonts] = useState<string[] | null>(null);
-  useEffect(() => {
-    invoke<string[]>("list_system_fonts")
-      .then(setSystemFonts)
-      .catch(() => setSystemFonts([]));
-  }, []);
+    selectedSkin,
+    terminalSelected,
+    cardinalitySelected,
+    ordinarySelected,
+    themeModeLocked,
+    displayedThemeMode,
+    opacityDisabled,
+    openSections,
+    toggleSection,
+    systemFonts,
+  } = useSettingsController();
 
   return (
     <ScreenOverlay screen="settings" title="設定">
