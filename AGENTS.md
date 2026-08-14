@@ -59,6 +59,7 @@ Humanが判断できる言葉に噛み砕く。
 - 最近の作業 → `context/WORKLOG.md`
 - 接続可能性 → `context/CONNECTION_POSSIBILITY_CHECKLIST.md`
 - 未確定の案 → `context/IDEAS_AND_HYPOTHESES.md`
+- UIの配色・見た目規約 → `context/UI_CONVENTIONS.md`
 
 
 ## 検証ループ

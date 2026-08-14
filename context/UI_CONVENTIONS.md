@@ -1,0 +1,54 @@
+# UI_CONVENTIONS.md
+
+UI/見た目を変更するときに、全テーマ(スキン)・ライト/ダークで一貫した見た目を保つための規約。
+見た目が「何か変」に見える不整合は、この規約にない色の直書きや独自装飾から生じる。
+
+## 配色システム
+
+- アプリの見た目は選択中スキンのアクセントRGB変数(`--accent-rgb-light/dark`)で駆動する。
+- 強調・選択状態は以下の抽象クラスを使い、色を直書きしない。
+  - `accent-text` … 強調テキスト、選択状態のアイコン(☆など)
+  - `accent-bg` … 塗り(プライマリCTA、トグルON)。文字色は白などを明示する
+  - `accent-bg-soft` … 薄い塗り(選択チップ、ソフトボタン)
+  - `accent-border` … 枠
+- ダークモードは`.dark`付き定義が自動適用される。
+- `accent-bg`と`accent-text`を同一要素に併用しない(同色で文字が読めない)。
+
+## 意味色
+
+- emerald(緑) = 成功・既読などの肯定状態(既読✓、RSS登録可、成功通知)
+- red(赤) = エラー
+- これ以外の装飾目的の色(amber等)はアクセントシステムへ。装飾色の直書きはしない。
+
+## レシピ(既存画面から流用)
+
+変更対象と同じ要素のclassNameを、参照画面からコピーする。
+
+- 入力欄: `border border-black/10 bg-black/5 ... outline-none dark:border-white/10 dark:bg-white/5`(focusリングなし)
+- プライマリCTA: `accent-bg` + 白文字
+- 選択チップ/タブ/セグメント: 選択=`accent-bg-soft accent-text font-medium`、非選択=`bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10`
+- カード(結果・一覧アイテム): `entry-card` + ガラス背景 + ホバー + `active:scale-[0.98]`(EntryRowと同じ)
+- ☆: 選択時`accent-text`、非選択時`opacity-60 hover:opacity-100`
+- チェックボックス: `checkbox-input`(ネイティブのaccent-colorをスキンへ追従)
+- 参照元画面: EntryRow / FilterBar / SettingsOverlay / StatePanel / DiscoverOverlay
+
+## 実装時の手順
+
+1. 変更対象と同種の要素を既存画面から探し、そのclassNameを流用する。
+2. 新規の見た目を作りたくなったら、先に既存レシピで代替できるか確認する。
+3. ライト/ダーク/最低1スキン(フローティング系など)で表示を確認する。
+4. 変更ファイルに装飾色の直書きがないかgrepで確認する
+   (`text-amber-|bg-amber-|ring-amber-`等。各々が意味色かどうか判定)。
+
+## 決定済みの判断
+
+以前Humanと確定したUI判断。再議論せずこの答えで実装する。
+
+- 探す画面のカード: 提供元ドメインは`accent-text text-xs`(タイムラインのフィード名強調と同じ)。大きくしない。
+- 検索ボタン: `accent-bg`+白文字のプライマリCTA。
+- 「候補の状態」チップ: 選択肢ごとの独自色分けをやめ、兄弟チップと同じ`accent-bg-soft`。
+
+## 共通化候補(グローバル層への昇格は要検証)
+
+- 「スキン連動のアクセント色をCSS変数+抽象クラスで持つ」という技法は他プロジェクトへ応用できる可能性がある。
+- 2つ目のプロジェクトで実際に通用したものをグローバル層へ昇格させる。単独プロジェクトの規則をグローバル原則とみなさない。
