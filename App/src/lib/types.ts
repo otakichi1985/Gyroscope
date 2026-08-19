@@ -58,6 +58,7 @@ export interface ScoredSource {
   domain: string;
   snippet: string;
   published_at: string | null;
+  feed_url: string | null;
   feed_available: boolean;
   thumbnail_url: string | null;
   bookmark_count: number;

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppearanceStore } from "../stores/appearanceStore";
 
@@ -11,13 +12,29 @@ export function TitleBar() {
   // window dragging off.
   const dragRegion = positionLocked ? undefined : true;
 
+  // `npm run tauri dev` runs against the Vite dev server, so DEV is true
+  // exactly for the development build. Tag the title bar and the OS window
+  // title so a dev build can't be mistaken for a release one (they look and
+  // behave identically otherwise, and both target the same user data).
+  const isDev = import.meta.env.DEV;
+  useEffect(() => {
+    if (isDev) {
+      void appWindow.setTitle("Gyroscope (開発版)");
+    }
+  }, [isDev]);
+
   return (
     <div
       data-tauri-drag-region={dragRegion}
       className="app-titlebar flex h-8 shrink-0 items-center justify-between pl-3 pr-1 select-none"
     >
-      <span data-tauri-drag-region={dragRegion} className="text-xs font-medium opacity-70">
+      <span data-tauri-drag-region={dragRegion} className="flex items-center gap-1.5 text-xs font-medium opacity-70">
         Gyroscope
+        {isDev && (
+          <span className="rounded bg-accent-bg-soft px-1 py-px text-[10px] font-semibold leading-none text-accent-text">
+            開発版
+          </span>
+        )}
       </span>
       <div className="flex items-center gap-1">
         <button

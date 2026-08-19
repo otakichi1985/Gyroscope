@@ -4,7 +4,8 @@ import { useEntriesStore } from "../stores/entriesStore";
 import { useAppearanceStore } from "../stores/appearanceStore";
 import { useUiStore, type Screen } from "../stores/uiStore";
 import { useUpdateStore } from "../stores/updateStore";
-import { ClockIcon, CloseIcon, CompassIcon, PaletteIcon, PinIcon, RssIcon, SearchIcon, StarIcon, TrashIcon } from "./icons";
+import { ClearableInput } from "./ClearableInput";
+import { ClockIcon, CompassIcon, PaletteIcon, PinIcon, RssIcon, SearchIcon, StarIcon, TrashIcon } from "./icons";
 
 /**
  * `hue` names a role colour rather than a literal colour. Only skins whose
@@ -142,6 +143,19 @@ export function FilterBar() {
       data-tauri-drag-region={dragRegion}
       className="app-filterbar flex shrink-0 flex-wrap items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10"
     >
+      {/* Always-visible "this is a dev build" marker. The title bar (where
+          the same 開発版 pill also appears) is opt-in and hidden by default,
+          so without this the OS window title would be the only other cue --
+          easy to miss. The FilterBar is permanent chrome, so a tiny pill
+          here guarantees a dev build can't be mistaken for a release one. */}
+      {import.meta.env.DEV && (
+        <span
+          className="shrink-0 rounded bg-accent-bg-soft px-1.5 py-0.5 text-[10px] font-semibold leading-none text-accent-text"
+          title="開発ビルドです"
+        >
+          開発版
+        </span>
+      )}
       {/* "位置を固定" stands alone at the far left, separated by a divider
           from everything else -- it used to sit in the same run as the
           other icons and was easy to hit by accident while reaching for a
@@ -233,7 +247,17 @@ export function FilterBar() {
       {NAV_ICONS.map(({ screen, label, shortLabel, hue, Icon }) => (
         <IconButton
           key={screen}
-          onClick={() => toggleScreen(screen)}
+          // The bookmark filter is a timeline-local view state, not a global
+          // mode -- navigating to any other screen clears it (and the
+          // timeline returns unfiltered when coming back). Otherwise the
+          // starredOnly flag leaked across screens: opening 探す after
+          // pressing the bookmark button kept the filter "expanded", and the
+          // ブクマ button looked active on screens where the filter isn't
+          // even visible.
+          onClick={() => {
+            setStarredOnly(false);
+            toggleScreen(screen);
+          }}
           active={activeScreen === screen}
           label={label}
           shortLabel={shortLabel}
@@ -265,24 +289,16 @@ export function FilterBar() {
         inert={!searchOpen}
       >
         <div className="relative">
-          <input
-            ref={searchInputRef}
+          <ClearableInput
+            inputRef={searchInputRef}
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="記事を検索"
+            clearLabel="検索をクリア"
+            onClear={() => setSearchQuery("")}
             className="w-full rounded border border-black/10 bg-black/5 py-1 pl-2 pr-6 text-xs outline-none dark:border-white/10 dark:bg-white/5"
           />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center rounded p-0.5 opacity-60 transition-colors duration-150 hover:opacity-100"
-              aria-label="検索をクリア"
-            >
-              <CloseIcon className="h-3 w-3" />
-            </button>
-          )}
         </div>
       </div>
       </div>

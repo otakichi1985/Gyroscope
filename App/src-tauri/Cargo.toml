@@ -45,6 +45,11 @@ reqwest = { version = "0.13.4", default-features = false, features = ["rustls", 
 feed-rs = "2.4.0"
 rusqlite = { version = "0.40.1", features = ["bundled", "chrono", "backup"] }
 scraper = "0.27.0"
+# Scraper's tree API is built on ego-tree, but the crate doesn't re-export
+# its NodeRef -- the article full-text extractor (fetch/article.rs) walks
+# the tree directly, so it needs this as a direct dependency. Pinned to the
+# version already resolved transitively to avoid a second copy.
+ego-tree = "0.11"
 quick-xml = "0.41.0"
 chrono = { version = "0.4.45", features = ["serde"] }
 thiserror = "2.0.19"

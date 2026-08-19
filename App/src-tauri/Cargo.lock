@@ -1576,6 +1576,7 @@ name = "gyroscope"
 version = "0.2.7"
 dependencies = [
  "chrono",
+ "ego-tree",
  "feed-rs",
  "mediatype",
  "percent-encoding",

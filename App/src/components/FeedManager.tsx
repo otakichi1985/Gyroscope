@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { useFeedsStore } from "../stores/feedsStore";
 import { BellIcon, BellOffIcon, CloseIcon, RefreshIcon, TrashIcon, WarningIcon } from "./icons";
+import { ClearableInput } from "./ClearableInput";
 
 const OPML_FILTER = [{ name: "OPML", extensions: ["opml", "xml"] }];
 
@@ -61,17 +62,27 @@ function GenreManager() {
           ))}
         </div>
       )}
-      <form onSubmit={handleCreate} className="flex gap-1">
-        <input
+      <div className="text-xs font-medium opacity-70">ジャンルを追加</div>
+      <form onSubmit={handleCreate} className="flex items-center gap-1">
+        {/* Not the dashed "+" composer anymore -- a filled chip read as a
+            button, and two near-identical rows (feed URL / genre name) were
+            indistinguishable. Instead each form now carries an explicit
+            label (フィードを追加 / ジャンルを追加) above it, so the rows are
+            told apart by what they say, not by how they're framed. */}
+        <ClearableInput
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="新しいジャンル名"
-          className="min-w-0 flex-1 rounded border border-black/10 bg-black/5 px-1.5 py-0.5 text-xs outline-none dark:border-white/10 dark:bg-white/5"
+          aria-label="新しいジャンル名"
+          clearLabel="ジャンル名をクリア"
+          onClear={() => setName("")}
+          wrapperClassName="min-w-0 flex-1"
+          className="w-full rounded border border-black/10 bg-black/5 px-2 py-1 text-xs outline-none placeholder:opacity-50 dark:border-white/10 dark:bg-white/5"
         />
         <button
           type="submit"
           disabled={busy || !name.trim()}
-          className="rounded bg-black/10 px-2 py-0.5 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 disabled:opacity-50 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
+          className="shrink-0 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 disabled:opacity-50 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
         >
           追加
         </button>
@@ -172,12 +183,17 @@ export function FeedManager() {
       {opmlMessage && <p className="text-xs opacity-70">{opmlMessage}</p>}
       {opmlError && <p className="text-xs text-red-500">{opmlError}</p>}
 
+      <div className="text-xs font-medium opacity-70">フィードを追加</div>
       <form onSubmit={handleAdd} className="flex gap-1">
-        <input
+        <ClearableInput
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com/feed.xml"
-          className="min-w-0 flex-1 rounded border border-black/10 bg-black/5 px-2 py-1 text-xs outline-none dark:border-white/10 dark:bg-white/5"
+          aria-label="フィードのURL"
+          clearLabel="フィードのURLをクリア"
+          onClear={() => setUrl("")}
+          wrapperClassName="min-w-0 flex-1"
+          className="w-full rounded border border-black/10 bg-black/5 px-2 py-1 text-xs outline-none dark:border-white/10 dark:bg-white/5"
         />
         <button
           type="submit"
@@ -272,10 +288,22 @@ export function FeedManager() {
                 <button
                   type="button"
                   onClick={() => setFeedNotify(feed.id, !feed.notify_enabled)}
-                  className="flex shrink-0 items-center rounded p-1 opacity-60 transition-colors duration-150 hover:opacity-100 active:bg-black/10 dark:active:bg-white/10"
+                  // Icon-only bell buttons read as "something about
+                  // notifications" but never made it obvious that the
+                  // setting is a plain on/off toggle. A labelled pill with
+                  // an explicit 通知ON/通知OFF state (accent fill when on)
+                  // makes the toggle and its current state visible at rest.
+                  className={`flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors duration-150 ${
+                    feed.notify_enabled
+                      ? "accent-bg-soft accent-text font-medium"
+                      : "bg-black/5 opacity-70 hover:opacity-100 dark:bg-white/5"
+                  }`}
                   aria-label={feed.notify_enabled ? "通知を無効にする" : "通知を有効にする"}
+                  aria-pressed={feed.notify_enabled}
+                  title={feed.notify_enabled ? "新着を通知しています（クリックでOFF）" : "通知はオフです（クリックでON）"}
                 >
-                  {feed.notify_enabled ? <BellIcon className="h-3.5 w-3.5" /> : <BellOffIcon className="h-3.5 w-3.5" />}
+                  {feed.notify_enabled ? <BellIcon className="h-3 w-3" /> : <BellOffIcon className="h-3 w-3" />}
+                  <span>{feed.notify_enabled ? "通知ON" : "通知OFF"}</span>
                 </button>
                 <button
                   type="button"

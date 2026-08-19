@@ -1,3 +1,4 @@
+pub mod article;
 pub mod booth;
 pub mod client;
 pub mod discovery;

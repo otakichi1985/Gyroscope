@@ -2115,6 +2115,15 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   height: auto;
   border-radius: 0.375rem;
 }
+.reader-content iframe,
+.reader-content video {
+  display: block;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  margin: 0.75em 0;
+  border-radius: 0.375rem;
+}
 .reader-content a {
   text-decoration: underline;
   text-underline-offset: 2px;
