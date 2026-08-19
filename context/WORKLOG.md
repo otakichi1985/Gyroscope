@@ -22,6 +22,8 @@
 
 <!-- ここから実際の記録 -->
 
+> - **[opencode]** モデル視覚・Human視覚に依存しない計算ベースのUI視覚監査を新設（未コミット）。`pngjs@7.0.0`追加。`e2e/helpers/visual.js`（DOM監査: 可視性・はみ出し・重なり`elementFromPoint`・コントラストを数値化、CLEAR_PASS/FAIL/AMBIGUOUSの3値分類。閉じたオーバーレイ・折りたたみセクション内の非表示コントロールは`skipped-in-closed`として誤検知を除外）、`e2e/helpers/pixeldiff.js`（基準画像とのピクセル差分を数値のみで報告）、`e2e/specs/ui-audit.spec.js`（11画面を歩行して各画面をDOM監査+基準画像`e2e/baselines/*.png`と差分、`UPDATE_BASELINES=1`で再生成、error1件でも失敗のハードゲート）。単独実行で全11画面CLEAR_PASS、フルスイート（10ファイル23テスト）全通過。VERIFY.mdにプリセット「UI視覚監査（計算ベース・モデル視覚非依存）」を追記。フルスイート時は先行スペックが残す保存記事でbookmarks画面がAMBIGUOUSになり得る（情報・ハードゲートはCLEAR_FAILのみ）。
+
 > - **[opencode]** 探す画面の提供元URL可視化と全テーマでの見た目統一。カードの提供元ドメインをタイムラインと同じ`accent-text`強調(10px/opacity55→text-xs/無減光)へ。色の不整合(amberハードコード)をアクセント基調へ統一 — ☆・「記事を保存」・チェックボックス(`checkbox-input`新設)・検索欄のfocusリングを撤去。検索ボタンを`accent-bg accent-text`(ライトモードで同色=ほぼ不可視のバグ)から正規プライマリCTA(`accent-bg`+白文字)へ修正。「候補の状態」チップも兄弟チップと同じ`accent-bg-soft`へ。カードを`entry-card`化(タイムラインのガラスカードと同じ背景/ホバー/`active:scale-[0.98]`押下)し、フローティング/スタイル系スキン(カーディナリティ・オーディナリー等)でも見た目が統一されるようにした。配置は不変。RSSバッジの緑(成功=既読✓と同じセマンティック色)と提供元注記は維持。`npm run build`成功、E2E(`bookmark-store.spec.js`)通過。
 > - **[opencode]** 探すタブのブックマーク保存をタイムラインのブックマーク一覧と統合。ユーザー要望4点を実装した。
 >   1. **提供元の明示**: 検索画面下部に「検索結果は「はてなブックマーク」のデータを使用しています」を追加。

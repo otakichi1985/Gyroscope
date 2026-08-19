@@ -165,6 +165,21 @@ E2Eが起動するアプリは `GYROSCOPE_DATA_DIR`（`%TEMP%\gyroscope-e2e-data
 対象のGUI変更を確認するスペックが無ければ先に書く必要がある。
 
 
+## UI視覚監査（計算ベース・モデル視覚非依存）
+
+**対象:** 全画面のレイアウト・描画の構造的崩れ（重なり・隠れ・はみ出し・コントラスト・画面変化）。画像を「見る」モデルやHuman視覚に頼らず、幾何・computed style・`elementFromPoint`・ピクセル差分の数値のみで判定する（非マルチモーダルモデルでも判断可能なように3値分類: CLEAR_PASS / CLEAR_FAIL / AMBIGUOUS。曖昧分のみHuman判断へ）。
+
+**用途:** GUI変更の回帰確認。構造バグ（クリック奪取、非表示化、描画崩れ）をモデル視覚なしで機械的に検出する既定の監査。`e2e/specs/ui-audit.spec.js`がホーム/ブックマーク/探す/履歴/ゴミ箱/フィード管理/設定×ライト・ダークを歩行し、各画面でDOM監査（`helpers/visual.js`）と基準画像とのピクセル差分（`helpers/pixeldiff.js`）を実行する。
+
+**実行:**  
+`App/` で `npm run test:e2e -- --spec e2e/specs/ui-audit.spec.js`。基準画像`e2e/baselines/*.png`はクリーン状態（`%TEMP%\gyroscope-e2e-data`を削除後）で生成する。基準を更新する意図的な画面変更時のみ `UPDATE_BASELINES=1` を付けて再生成し、差分が意図通りかを確認してコミットする。
+
+**確認:**  
+`SUMMARY: screens=11 CLEAR_FAIL=0` を満たし、各画面が `dom=CLEAR_PASS shot=CLEAR_PASS`。CLEAR_FAILは構造バグ（要修正）。AMBIGUOUSは「基準と異なる」の情報であり、原因を特定して意図的なら許容・不意なら修正する。
+
+**限界:**  
+閉じたオーバーレイ・折りたたみセクション等の非表示コンテナ内コントロールは`skipped-in-closed`として集計（誤検知を防ぐため対象外）。フルスイート`npm run test:e2e`では先行スペックが残す保存記事・画面状態により bookmarks / trash がAMBIGUOUSになり得る（共有DBのため。構造バグ検出はDOM監査層で担保）。決定的なピクセル検証はクリーンなデータで単独実行する。基準画像はDPI倍率（本環境1.25x）に依存するため、別環境で再生成が必要。
+
 <!-- ここから実際の検証プリセット -->
 
 
