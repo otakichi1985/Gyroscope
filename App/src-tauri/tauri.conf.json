@@ -26,8 +26,9 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https: http:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'"
-    }
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https: http:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; media-src 'self' https: http:; frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.dailymotion.com https://player.bilibili.com https://embed.nicovideo.jp https://drive.google.com https://youtu.be https://vimeo.com; frame-ancestors 'none'"
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,

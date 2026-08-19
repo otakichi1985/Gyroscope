@@ -33,7 +33,7 @@ const DEFAULT_LIMIT: i64 = 200;
 /// ENTRY_COLUMNS so Entry::from_row maps it unchanged. The frontend branches
 /// on `id < 0` to open such rows in the system browser (no reader entry
 /// exists for them).
-const SAVED_ARTICLE_ENTRY_COLUMNS: &str = "-s.id, 0, s.url, s.title, NULL, s.url, s.snippet, NULL, \
+const SAVED_ARTICLE_ENTRY_COLUMNS: &str = "-s.id, 0, s.url, s.title, s.url, NULL, s.snippet, NULL, \
      s.thumbnail_url, s.saved_at, s.saved_at, 1, 1, s.deleted_at";
 
 /// Turns free-text user input into a safe FTS5 `MATCH` query. Passing raw
@@ -284,6 +284,30 @@ pub fn mark_all_unread(db: State<'_, Db>, feed_id: Option<i64>) -> AppResult<()>
         Some(id) => conn.execute("UPDATE entries SET is_read = 0 WHERE feed_id = ?1", params![id])?,
         None => conn.execute("UPDATE entries SET is_read = 0", [])?,
     };
+    Ok(())
+}
+
+/// External articles opened from the discover ("探す") screen have no row in
+/// `entries`, so `record_read_history` never runs for them -- they were
+/// vanishing from 既読履歴 entirely. This snapshots such an article into
+/// `read_history` directly, keyed on (feed_title, url) the same way so a
+/// re-open keeps the original read_at. Best-effort by design: recording is
+/// incidental to opening the browser, so the frontend treats failure as
+/// non-fatal.
+#[tauri::command]
+pub fn record_external_read(
+    db: State<'_, Db>,
+    url: String,
+    title: String,
+    feed_title: String,
+) -> AppResult<()> {
+    let conn = db.0.lock().unwrap();
+    conn.execute(
+        "INSERT INTO read_history (feed_title, entry_guid, title, link, read_at) \
+         VALUES (?1, ?2, ?3, ?4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) \
+         ON CONFLICT(feed_title, entry_guid) DO NOTHING",
+        params![feed_title, url, title, url],
+    )?;
     Ok(())
 }
 

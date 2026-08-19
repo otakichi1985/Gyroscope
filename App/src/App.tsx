@@ -101,6 +101,25 @@ function App() {
     return () => window.removeEventListener("focus", syncFeeds);
   }, [refreshFeeds, refreshGenres]);
 
+  // Mouse side buttons navigate between screens: button 3 (the "back" side
+  // button) steps back through the screen history, button 4 (the "forward"
+  // one) steps forward. preventDefault stops Chromium's own back/forward
+  // behaviour from fighting ours. `auxclick` fires only for non-primary
+  // buttons, so normal clicks are unaffected.
+  useEffect(() => {
+    function handleAuxClick(e: MouseEvent) {
+      if (e.button === 3) {
+        e.preventDefault();
+        useUiStore.getState().goBack();
+      } else if (e.button === 4) {
+        e.preventDefault();
+        useUiStore.getState().goForward();
+      }
+    }
+    window.addEventListener("auxclick", handleAuxClick);
+    return () => window.removeEventListener("auxclick", handleAuxClick);
+  }, []);
+
   const [idlePattern, setIdlePattern] = useState(IDLE_PATTERNS[0]);
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,

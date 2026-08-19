@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { entrySnippet, formatPublished } from "../lib/text";
 import { useAppearanceStore, type CardSize } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
+import { fetchArticleThumb } from "../lib/articleThumb";
 import type { Entry } from "../lib/types";
 import { ImageOffIcon, StarIcon, TrashIcon } from "./icons";
 import { MarqueeTitle } from "./MarqueeTitle";
@@ -61,21 +62,66 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
   const [thumbFailed, setThumbFailed] = useState(false);
   const [feedIconFailed, setFeedIconFailed] = useState(false);
 
+  // Lazily fetch a real thumbnail (og:image etc.) for entries whose feed
+  // provided none -- previously those rows dropped to the favicon / image-off
+  // placeholder. Only in card mode (the only mode that renders a thumbnail),
+  // only when there's no feed-provided image, and only when the row is
+  // actually visible: rows are virtualised with overscan, so without an
+  // IntersectionObserver gate we'd fetch for a bunch of off-screen rows.
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [fetchedThumb, setFetchedThumb] = useState<string | null>(null);
+  const shouldFetchThumb =
+    mode === "card" && !blockImages && !entry.thumbnail_url && !!entry.link && HTTP_LINK_RE.test(entry.link);
+  useEffect(() => {
+    if (!shouldFetchThumb) return;
+    let cancelled = false;
+    const apply = () =>
+      fetchArticleThumb(entry.link!).then((url) => {
+        if (!cancelled) setFetchedThumb(url);
+      });
+    // Fall back to fetching immediately when IntersectionObserver is
+    // unavailable (defensive; WebView2 has it).
+    const el = rowRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      void apply();
+    } else {
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            io.disconnect();
+            void apply();
+          }
+        },
+        { rootMargin: "200px" },
+      );
+      io.observe(el);
+      return () => {
+        cancelled = true;
+        io.disconnect();
+      };
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldFetchThumb, entry.link]);
+
+  // The thumbnail actually shown: the feed-provided one if present, otherwise
+  // the lazily-fetched og:image.
+  const thumbUrl = entry.thumbnail_url || fetchedThumb;
+
   // A refresh can replace either URL without remounting this keyed row.
   // Let the new resource try instead of keeping an old failure forever.
   useEffect(() => setThumbFailed(false), [entry.thumbnail_url]);
   useEffect(() => setFeedIconFailed(false), [feedIconUrl]);
 
   async function handleOpen() {
-    // Saved-article bookmarks carry a synthetic negative id with no reader
-    // row or read state -- open them straight in the system browser.
-    if (entry.id < 0) {
-      if (entry.link && HTTP_LINK_RE.test(entry.link)) {
-        await openUrl(entry.link);
-      }
-      return;
-    }
-    if (!entry.is_read) markRead(entry.id, true);
+    // Saved-article bookmarks (negative ids) have no reader read-state, so
+    // skip markRead for them -- but otherwise they behave exactly like normal
+    // entries now: the default "reader" click behavior opens them in the
+    // in-app reader (whose full-text auto-fetch replaces their short snippet),
+    // and the "browser" click behavior is the option that opens the default
+    // browser instead.
+    if (!entry.is_read && entry.id >= 0) markRead(entry.id, true);
     if (clickBehavior === "reader") {
       useUiStore.getState().openReader(entry.id);
       return;
@@ -251,6 +297,7 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
   return (
     <div
       {...rowProps}
+      ref={rowRef}
       // Same glass-card language as list mode, just with room for the
       // thumbnail and a soft shadow since card mode is the most spacious view.
       // See list mode above for `entry-card`/`transition`/`active:scale`.
@@ -266,9 +313,9 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
         >
           <ImageOffIcon className="h-1/2 w-1/2 opacity-40" />
         </div>
-      ) : entry.thumbnail_url && !thumbFailed ? (
+      ) : thumbUrl && !thumbFailed ? (
         <img
-          src={entry.thumbnail_url}
+          src={thumbUrl}
           alt=""
           onError={() => setThumbFailed(true)}
           className={`${CARD_THUMB_SIZE[cardSize]} shrink-0 rounded object-cover`}

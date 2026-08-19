@@ -34,6 +34,13 @@ pub struct ScoredSource {
     pub domain: String,
     pub snippet: String,
     pub published_at: Option<String>,
+    /// The resolved feed URL when a feed was actually found (via the article
+    /// URL or the site root -- see `discover_feed_url`). The register action
+    /// should subscribe to *this*, not `url`: on sites like zenn.dev the
+    /// article page carries no feed link but the site root does, and feeding
+    /// the article URL to add_feed would then fail after the badge already
+    /// promised "RSS登録可".
+    pub feed_url: Option<String>,
     pub feed_available: bool,
     pub thumbnail_url: Option<String>,
     pub bookmark_count: u32,
@@ -134,14 +141,14 @@ async fn rank_hits(client: &Client, hits: Vec<hatena_bookmark::SearchHit>) -> Ap
         let semaphore = Arc::clone(&semaphore);
         handles.push(tauri::async_runtime::spawn(async move {
             let _permit = semaphore.acquire_owned().await;
-            let found = discovery::discover(&client, &site_url).await.is_ok();
-            (domain, hit, found)
+            let feed_url = discover_feed_url(&client, &site_url).await;
+            (domain, hit, feed_url)
         }));
     }
 
     let mut results = Vec::with_capacity(handles.len());
     for handle in handles {
-        let Ok((domain, hit, found)) = handle.await else { continue };
+        let Ok((domain, hit, feed_url)) = handle.await else { continue };
         let policy_result = policy::score(&domain, &hit.url);
         let (bookmark_score, bookmark_reason) = policy::bookmark_boost(hit.bookmark_count);
         let mut reasons = policy_result.reasons;
@@ -152,7 +159,8 @@ async fn rank_hits(client: &Client, hits: Vec<hatena_bookmark::SearchHit>) -> Ap
             domain,
             snippet: hit.snippet,
             published_at: hit.published_at,
-            feed_available: found,
+            feed_url: feed_url.clone(),
+            feed_available: feed_url.is_some(),
             thumbnail_url: hit.thumbnail_url,
             bookmark_count: hit.bookmark_count,
             score: policy_result.score + bookmark_score,
@@ -164,6 +172,34 @@ async fn rank_hits(client: &Client, hits: Vec<hatena_bookmark::SearchHit>) -> Ap
     Ok(results)
 }
 
+/// Resolves a candidate's actual feed URL for the "RSS登録可" badge.
+///
+/// Tries the article URL first (that's what a user is looking at), then
+/// falls back to the site root: many article pages don't link the feed even
+/// when the site publishes one (zenn.dev's `/feed` is only exposed from the
+/// root, confirmed by hand), so testing just the article page produced
+/// "RSSなし" badges for sites that genuinely have a subscribable feed --
+/// which also contradicted the feed tab, where entering the site URL
+/// discovered the same feed fine.
+async fn discover_feed_url(client: &Client, article: &Url) -> Option<String> {
+    if let Ok(discovered) = discovery::discover(client, article).await {
+        return Some(discovered.feed_url);
+    }
+    let root = site_root(article)?;
+    discovery::discover(client, &root).await.ok().map(|d| d.feed_url)
+}
+
+/// The bare `scheme://host` of a URL, or None when the URL is already the
+/// root / has no parseable host. Used for the site-root fallback above.
+fn site_root(url: &Url) -> Option<Url> {
+    let host = url.host_str()?;
+    let root = Url::parse(&format!("{}://{}", url.scheme(), host)).ok()?;
+    if root == *url {
+        return None;
+    }
+    Some(root)
+}
+
 fn clone_hit(hit: &hatena_bookmark::SearchHit) -> hatena_bookmark::SearchHit {
     hatena_bookmark::SearchHit {
         title: hit.title.clone(),
@@ -172,5 +208,35 @@ fn clone_hit(hit: &hatena_bookmark::SearchHit) -> hatena_bookmark::SearchHit {
         published_at: hit.published_at.clone(),
         thumbnail_url: hit.thumbnail_url.clone(),
         bookmark_count: hit.bookmark_count,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn site_root_reduces_an_article_url_to_origin() {
+        let article = Url::parse("https://zenn.dev/dress_code/articles/da536c39873876").unwrap();
+        // url::Url normalizes the empty path of a bare origin to "/".
+        assert_eq!(site_root(&article).unwrap().as_str(), "https://zenn.dev/");
+    }
+
+    #[test]
+    fn site_root_preserves_www() {
+        let article = Url::parse("https://www.example.com/a/b").unwrap();
+        assert_eq!(site_root(&article).unwrap().as_str(), "https://www.example.com/");
+    }
+
+    #[test]
+    fn site_root_is_none_when_already_at_the_root() {
+        let root = Url::parse("https://example.com").unwrap();
+        assert!(site_root(&root).is_none());
+    }
+
+    #[test]
+    fn site_root_is_none_without_a_host() {
+        let no_host = Url::parse("file:///tmp/feed.xml").unwrap();
+        assert!(site_root(&no_host).is_none());
     }
 }

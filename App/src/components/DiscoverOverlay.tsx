@@ -3,9 +3,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useFeedsStore } from "../stores/feedsStore";
 import { useUiStore } from "../stores/uiStore";
+import { useAppearanceStore } from "../stores/appearanceStore";
+import { sanitizeArticleHtml } from "../lib/sanitize";
 import type { ScoredSource, SearchCategory } from "../lib/types";
+import { MarqueeTitle } from "./MarqueeTitle";
 import { ScreenOverlay } from "./ScreenOverlay";
+import { ClearableInput } from "./ClearableInput";
 import { ImageOffIcon, StarIcon } from "./icons";
+
+const HTTP_LINK_RE = /^https?:\/\//i;
 
 type ResultSort = "recommended" | "newest" | "oldest";
 type ResultSize = "compact" | "standard" | "large";
@@ -79,6 +85,7 @@ function hostOf(url: string): string {
  */
 export function DiscoverOverlay() {
   const { addFeed, feeds } = useFeedsStore();
+  const blockImages = useAppearanceStore((s) => s.blockImages);
 
   const [query, setQuery] = useState("");
   const [categories, setCategories] = useState<SearchCategory[]>([]);
@@ -104,6 +111,16 @@ export function DiscoverOverlay() {
   const [resultSize, setResultSize] = useState<ResultSize>("standard");
   const [resultKind, setResultKind] = useState<ResultKind>("all");
   const [resultAvailability, setResultAvailability] = useState<ResultAvailability>("all");
+
+  // In-place full-text reader for a discover card ("全文を読む"): fetches the
+  // article body via commands::article and shows it over the results, so a
+  // discovered summary-only article can be read without leaving the app. The
+  // snippet/title/domain are kept so a readable reader view renders
+  // immediately, and the fetched full text then replaces the snippet.
+  const [reader, setReader] = useState<{ url: string; title: string; snippet: string; domain: string } | null>(null);
+  const [readerHtml, setReaderHtml] = useState<string | null>(null);
+  const [readerFetching, setReaderFetching] = useState(false);
+  const [readerError, setReaderError] = useState<string | null>(null);
 
   const existingHosts = new Set(
     feeds.flatMap((f) => [f.url, f.site_url ?? ""]).map(hostOf).filter(Boolean),
@@ -197,7 +214,11 @@ export function DiscoverOverlay() {
     setRegistering(source.url);
     setError(null);
     try {
-      await addFeed(source.url);
+      // Subscribe to the resolved feed URL (see ScoredSource.feed_url) --
+      // the card's article URL may have no feed link of its own even though
+      // the site publishes one (found via the site root), and add_feed
+      // needs a URL it can discover the feed from.
+      await addFeed(source.feed_url ?? source.url);
       setRegisteredHosts((prev) => new Set(prev).add(hostOf(source.url)));
       setNotice(`「${source.title}」をフィードに追加しました`);
       if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
@@ -300,18 +321,47 @@ export function DiscoverOverlay() {
     }
   }
 
+  async function handleReadFullText(source: ScoredSource) {
+    setReader({ url: source.url, title: source.title, snippet: source.snippet ?? "", domain: source.domain });
+    setReaderHtml(null);
+    setReaderError(null);
+    setReaderFetching(true);
+    try {
+      const result = await invoke<{ html: string }>("fetch_article_full_text", { url: source.url });
+      setReaderHtml(result.html);
+    } catch (err) {
+      setReaderError(String(err));
+    } finally {
+      setReaderFetching(false);
+    }
+  }
+
+  // Same interception as ReaderOverlay: an <a> inside dangerouslySetInnerHTML
+  // would navigate this app's own webview (CSP has nowhere for it to go), so
+  // route through the same openUrl() every other link uses.
+  function handleReaderClick(e: React.MouseEvent<HTMLDivElement>) {
+    const anchor = (e.target as HTMLElement).closest("a");
+    if (!anchor) return;
+    e.preventDefault();
+    const href = anchor.getAttribute("href");
+    if (href && HTTP_LINK_RE.test(href)) void openUrl(href);
+  }
+
   return (
     <ScreenOverlay screen="discover" title="サイトを探す">
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm">
         {/* 検索 */}
         <section className="flex flex-col gap-1.5">
           <form onSubmit={handleSearch} className="flex min-w-0 gap-1">
-            <input
+            <ClearableInput
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="キーワードで検索"
               aria-label="キーワードで検索"
-              className="min-w-0 flex-1 rounded border border-black/10 bg-black/5 px-2 py-1.5 text-xs outline-none placeholder:opacity-50 dark:border-white/10 dark:bg-white/5"
+              clearLabel="検索をクリア"
+              onClear={() => setQuery("")}
+              wrapperClassName="min-w-0 flex-1"
+              className="w-full rounded border border-black/10 bg-black/5 px-2 py-1.5 text-xs outline-none placeholder:opacity-50 dark:border-white/10 dark:bg-white/5"
             />
             <button
               type="submit"
@@ -473,7 +523,23 @@ export function DiscoverOverlay() {
                 const expanded = expandedUrl === source.url;
                 const thumbSize =
                   resultSize === "compact" ? "h-8 w-8" : resultSize === "large" ? "h-14 w-14" : "h-10 w-10";
-                return (
+// Opening an article from here goes straight to the system browser --
+  // there's no reader entry to mark read, so record the read into history
+  // explicitly (best-effort; failing to log is not worth blocking the open).
+  async function handleOpenArticle(source: ScoredSource) {
+    await openUrl(source.url);
+    try {
+      await invoke("record_external_read", {
+        url: source.url,
+        title: source.title,
+        feedTitle: source.domain,
+      });
+    } catch {
+      // Non-fatal.
+    }
+  }
+
+  return (
                   <li
                     key={source.url}
                     className="entry-card flex flex-col overflow-hidden rounded-lg border border-black/5 bg-black/[0.03] transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10"
@@ -508,13 +574,12 @@ export function DiscoverOverlay() {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div
-                          className={`truncate font-medium leading-snug ${
+                        <MarqueeTitle
+                          text={source.title}
+                          textClassName={`font-medium leading-snug ${
                             resultSize === "compact" ? "text-xs" : resultSize === "large" ? "text-base" : "text-sm"
                           }`}
-                        >
-                          {source.title}
-                        </div>
+                        />
                         {/* The provider site gets the same accent-colored,
                             undimmed source emphasis the timeline gives its
                             feed titles (see EntryRow's meta), so "where did
@@ -575,13 +640,24 @@ export function DiscoverOverlay() {
                           />
                         )}
                         {source.snippet && <p className="text-xs opacity-80">{source.snippet}</p>}
+                        {/* Reading an article here behaves like the timeline:
+                            the primary action opens the in-app full-text reader
+                            (full text is fetched automatically), and opening the
+                            default browser stays as an explicit option below. */}
+                        <button
+                          type="button"
+                          onClick={() => handleReadFullText(source)}
+                          className="accent-bg w-full rounded px-2 py-1 text-xs font-medium text-white transition-opacity duration-150 hover:opacity-90 active:opacity-80"
+                        >
+                          この記事の全文を読む
+                        </button>
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            onClick={() => openUrl(source.url)}
+                            onClick={() => handleOpenArticle(source)}
                             className="flex-1 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
                           >
-                            元記事を開く
+                            ブラウザで開く
                           </button>
                           <button
                             type="button"
@@ -617,6 +693,72 @@ export function DiscoverOverlay() {
           検索結果は「はてなブックマーク」のデータを使用しています
         </p>
       </div>
+
+      {/* In-place full-text reader, drawn over the results so a discovered
+          summary-only article can be read without leaving the app. The
+          snippet renders as a readable reader view right away (title, source,
+          body); the fetched full text then replaces the snippet in place. */}
+      {reader && (
+        <div className="panel-bg absolute inset-0 z-20 flex flex-col p-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setReader(null)}
+              aria-label="全文表示を閉じる"
+              className="shrink-0 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
+            >
+              ← 結果に戻る
+            </button>
+            <div className="min-w-0 flex-1">
+              <MarqueeTitle text={reader.title} textClassName="text-sm font-semibold" />
+              <div className="accent-text mt-0.5 truncate text-xs">{reader.domain}</div>
+            </div>
+            {/* Same "open in the default browser" option the timeline reader
+                always carries -- reading stays in-app by default, jumping to
+                the browser is the explicit choice. */}
+            <button
+              type="button"
+              onClick={() => void openUrl(reader.url)}
+              className="shrink-0 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
+            >
+              ブラウザで開く
+            </button>
+          </div>
+          <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+            {readerFetching && (
+              <p className="mb-2 text-xs opacity-60" role="status">
+                全文を取得中...
+              </p>
+            )}
+            {readerError && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-red-500">{readerError}</p>
+                <button
+                  type="button"
+                  onClick={() => void openUrl(reader.url)}
+                  className="w-fit rounded bg-black/10 px-3 py-1.5 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
+                >
+                  ブラウザで開く
+                </button>
+              </div>
+            )}
+            {readerHtml ? (
+              <div
+                className="reader-content max-w-none text-sm"
+                onClick={handleReaderClick}
+                dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(readerHtml, blockImages) }}
+              />
+            ) : (
+              !readerError &&
+              reader.snippet && (
+                <div className="reader-content max-w-none text-sm">
+                  <p className="whitespace-pre-wrap">{reader.snippet}</p>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
     </ScreenOverlay>
   );
 }

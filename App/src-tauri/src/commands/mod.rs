@@ -1,3 +1,4 @@
+pub mod article;
 pub mod entries;
 pub mod feed_genres;
 pub mod feed_maintenance;

@@ -81,9 +81,23 @@
 
 現行版に対するバグ修正・新機能追加を、リリースノートへ反映するまで保持する。
 コミット済みでも削除せず、リリースノート作成後にリリース済み項目だけ削除する。削除前の内容はGitに残る。
-
-
 <!-- ここから実際の記録 -->
+
+> - **[opencode]** 全文抽出の失敗を減らすためJSON-LDフォールバックを追加。`fetch/article.rs`の`extract_article`で、DOMから本文コンテナを発見できないページ（JS描画・非セマンティックなマークアップ等）でも、`<script type="application/ld+json">`の`articleBody`（SEO目的で全文を埋め込むサイトが多い）から本文を取得できるようにした。`@graph`/配列などの構造を再帰的に探索し、最も長い`articleBody`を採用。HTML入りの`articleBody`はそのまま渡し（フロントのDOMPurifyが除去）、プレーンテキストは`\n`ごとに`<p>`化してエスケープ。DOM抽出が成功するページは従来どおり優先（画像・埋め込みを含む高品質なHTML）。検証: `cargo test`83件成功（JSON-LD単体テスト追加）、`cargo clippy`警告なし、ローカルサーバーの一時E2Eで「DOMコンテナなし＋JSON-LDのみのページ→全文取得成功」を実機確認後削除、フルスイート8ファイル22テスト全通過。
+
+> - **[opencode]** ブックマークの「探す」由来の単体記事と、探すタブの記事の開き方を通常記事と同じ仕様に統一。①`EntryRow`の`handleOpen`で、保存記事（負のID）を無条件でシステムブラウザに飛ばしていた特別扱いを廃止し、通常記事と同じく`clickBehavior`に従うようにした（既定reader=アプリ内リーダーで開き、スニペットが短いので全文自動取得が走って本文に差し替わる。オプションはbrowser設定かリーダー内「ブラウザで開く」で既定ブラウザを開ける）。負IDの`markRead`はスキップ（読み状態が無いため。Rust側もno-op）。②`DiscoverOverlay`: 展開カードで「この記事の全文を読む」（アプリ内全文取得）をプライマリ動作にし、「元記事を開く」を「ブラウザで開く」に改名してオプションに。全文パネルのヘッダーにも常時「ブラウザで開く」ボタンを追加（従来はエラー時のみ）。検証: `npm run build`成功、ローカルHTTPサーバーの一時E2Eで「保存記事クリック→アプリ内リーダーが開き自動全文取得」を実機確認後削除、フルスイート8ファイル22テスト全通過。
+
+> - **[opencode]** リーダーの「全文を取得して読む」ボタンを廃止し、記事を開いたら自動で全文を取得するようにした。`ReaderOverlay`で要約のみ配信の記事（本文400字未満のヒューリスティック）を開くと、フィード内容を即表示したまま裏で`fetch_article_full_text`を自動実行し、取得完了で差し替える（reader-firstは従来どおり）。失敗時は自動リトライループさせず「再取得」「ブラウザで開く」を表示（`fetchError`ガード）。ボタン消滅。検証: `npm run build`成功、ローカルHTTPサーバーを立てた一時E2Eで「要約のみフィード→記事を開く→自動で全文取得・差し替え・ボタン非表示」を実機確認後削除、フルスイート8ファイル22テスト全通過。
+
+> - **[opencode]** 記事サムネを本文取得の仕組みで補完。RSSがサムネを提供しないサイトで、これまでfavicon/画像なしアイコンにフォールバックしていたのを、記事ページの`og:image`→`twitter:image`→`link[rel=image_src]`→最初の実画像の順で取得して表示するようにした。バックエンド: `fetch/article.rs`に`extract_article_image`(上記の優先順位で抽出、lazy-placeholder/data:はスキップ、相対URL解決)、`commands/article.rs`に`fetch_article_image`コマンド追加、`lib.rs`登録。フロント: `src/lib/articleThumb.ts`にURL単位のキャッシュ+in-flight重複防止を実装し、`EntryRow`のカードモードで`thumbnail_url`が無い行に限り、`IntersectionObserver`で可視になった時のみ遅延取得(仮想化のoverscan分を無駄にfetchしない)。表示は`entry.thumbnail_url || fetchedThumb`に統一し、取得失敗時は従来どおりfaviconへ。`blockImages`時は取得しない。検証: `cargo test`82件成功(og:image/最初の実画像の単体テスト追加)、`cargo clippy`警告なし、`npm run build`成功、実URLでコマンド確認(publickey1/gihyo/zennとも画像URL返却)、E2Eフルスイート8ファイル22テスト全通過。
+
+> - **[opencode]** 全文抽出のノイズ除去を強化＋ブクマが開けないバグを修正。①SNS/埋め込み/関連記事の除去: はてなブックマーク・note埋め込み・SNSアイコン・関連記事などの本文外要素を隠すため、`fetch/article.rs`の`NOISE_CLASS_MARKERS`/`NOISE_ID_MARKERS`を拡張(hatena/bookmark-button/note-embed/sns/twitter/facebook/related/recommend/entry-related/next-post/pager等)。単体テスト`strips_sns_embed_and_related_noise`追加。動画iframeは従来どおり許可リストで保持。②ブクマが開けないバグ: 保存記事(discoverで保存した負IDエントリ)の合成SQL `SAVED_ARTICLE_ENTRY_COLUMNS`で`link`列の位置に`NULL`が入っていた(列対応ズレ。`s.url`がauthor位置へ)ため、`handleOpen`の`entry.link`ガードで何もせず「開けない」。`s.url`をlink列へ正しく配置し修正。E2Eで`list_entries`の保存記事linkが非NULLになることを確認し、bookmark-store.spec.jsに回帰ガード(`savedEntryHasLink`)を追加。検証: `cargo test`81件成功、`cargo clippy`警告なし、E2Eフルスイート8ファイル22テスト全通過。
+
+> - **[opencode]** 全文取得まわり3点を改善。①動画埋め込み対応: 抽出(`fetch/article.rs`)で`iframe`を一律除去せず、YouTube/Vimeo/Bilibili/ニコニコ等の既知プレイヤーに限り保持(それ以外のiframeは従来どおり除去)。フロントは共有サニタイズ`src/lib/sanitize.ts`を新設し、DOMPurifyでvideo/iframe/sourceを許可+afterSanitizeAttributesフックで非動画iframeを除去(セキュリティ維持)。CSPを`frame-src 'none'`→既知プレイヤー許可、`media-src`追加。`.reader-content iframe/video`のCSS追加(16:9, max-width100%)。②探すタブから全文読み: DiscoverOverlayのカードに「この記事の全文を読む」ボタンを追加し、fetch→その場で全文パネル表示(`panel-bg`のabsolute z-20、戻るボタン・リンクはopenUrl)。③一番上の画像しか出ない問題: lazy-load画像(`src`がplaceholder/data:のとき`data-src`等へフォールバック)+`srcset`解決を実装(これまで下の画像が透過プレースホルダのまま見えなかった)。検証: `cargo test`80件成功(動画iframe保持・lazy img・srcsetの単体テスト追加)、`cargo clippy`警告なし、`npm run build`成功、E2Eフルスイート8ファイル22テスト全通過(CSP変更でも回帰なし)、live抽出も従来どおり成功。→ 追補: ①SNS埋め込み(X/Twitter・Facebook・Instagram等)は動画プレイヤーの許可リスト外のため、抽出・DOMPurifyフックの両方で既に除外(動画対応後も混入しない)。②「リーダー表示を先に、その上で全文取得」: DiscoverOverlayの「全文を読む」を、取得中は空欄ではなく**先にタイトル・提供元・スニペットで読みやすいリーダー表示**を出し、取得完了で全文に差し替えるよう変更(reader状態にsnippet/domainを保持)。ビルド成功、Discover関連E2E(ui-fixes/bookmark-store)通過。
+
+> - **[opencode]** 修正予定9件＋追加予定2件を一括実装。修正: ①ブクマ絞り込みを別タブ移動時に解除(FilterBarのNAV_ICONSで`setStarredOnly(false)`)、②探すの「元記事を開く」を既読履歴へ記録(`record_external_read`新コマンド+DiscoverOverlayでinvoke)、③ジャンル追加枠をdashed「＋」タグ入力へ変更しフィードURL入力と区別、④通知トグルを「通知ON/OFF」ラベル付きピルへ変更、⑤探すカードのタイトルをMarqueeTitle化、⑥リーダーのスクロール位置を記事切替時にリセット(`key`再マウント+useLayoutEffect scrollTo)、⑦「RSSなし」誤判定を検索パイプラインのサイトルートフォールバックで修正(`feed_url`を返すよう変更し登録時も実際のフィードURLを使用)。追加: ⑧探す検索窓に✕全消しボタン、⑨要約のみ配信サイトの全文表示(fetch/article.rsにscraperベースの本文抽出+`fetch_article_full_text`コマンド+リーダーに「全文を取得して読む」ボタン。実サイト3件で抽出成功確認)。検証: `cargo test`78件成功、`cargo clippy`警告なし、`npm run build`成功、E2Eフルスイート8ファイル19テスト全部通過。E2E補助で`tauri.conf.json`に`withGlobalTauri: true`を追加(テストから`window.__TAURI__.core.invoke`でコマンド直接呼び出し用。低リスク)。`search-stacking-diagnose.spec.js`の既存フレーク(stale element+空DBで`.entry-list-scroll`がnull)をexecuteベース再取得とnullガードで修正。恒久回帰スペック`ui-fixes.spec.js`を新設(ブクマ解除・✕ボタン・フィード管理UI)。
+
+
 
 
 # Uncommitted Archive
@@ -102,6 +116,9 @@
 
 
 <!-- ここから実際の記録 -->
+
+> - **[opencode]** 追加要望5件を実装。①探すタブから他タブへの移動: E2Eで「既に可能」であることを確認(ナビアイコンは最前面で覆われておらず履歴・設定へ遷移成功。検索フォーム無しでも)。「できない」と感じる原因は戻る/進むの操作手段が無いことと判断し、④のサイドボタンで補完。②✕全消しボタン: 共通`ClearableInput`コンポーネントを新設し、FilterBar検索・Discover検索・FeedManager URL・ジャンル名・FontPickerフォント検索の全テキスト入力欄に実装。③ジャンル追加枠の＋誤認: 「＋」チップ+ダッシュ枠を廃止し、両フォームに「フィードを追加」「ジャンルを追加」の明示ラベルを付ける方式へ変更。④マウスサイドボタン: `uiStore`にナビゲーション履歴スタック(`navStack`/`navIndex`+`goBack`/`goForward`)を追加し、`App.tsx`の`auxclick`(button3=戻る、4=進む)で画面遷移。⑤開発版の識別: タイトルバー(表示時)+ウィンドウタイトル`Gyroscope (開発版)`+常時表示のFilterBarに「開発版」バッジ(タイトルバーは既定で非表示のためFilterBarにも追加)。検証: `npm run build`成功、E2Eフルスイート8ファイル22テスト全通過(ui-fixes.spec.jsにクリアボタン・ジャンル枠・サイドボタン・開発版バッジの回帰テストを追加)。診断用zz-tempは削除。
+
 
 > - **[Codex]** `App/src/components/SettingsOverlay.tsx` の設定状態・副作用（Zustand、テーマ判定、セクション開閉、システムフォント取得）を `useSettingsController.ts` へ分離。設定画面の描画責務と状態管理責務の境界を明確化した。`npm run build` 成功。既存の未コミット変更は保持。
 

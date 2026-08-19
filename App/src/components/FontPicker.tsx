@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDownIcon } from "./icons";
+import { ClearableInput } from "./ClearableInput";
 
 interface FontPickerProps {
   value: string; // "" = default (no override)
@@ -126,13 +127,15 @@ export function FontPicker({
             style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
             className="dropdown-enter z-50 flex flex-col overflow-hidden rounded-lg border border-black/10 bg-white/85 shadow-lg backdrop-blur-md dark:border-white/15 dark:bg-neutral-900/85"
           >
-            <input
+            <ClearableInput
               autoFocus
               type="text"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="フォントを検索"
-              className="border-b border-black/10 bg-transparent px-2 py-1.5 text-xs text-neutral-900 outline-none dark:border-white/10 dark:text-neutral-100"
+              clearLabel="フォント検索をクリア"
+              onClear={() => setFilter("")}
+              className="w-full border-b border-black/10 bg-transparent px-2 py-1.5 text-xs text-neutral-900 outline-none dark:border-white/10 dark:text-neutral-100"
             />
             <div style={{ maxHeight: pos.maxHeight }} className="overflow-y-auto py-1">
               <button

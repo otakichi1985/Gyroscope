@@ -60,6 +60,11 @@ const S = {
   clickRestoreFor: (title) => click(`(() => { const o = ${activeOverlay}; const b = Array.from(o.querySelectorAll("button")).find(b => b.textContent.trim() === "${J.restoreBtn}" && b.closest("li") && b.closest("li").textContent.includes(${JSON.stringify(title)})); if (!b) throw new Error("restore missing"); return b; })()`),
   clickCloseOverlay: click(byLabelIn(activeOverlay, J.closeBtn)),
   hasNoActiveOverlay: `(${activeOverlay}) === null`,
+  // Regression guard: a saved-article bookmark must carry a usable article
+  // link (a past column-alignment bug left `link` NULL, so clicking the row
+  // silently did nothing -- "開けない"). Check via the same list_entries the
+  // store uses, for the synthetic negative-id rows only.
+  savedEntryHasLink: `(async () => { const entries = await window.__TAURI__.core.invoke("list_entries", { filter: { feed_id: null, folder: null, unread_only: null, starred_only: true, query: null, limit: 50, offset: 0, sort_order: "desc" } }); return entries.filter(e => e.id < 0).some(e => !!e.link); })()`,
 };
 
 function dump(label, extra = {}) {
@@ -146,6 +151,8 @@ describe("bookmark-store verify (discover saves merge into bookmark view + trash
       timeout: 20000,
       interval: 500,
     });
+    // The saved bookmark must be openable -- its link must not be NULL.
+    expect(await browser.execute(S.savedEntryHasLink)).toBe(true);
     await browser.saveScreenshot(`${shotDir}/bookmark-store-view.png`);
 
     // 3. Toggle the filter back off -- the saved article leaves the list
