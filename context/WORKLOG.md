@@ -84,19 +84,11 @@
 リリースノートへ転記するのはエンドユーザーに見える変更のみ。開発工程のみの変更（E2E整備・テスト設定・開発版バッジなど）は転記しない（原因・再発防止策は`VERIFY.md`の「GitHub Release ノート確認」参照）。
 <!-- ここから実際の記録 -->
 
-> - **[opencode]** 全文抽出の失敗を減らすためJSON-LDフォールバックを追加。`fetch/article.rs`の`extract_article`で、DOMから本文コンテナを発見できないページ（JS描画・非セマンティックなマークアップ等）でも、`<script type="application/ld+json">`の`articleBody`（SEO目的で全文を埋め込むサイトが多い）から本文を取得できるようにした。`@graph`/配列などの構造を再帰的に探索し、最も長い`articleBody`を採用。HTML入りの`articleBody`はそのまま渡し（フロントのDOMPurifyが除去）、プレーンテキストは`\n`ごとに`<p>`化してエスケープ。DOM抽出が成功するページは従来どおり優先（画像・埋め込みを含む高品質なHTML）。検証: `cargo test`83件成功（JSON-LD単体テスト追加）、`cargo clippy`警告なし、ローカルサーバーの一時E2Eで「DOMコンテナなし＋JSON-LDのみのページ→全文取得成功」を実機確認後削除、フルスイート8ファイル22テスト全通過。
 
-> - **[opencode]** ブックマークの「探す」由来の単体記事と、探すタブの記事の開き方を通常記事と同じ仕様に統一。①`EntryRow`の`handleOpen`で、保存記事（負のID）を無条件でシステムブラウザに飛ばしていた特別扱いを廃止し、通常記事と同じく`clickBehavior`に従うようにした（既定reader=アプリ内リーダーで開き、スニペットが短いので全文自動取得が走って本文に差し替わる。オプションはbrowser設定かリーダー内「ブラウザで開く」で既定ブラウザを開ける）。負IDの`markRead`はスキップ（読み状態が無いため。Rust側もno-op）。②`DiscoverOverlay`: 展開カードで「この記事の全文を読む」（アプリ内全文取得）をプライマリ動作にし、「元記事を開く」を「ブラウザで開く」に改名してオプションに。全文パネルのヘッダーにも常時「ブラウザで開く」ボタンを追加（従来はエラー時のみ）。検証: `npm run build`成功、ローカルHTTPサーバーの一時E2Eで「保存記事クリック→アプリ内リーダーが開き自動全文取得」を実機確認後削除、フルスイート8ファイル22テスト全通過。
 
-> - **[opencode]** リーダーの「全文を取得して読む」ボタンを廃止し、記事を開いたら自動で全文を取得するようにした。`ReaderOverlay`で要約のみ配信の記事（本文400字未満のヒューリスティック）を開くと、フィード内容を即表示したまま裏で`fetch_article_full_text`を自動実行し、取得完了で差し替える（reader-firstは従来どおり）。失敗時は自動リトライループさせず「再取得」「ブラウザで開く」を表示（`fetchError`ガード）。ボタン消滅。検証: `npm run build`成功、ローカルHTTPサーバーを立てた一時E2Eで「要約のみフィード→記事を開く→自動で全文取得・差し替え・ボタン非表示」を実機確認後削除、フルスイート8ファイル22テスト全通過。
 
-> - **[opencode]** 記事サムネを本文取得の仕組みで補完。RSSがサムネを提供しないサイトで、これまでfavicon/画像なしアイコンにフォールバックしていたのを、記事ページの`og:image`→`twitter:image`→`link[rel=image_src]`→最初の実画像の順で取得して表示するようにした。バックエンド: `fetch/article.rs`に`extract_article_image`(上記の優先順位で抽出、lazy-placeholder/data:はスキップ、相対URL解決)、`commands/article.rs`に`fetch_article_image`コマンド追加、`lib.rs`登録。フロント: `src/lib/articleThumb.ts`にURL単位のキャッシュ+in-flight重複防止を実装し、`EntryRow`のカードモードで`thumbnail_url`が無い行に限り、`IntersectionObserver`で可視になった時のみ遅延取得(仮想化のoverscan分を無駄にfetchしない)。表示は`entry.thumbnail_url || fetchedThumb`に統一し、取得失敗時は従来どおりfaviconへ。`blockImages`時は取得しない。検証: `cargo test`82件成功(og:image/最初の実画像の単体テスト追加)、`cargo clippy`警告なし、`npm run build`成功、実URLでコマンド確認(publickey1/gihyo/zennとも画像URL返却)、E2Eフルスイート8ファイル22テスト全通過。
 
-> - **[opencode]** 全文抽出のノイズ除去を強化＋ブクマが開けないバグを修正。①SNS/埋め込み/関連記事の除去: はてなブックマーク・note埋め込み・SNSアイコン・関連記事などの本文外要素を隠すため、`fetch/article.rs`の`NOISE_CLASS_MARKERS`/`NOISE_ID_MARKERS`を拡張(hatena/bookmark-button/note-embed/sns/twitter/facebook/related/recommend/entry-related/next-post/pager等)。単体テスト`strips_sns_embed_and_related_noise`追加。動画iframeは従来どおり許可リストで保持。②ブクマが開けないバグ: 保存記事(discoverで保存した負IDエントリ)の合成SQL `SAVED_ARTICLE_ENTRY_COLUMNS`で`link`列の位置に`NULL`が入っていた(列対応ズレ。`s.url`がauthor位置へ)ため、`handleOpen`の`entry.link`ガードで何もせず「開けない」。`s.url`をlink列へ正しく配置し修正。E2Eで`list_entries`の保存記事linkが非NULLになることを確認し、bookmark-store.spec.jsに回帰ガード(`savedEntryHasLink`)を追加。検証: `cargo test`81件成功、`cargo clippy`警告なし、E2Eフルスイート8ファイル22テスト全通過。
 
-> - **[opencode]** 全文取得まわり3点を改善。①動画埋め込み対応: 抽出(`fetch/article.rs`)で`iframe`を一律除去せず、YouTube/Vimeo/Bilibili/ニコニコ等の既知プレイヤーに限り保持(それ以外のiframeは従来どおり除去)。フロントは共有サニタイズ`src/lib/sanitize.ts`を新設し、DOMPurifyでvideo/iframe/sourceを許可+afterSanitizeAttributesフックで非動画iframeを除去(セキュリティ維持)。CSPを`frame-src 'none'`→既知プレイヤー許可、`media-src`追加。`.reader-content iframe/video`のCSS追加(16:9, max-width100%)。②探すタブから全文読み: DiscoverOverlayのカードに「この記事の全文を読む」ボタンを追加し、fetch→その場で全文パネル表示(`panel-bg`のabsolute z-20、戻るボタン・リンクはopenUrl)。③一番上の画像しか出ない問題: lazy-load画像(`src`がplaceholder/data:のとき`data-src`等へフォールバック)+`srcset`解決を実装(これまで下の画像が透過プレースホルダのまま見えなかった)。検証: `cargo test`80件成功(動画iframe保持・lazy img・srcsetの単体テスト追加)、`cargo clippy`警告なし、`npm run build`成功、E2Eフルスイート8ファイル22テスト全通過(CSP変更でも回帰なし)、live抽出も従来どおり成功。→ 追補: ①SNS埋め込み(X/Twitter・Facebook・Instagram等)は動画プレイヤーの許可リスト外のため、抽出・DOMPurifyフックの両方で既に除外(動画対応後も混入しない)。②「リーダー表示を先に、その上で全文取得」: DiscoverOverlayの「全文を読む」を、取得中は空欄ではなく**先にタイトル・提供元・スニペットで読みやすいリーダー表示**を出し、取得完了で全文に差し替えるよう変更(reader状態にsnippet/domainを保持)。ビルド成功、Discover関連E2E(ui-fixes/bookmark-store)通過。
-
-> - **[opencode]** 修正予定9件＋追加予定2件を一括実装。修正: ①ブクマ絞り込みを別タブ移動時に解除(FilterBarのNAV_ICONSで`setStarredOnly(false)`)、②探すの「元記事を開く」を既読履歴へ記録(`record_external_read`新コマンド+DiscoverOverlayでinvoke)、③ジャンル追加枠をdashed「＋」タグ入力へ変更しフィードURL入力と区別、④通知トグルを「通知ON/OFF」ラベル付きピルへ変更、⑤探すカードのタイトルをMarqueeTitle化、⑥リーダーのスクロール位置を記事切替時にリセット(`key`再マウント+useLayoutEffect scrollTo)、⑦「RSSなし」誤判定を検索パイプラインのサイトルートフォールバックで修正(`feed_url`を返すよう変更し登録時も実際のフィードURLを使用)。追加: ⑧探す検索窓に✕全消しボタン、⑨要約のみ配信サイトの全文表示(fetch/article.rsにscraperベースの本文抽出+`fetch_article_full_text`コマンド+リーダーに「全文を取得して読む」ボタン。実サイト3件で抽出成功確認)。検証: `cargo test`78件成功、`cargo clippy`警告なし、`npm run build`成功、E2Eフルスイート8ファイル19テスト全部通過。E2E補助で`tauri.conf.json`に`withGlobalTauri: true`を追加(テストから`window.__TAURI__.core.invoke`でコマンド直接呼び出し用。低リスク)。`search-stacking-diagnose.spec.js`の既存フレーク(stale element+空DBで`.entry-list-scroll`がnull)をexecuteベース再取得とnullガードで修正。恒久回帰スペック`ui-fixes.spec.js`を新設(ブクマ解除・✕ボタン・フィード管理UI)。
 
 
 
@@ -140,6 +132,21 @@
 
 <!-- ここから実際の記録 -->
 
+## 02fb1b6 — 2026-08-20
+**環境:** opencode
+
+v0.2.8としてリリース（`package.json`/`tauri.conf.json`/`Cargo.toml`のバージョン更新、ロックファイル同期）。ポータブル版をビルドし、GitHub Releaseに`gyroscope-portable-v0.2.8.zip`と単体`gyroscope.exe`を添付して公開。Discord通知は`discord-release-notify.yml`ワークフローが自動投稿（成功確認済み）。v0.2.7の事故対策どおり`main`をpush済みで、タグはバンプコミット02fb1b6へ正しく付いた（`git ls-remote --tags`で確認）。リリースノートはエンドユーザー向けの変更のみで構成し、開発工程の変更（E2E・開発版バッジ等）は`VERIFY.md`の「対象外」ルールで除外。
+
+## a2a3b9d — 2026-08-20
+**環境:** opencode
+
+リリースノート起草で開発工程だけの変更が混ざった件の原因と再発防止を記述手順へ追記。`VERIFY.md`「GitHub Release ノート確認」に「対象外（開発工程のみの変更）」の定義（E2E・テスト用設定・開発版バッジ・内部リファクタ等）、混入の原因、再発防止（ユーザーに見える変更かを判定して転記し、完成後に対象外の有無を確認）を追加。`WORKLOG.md`の`Unreleased Changes`定義にも「転記はエンドユーザー向けのみ」を明記。
+
+## be06ac6 — 2026-08-20
+**環境:** opencode
+
+リーダー・ブックマーク・UIの一括改善（v0.2.8本体）。①リーダーを開いたら自動で全文取得（「全文を取得して読む」ボタン廃止）＋JSON-LD `articleBody`フォールバックでJS描画・非セマンティックなページにも対応。②動画埋め込み表示（既知プレイヤーのiframe許可＋CSP拡張）・SNS/関連ノイズ除去・lazy画像/srcset解決。③サムネを`og:image`等から自動補完（`fetch_article_image`＋`articleThumb.ts`キャッシュ）。④ブックマーク・探すの開き方を通常記事と同じ仕様へ統一し、保存記事の合成SQLのlink列ズレ（開けないバグ）を修正。⑤✕クリア入力・ジャンル/フィードの明示ラベル・マウスサイドボタン・開発版バッジ等。検証: `cargo test`83件、clippy警告なし、E2Eフルスイート8ファイル22テスト全通過。
+
 ## 91c6dfa — 2026-08-14
 **環境:** opencode
 
@@ -152,26 +159,11 @@ UIの見た目規約を`context/UI_CONVENTIONS.md`として新設（配色シス
 開発基盤の改善チェック候補A〜Dを適用。A: `VERIFY.md`へ「GitHub Release 実行」プリセットを追加（v0.2.7でタグが古いコミットに張られた事故の再発防止）。B: 恒久回帰テストを`bookmark-store.spec.js`へ改名、診断用`zz-temp-`スペックを削除し「使い捨て=zz-temp名・残す回帰テストは恒久名」をE2Eプリセットへ追記。C: 共有`IMPLEMENTATION.md`(#1 Understand)へ「曖昧なUI要望はHumanへ確認してから実装」を追記。D: `effective_data_dir`を`#[cfg(debug_assertions)]`限定にしreleaseビルドの`dead_code`警告を解消。
 `cargo check --release`で警告なし、E2Eフルスイート7件通過。
 
-## 191d72c — 2026-08-14
+## 4df6e05 — 2026-08-14
 **環境:** opencode
 
-v0.2.7としてリリース（`package.json`/`tauri.conf.json`/`Cargo.toml`のバージョン更新、ロックファイル同期）。
-ポータブル版をビルドし、GitHub Releaseに`gyroscope-portable-v0.2.7.zip`と単体`gyroscope.exe`を添付して公開。Discord通知は`discord-release-notify.yml`ワークフローが自動投稿（成功確認済み）。
-`gh release create`がリモートデフォルトブランチ先端(87a0a67)へタグを張ってしまった不具合を検知し、タグを実際のリリースコミット(191d72c)へ付け直した（mainもpush済み）。添付物は新コードでビルド済みだったため成果物は当初から正しい。
-
-> - **[opencode]** 「サイトを探す」のUI積み重ねで生じた不具合を修正。全件マッチして機能していなかった「記事保存可」フィルターは、全候補が記事保存可能なため選択肢ごと削除（すべて/RSS登録可/RSSなしの3択へ）。`hidden`で隠されたまま残っていた死にセクション（並び順・登録済み非表示・表示サイズ）を削除し、登録済み非表示は固定動作として維持。`npm run build` 成功、実機E2E（DOMプローブ）で死にセクション消滅と候補状態3択化を確認。
-
-## 6805aba — 2026-08-14
-**環境:** Claude Code / Sonnet
-
-改善ループAを実施：UNKNOWN_DOMAIN.mdの「Observability」に、外部サイト/APIの挙動は実装前にcurl等で直接確認する旨を追記し、正本`human-ai-foundation`側にも手動で反映。
-将来ニーズとして「workflowsの自動反映の仕組み」「開発版起動時に自分用TLのDBが壊れる件」を`IDEAS_AND_HYPOTHESES.md`へ記録。
-
-## 189a55c — 2026-08-14
-**環境:** Claude Code / Sonnet
-
-WORKLOG振り返りから改善ループを実施。GUI変更が毎回Human確認待ちになる件を`scripts/run-e2e.mjs`（driver残留プロセスを実行前後で自動終了）で解消し、`VERIFY.md`のE2Eプリセットを既定の検証手段として格上げ。
-実機で確認（成功/失敗どちらのケースもdriverプロセスが残らないこと、失敗時の終了コードが正しく伝播することを確認済み）。
+開発基盤の改善チェック候補A〜Dを適用。A: `VERIFY.md`へ「GitHub Release 実行」プリセットを追加（v0.2.7でタグが古いコミットに張られた事故の再発防止）。B: 恒久回帰テストを`bookmark-store.spec.js`へ改名、診断用`zz-temp-`スペックを削除し「使い捨て=zz-temp名・残す回帰テストは恒久名」をE2Eプリセットへ追記。C: 共有`IMPLEMENTATION.md`(#1 Understand)へ「曖昧なUI要望はHumanへ確認してから実装」を追記。D: `effective_data_dir`を`#[cfg(debug_assertions)]`限定にしreleaseビルドの`dead_code`警告を解消。
+`cargo check --release`で警告なし、E2Eフルスイート7件通過。
 
 
 # Rotation
