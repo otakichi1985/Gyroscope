@@ -41,6 +41,7 @@ Humanが判断できる言葉に噛み砕く。
 
 以下が繰り返し起きる場合は、構造上の問題を疑い
 `context/workflows/REFACTORING.md` を参照する。
+（トリガーの完全な一覧は `REFACTORING.md` の `Triggers` が正本）
 
 - 小さな変更でも多くの箇所を触る
 - 同じ修正を複数箇所へ繰り返す
