@@ -48,7 +48,10 @@ async function setAppearance(store) {
     localStorage.setItem("gyroscope:appearance", JSON.stringify(s));
     location.reload();
   }, store);
-  await browser.pause(3000);
+  await browser.waitUntil(
+    async () => (await browser.execute(() => !!document.querySelector(".app-filterbar"))) === true,
+    { timeout: 20000, interval: 500 },
+  );
 }
 
 // The face-name map is fetched over a Tauri invoke after the page reload, so
@@ -86,7 +89,10 @@ describe("global font split resolves local() for the Yu family", () => {
     } catch (e) {
       console.log("setWindowSize failed:", e.message);
     }
-    await browser.pause(2000);
+    await browser.waitUntil(
+      async () => (await browser.execute(() => !!document.querySelector(".app-filterbar"))) === true,
+      { timeout: 20000, interval: 500 },
+    );
 
     await setAppearance(appearance("Yu Gothic UI", ""));
     await expectFaceLoaded("latin=Yu Gothic UI", "RssWidgetLatin");

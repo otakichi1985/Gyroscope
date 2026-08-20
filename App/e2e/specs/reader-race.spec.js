@@ -97,7 +97,10 @@ describe("reader: a late full-text reply must not overwrite the current article"
     // have left, then reload so the store re-reads.
     await browser.execute(() => localStorage.removeItem("gyroscope:appearance"));
     await browser.execute(() => location.reload());
-    await browser.pause(2500);
+    await browser.waitUntil(
+      async () => (await browser.execute(() => !!document.querySelector(".app-filterbar"))) === true,
+      { timeout: 20000, interval: 500 },
+    );
 
     await browser.waitUntil(async () => (await browser.execute(S.hasRow(RACE_A_TITLE))) === true, {
       timeout: 20000,

@@ -103,13 +103,19 @@ describe("reader readability: theme wins + adjustable typography", () => {
     } catch (e) {
       console.log("setWindowSize failed:", e.message);
     }
-    await browser.pause(2500);
+    await browser.waitUntil(
+      async () => (await browser.execute(() => !!document.querySelector(".app-filterbar"))) === true,
+      { timeout: 20000, interval: 500 },
+    );
 
     // Deterministic starting point: drop any reader settings a previous run
     // left in localStorage, then reload the frontend so the store re-reads.
     await browser.execute(() => localStorage.removeItem("gyroscope:appearance"));
     await browser.execute(() => location.reload());
-    await browser.pause(2500);
+    await browser.waitUntil(
+      async () => (await browser.execute(() => !!document.querySelector(".app-filterbar"))) === true,
+      { timeout: 20000, interval: 500 },
+    );
 
     // 1. Open the seeded article in the reader.
     await browser.waitUntil(async () => (await browser.execute(S.hasTimelineRow)) === true, {

@@ -113,7 +113,10 @@ describe("scroll: Home/End/PageUp/PageDown keys + 一番上に戻る button", ()
     // Force the frontend to re-read the seeded articles: reloading remounts
     // EntryList, whose mount triggers the timeline refresh.
     await browser.execute(() => location.reload());
-    await browser.pause(2500);
+    await browser.waitUntil(
+      async () => (await browser.execute(() => !!document.querySelector(".app-filterbar"))) === true,
+      { timeout: 20000, interval: 500 },
+    );
 
     // Make sure the timeline actually rendered rows before scrolling.
     await browser.waitUntil(
