@@ -167,6 +167,38 @@ export function ensureSchema(db) {
   db.exec("PRAGMA user_version = 6");
 }
 
+/**
+ * Clears all app data from the shared E2E DB (feeds/entries cascade via FK,
+ * plus history/bookmarks/tags), retrying briefly on "database is locked".
+ * Used by ui-audit in its before() so the pixel baselines (which expect an
+ * empty timeline) are deterministic regardless of what earlier specs left in
+ * the shared DB.
+ */
+export async function clearE2eData() {
+  const deadline = Date.now() + 5000;
+  const sleep = () => new Promise((r) => setTimeout(r, 150));
+  for (;;) {
+    try {
+      const db = openDb();
+      try {
+        ensureSchema(db);
+        db.prepare(`DELETE FROM feed_tags`).run();
+        db.prepare(`DELETE FROM tags`).run();
+        db.prepare(`DELETE FROM entries`).run();
+        db.prepare(`DELETE FROM feeds`).run();
+        db.prepare(`DELETE FROM read_history`).run();
+        db.prepare(`DELETE FROM saved_articles`).run();
+        return;
+      } finally {
+        db.close();
+      }
+    } catch (err) {
+      if (Date.now() > deadline) throw err;
+      await sleep();
+    }
+  }
+}
+
 /** Removes the seed feed + article. Safe to call while the app holds the DB. */
 export function unseedReaderData() {
   const db = openDb();
