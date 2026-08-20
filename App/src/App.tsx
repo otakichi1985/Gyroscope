@@ -207,11 +207,32 @@ function App() {
   // rather than continuously.
   const spotlightRef = useRef<HTMLDivElement>(null);
   const [spotlightActive, setSpotlightActive] = useState(false);
+  // The spotlight repaints a full-window gradient on every mousemove, and on
+  // a per-pixel-alpha (floating) window each repaint re-composites the whole
+  // window -- expensive enough that a burst of mousemove events stalled input
+  // and WebDriver commands (a single click measured ~23s in a floating skin).
+  // Coalesce updates to one per animation frame and read layout once per
+  // frame instead of once per event.
+  const spotlightRaf = useRef<number | null>(null);
+  const spotlightPos = useRef({ x: 0, y: 0 });
   function handleSpotlightMove(e: React.MouseEvent<HTMLDivElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    spotlightRef.current?.style.setProperty("--spot-x", `${e.clientX - rect.left}px`);
-    spotlightRef.current?.style.setProperty("--spot-y", `${e.clientY - rect.top}px`);
+    spotlightPos.current = { x: e.clientX, y: e.clientY };
+    if (spotlightRaf.current !== null) return;
+    spotlightRaf.current = requestAnimationFrame(() => {
+      spotlightRaf.current = null;
+      const el = spotlightRef.current;
+      const host = el?.parentElement;
+      if (!el || !host) return;
+      const rect = host.getBoundingClientRect();
+      el.style.setProperty("--spot-x", `${spotlightPos.current.x - rect.left}px`);
+      el.style.setProperty("--spot-y", `${spotlightPos.current.y - rect.top}px`);
+    });
   }
+  useEffect(() => {
+    return () => {
+      if (spotlightRaf.current !== null) cancelAnimationFrame(spotlightRaf.current);
+    };
+  }, []);
 
   function handleRootPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     const target = e.target;
