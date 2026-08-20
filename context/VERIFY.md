@@ -174,7 +174,7 @@ E2Eが起動するアプリは `GYROSCOPE_DATA_DIR`（`%TEMP%\gyroscope-e2e-data
 **用途:** GUI変更の回帰確認。構造バグ（クリック奪取、非表示化、描画崩れ）をモデル視覚なしで機械的に検出する既定の監査。`e2e/specs/ui-audit.spec.js`がホーム/ブックマーク/探す/履歴/ゴミ箱/フィード管理/設定×ライト・ダークを歩行し、各画面でDOM監査（`helpers/visual.js`）と基準画像とのピクセル差分（`helpers/pixeldiff.js`）を実行する。
 
 **実行:**  
-`App/` で `npm run test:e2e -- --spec e2e/specs/ui-audit.spec.js`。基準画像`e2e/baselines/*.png`はクリーン状態（`%TEMP%\gyroscope-e2e-data`を削除後）で生成する。基準を更新する意図的な画面変更時のみ `UPDATE_BASELINES=1` を付けて再生成し、差分が意図通りかを確認してコミットする。
+`App/` で `npm run test:e2e -- --spec e2e/specs/ui-audit.spec.js`。基準画像`e2e/baselines/*.png`はクリーン状態（`%TEMP%\gyroscope-e2e-data`を削除後）で生成する。基準を更新する意図的な画面変更時のみ `UPDATE_BASELINES=1` を付けて再生成し、差分が意図通りかを確認してコミットする。局所的な微小差分（`pctChanged≦0.5%`＝CLEAR_PASS、例: アイコンの差し替え）はゲートを通過するため基準画像の**再生成は任意**。再生成が必要なのは意図的な構造的・視覚的な見た目変更時のみで、毎回の再生成は不要。
 
 **確認:**  
 `SUMMARY: screens=11 CLEAR_FAIL=0` を満たし、各画面が `dom=CLEAR_PASS shot=CLEAR_PASS`。CLEAR_FAILは構造バグ（要修正）。AMBIGUOUSは「基準と異なる」の情報であり、原因を特定して意図的なら許容・不意なら修正する。

@@ -22,6 +22,8 @@
 
 <!-- ここから実際の記録 -->
 
+> - **[opencode]** v0.2.10後の改善ループを実施（Human選定）。**A**: 挙動・操作感の要望も実装前に解釈確認する旨を共有`workflows/IMPLEMENTATION.md`§1へ追記（今回のマウスホイール誤解の再発防止）。**B**: 共有`workflows/DISCOVERY.md`§9に「技術的な説明と非エンジニア向けの噛み砕いた説明を併記する」ルールを追記（AGENTS.mdのHuman節にも併記）。**C**: 探すリーダーとTLリーダーの構造非対称（navStack内外）を`IDEAS_AND_HYPOTHESES.md`へ将来対応として記録。**D(E2E高速化)**: ①使い終わった調査用スペック4件を削除（`debug-probe`/`search-stacking-diagnose`/`search-layout-diagnose`/`search-focus-geometry`。本番の`search-focus.spec.js`とui-auditが同じ箇所をカバー）。②リロード後の固定`pause(2500〜3000)`を「`.app-filterbar`表示待ち`waitUntil`」へ置換（font-split/reader-race/reader-readability/scroll-keys）。結果: フルスイート9スペック全通過、実行時間**8分17秒→6分8秒**（約2分短縮）。`VERIFY.md`のui-auditには「局所的な微小差分(<0.5%)は再生成任意」を明記。
+
 > - **[opencode]** v0.2.10をリリース公開（2026-08-20）。リリースノートは前回v0.2.9との差分ベースで起草し、バグ修正2件（探す検索の関連度・表示ブレ／探すリーダー表示）は`git show v0.2.9:App/src/components/DiscoverOverlay.tsx`で実在を確認してからHuman承認（バージョンはv0.2.10で決定）を得た。`npm run package:portable`で配布物（zip+単体exe）を生成し、`gh release create v0.2.10`（zip+exe添付、HEAD=21a3389にタグ）で公開。タグ位置は`git ls-remote`でHEADと一致を確認。URL: https://github.com/otakichi1985/Gyroscope/releases/tag/v0.2.10
 
 > - **[opencode]** v0.2.9をリリース公開（2026-08-20）。リリースノートは「前回リリース版との差分」ベースで起草し、バグ修正2件（フォント分割が一部フォントで適用されない／全文取得の競合で前の記事の本文に置き換わる）は`git log -S`でv0.2.8に実在を確認してからHuman承認を得た。`npm run package:portable`で配布物を生成し、`gh release create v0.2.9`（zip+exe添付、HEAD=43b4673にタグ）で公開。タグ位置は`git ls-remote`でHEADと一致を確認。URL: https://github.com/otakichi1985/Gyroscope/releases/tag/v0.2.9
