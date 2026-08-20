@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useFeedsStore } from "../stores/feedsStore";
@@ -13,6 +13,9 @@ import {
 } from "../stores/appearanceStore";
 import { sanitizeArticleHtml } from "../lib/sanitize";
 import { getSkin } from "../lib/skins";
+import { formatPublished } from "../lib/text";
+import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
+import { useScrollTargetRef } from "../hooks/useScrollTargetRef";
 import { readerPresetVar } from "../lib/readerTheme";
 import type { ScoredSource, SearchCategory } from "../lib/types";
 import { MarqueeTitle } from "./MarqueeTitle";
@@ -22,12 +25,13 @@ import { ExternalLinkIcon, ImageOffIcon, StarIcon } from "./icons";
 
 const HTTP_LINK_RE = /^https?:\/\//i;
 
-type ResultSort = "recommended" | "newest" | "oldest";
+type ResultSort = "relevance" | "recommended" | "newest" | "oldest";
 type ResultSize = "compact" | "standard" | "large";
 type ResultKind = "all" | "personal" | "technical" | "academic" | "qa" | "developer";
 type ResultAvailability = "all" | "feed" | "noFeed";
 
 const SORTS: [ResultSort, string][] = [
+  ["relevance", "関連度"],
   ["recommended", "おすすめ"],
   ["newest", "新着"],
   ["oldest", "古い"],
@@ -109,6 +113,26 @@ function hostOf(url: string): string {
   }
 }
 
+// Keyword-search relevance: Hatena's RSS endpoints only return recency order
+// (see search.rs), so the "関連度" sort re-ranks the candidates locally by how
+// strongly the query tokens appear in the title/snippet/domain. Japanese
+// queries have no whitespace, so the whole phrase becomes one token; a hit
+// with no literal match scores 0 and falls back to the popularity score.
+function relevanceOf(source: ScoredSource, query: string): number {
+  const tokens = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return 0;
+  const title = source.title.toLocaleLowerCase();
+  const snippet = (source.snippet ?? "").toLocaleLowerCase();
+  const domain = source.domain.toLocaleLowerCase();
+  let score = 0;
+  for (const token of tokens) {
+    if (title.includes(token)) score += 3;
+    if (snippet.includes(token)) score += 1;
+    if (domain.includes(token)) score += 2;
+  }
+  return score;
+}
+
 /**
  * "探す" screen: finds candidate *sites* to subscribe to, as a discovery
  * step distinct from the timeline's own genre/folder filter (FeedPicker) --
@@ -140,6 +164,28 @@ export function DiscoverOverlay() {
   const readerCodeFont = useAppearanceStore((s) => s.readerCodeFont);
   const readerColors = useAppearanceStore((s) => s.readerColors);
   const skinId = useAppearanceStore((s) => s.skinId);
+  const smoothScroll = useAppearanceStore((s) => s.smoothScroll);
+  // Smooth-wheel glide for the results list and the in-place reader pane, each
+  // also registered with the scrollable registry so the scroll-to-top button
+  // and the page-scroll keys follow which pane is on screen.
+  const resultsWheel = useSmoothWheelScroll<HTMLDivElement>(smoothScroll);
+  const readerWheel = useSmoothWheelScroll<HTMLDivElement>(smoothScroll);
+  const resultsTarget = useScrollTargetRef<HTMLDivElement>();
+  const readerTarget = useScrollTargetRef<HTMLDivElement>();
+  const resultsScrollRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      resultsWheel(el);
+      resultsTarget(el);
+    },
+    [resultsWheel, resultsTarget],
+  );
+  const readerScrollRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      readerWheel(el);
+      readerTarget(el);
+    },
+    [readerWheel, readerTarget],
+  );
 
   const [query, setQuery] = useState("");
   const [categories, setCategories] = useState<SearchCategory[]>([]);
@@ -160,6 +206,15 @@ export function DiscoverOverlay() {
   // without this it looks like the action silently failed).
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<number | null>(null);
+  // The keyword that produced the current results (null while browsing a
+  // category). The search box doubles as a live in-result filter, but it must
+  // not re-apply itself on top of a keyword search: the backend already
+  // matched the candidates against that keyword, and a second literal
+  // substring pass here dropped results Hatena deemed relevant (user report:
+  // search results for a word were less on-topic than the ones shown after
+  // clearing the box). Only when the box is edited to something *different*
+  // from the executed keyword does it narrow the results again.
+  const executedQuery = useRef<string | null>(null);
   const [resultSort, setResultSort] = useState<ResultSort>("newest");
   const [hideRegistered, setHideRegistered] = useState(true);
   const [resultSize, setResultSize] = useState<ResultSize>("standard");
@@ -171,7 +226,13 @@ export function DiscoverOverlay() {
   // discovered summary-only article can be read without leaving the app. The
   // snippet/title/domain are kept so a readable reader view renders
   // immediately, and the fetched full text then replaces the snippet.
-  const [reader, setReader] = useState<{ url: string; title: string; snippet: string; domain: string } | null>(null);
+  const [reader, setReader] = useState<{
+    url: string;
+    title: string;
+    snippet: string;
+    domain: string;
+    publishedAt: string | null;
+  } | null>(null);
   const [readerHtml, setReaderHtml] = useState<string | null>(null);
   const [readerFetching, setReaderFetching] = useState(false);
   const [readerError, setReaderError] = useState<string | null>(null);
@@ -191,9 +252,11 @@ export function DiscoverOverlay() {
   const visibleResults = useMemo(() => {
     if (!results) return null;
     const q = query.trim().toLocaleLowerCase();
+    const executed = executedQuery.current?.toLocaleLowerCase() ?? null;
+    const liveFiltering = executed === null || q !== executed;
     const filtered = results.filter((source) => {
       if (hideRegistered && isRegistered(source)) return false;
-      if (q && !`${source.title} ${source.snippet} ${source.domain}`.toLocaleLowerCase().includes(q))
+      if (liveFiltering && q && !`${source.title} ${source.snippet} ${source.domain}`.toLocaleLowerCase().includes(q))
         return false;
       if (resultAvailability === "feed" && !source.feed_available) return false;
       if (resultAvailability === "noFeed" && source.feed_available) return false;
@@ -210,6 +273,13 @@ export function DiscoverOverlay() {
       return true;
     });
     return [...filtered].sort((a, b) => {
+      if (resultSort === "relevance") {
+        return (
+          relevanceOf(b, query) - relevanceOf(a, query) ||
+          b.score - a.score ||
+          b.bookmark_count - a.bookmark_count
+        );
+      }
       if (resultSort === "newest" || resultSort === "oldest") {
         const direction = resultSort === "newest" ? -1 : 1;
         const dateOrder = (b.published_at ?? "").localeCompare(a.published_at ?? "");
@@ -234,18 +304,26 @@ export function DiscoverOverlay() {
     e.preventDefault();
     if (!query.trim() || loading) return;
     setActiveCategory(null);
+    executedQuery.current = query.trim();
+    // Keyword hits default to 関連度: Hatena's RSS search returns candidates
+    // in recency order, so without a relevance sort the top of the list was
+    // just "recent or popular" rather than "on topic" (the reported ブレ).
+    setResultSort("relevance");
     await runSearch(() => invoke<ScoredSource[]>("search_sources", { query: query.trim() }));
   }
 
   async function handleBrowseCategory(slug: string) {
     if (loading) return;
     setActiveCategory(slug);
+    executedQuery.current = null;
+    setResultSort("newest");
     await runSearch(() => invoke<ScoredSource[]>("browse_category", { category: slug }));
   }
 
   // "すべて" = no genre selected: back to the bare keyword-search state.
   function handleReset() {
     setActiveCategory(null);
+    executedQuery.current = null;
     setQuery("");
     setResults(null);
     setExpandedUrl(null);
@@ -304,6 +382,25 @@ export function DiscoverOverlay() {
       loadSavedUrls();
     }
   }, [activeScreen]);
+
+  // Mouse side buttons (App.tsx) navigate back/forward between screens. While
+  // the in-place reader is open, the "back" button is intercepted here --
+  // capture phase, so it runs before App's own handler -- and closes the
+  // reader back to the results first, like the timeline reader does, instead
+  // of jumping straight to the previous screen.
+  useEffect(() => {
+    if (activeScreen !== "discover") return;
+    function onAuxClick(e: MouseEvent) {
+      if (e.button === 3 && reader) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        fullTextFetchRef.current = null;
+        setReader(null);
+      }
+    }
+    window.addEventListener("auxclick", onAuxClick, true);
+    return () => window.removeEventListener("auxclick", onAuxClick, true);
+  }, [activeScreen, reader]);
 
   // One-time migration: before the unified bookmark store existed, "記事を保存"
   // and ☆ wrote only to localStorage. Fold whatever survived there into the
@@ -379,7 +476,13 @@ export function DiscoverOverlay() {
   }
 
   async function handleReadFullText(source: ScoredSource) {
-    setReader({ url: source.url, title: source.title, snippet: source.snippet ?? "", domain: source.domain });
+    setReader({
+      url: source.url,
+      title: source.title,
+      snippet: source.snippet ?? "",
+      domain: source.domain,
+      publishedAt: source.published_at,
+    });
     setReaderHtml(null);
     setReaderError(null);
     setReaderFetching(true);
@@ -429,7 +532,7 @@ export function DiscoverOverlay() {
 
   return (
     <ScreenOverlay screen="discover" title="サイトを探す">
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm">
+      <div ref={resultsScrollRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm">
         {/* 検索 */}
         <section className="flex flex-col gap-1.5">
           <form onSubmit={handleSearch} className="flex min-w-0 gap-1">
@@ -811,7 +914,7 @@ export function DiscoverOverlay() {
               ブラウザで開く
             </button>
           </div>
-          <div style={readerVars} className="mt-3 min-h-0 flex-1 overflow-y-auto">
+          <div ref={readerScrollRef} style={readerVars} className="mt-3 min-h-0 flex-1 overflow-y-auto">
             {readerFetching && (
               <p className="mb-2 text-xs opacity-60" role="status">
                 全文を取得中...
@@ -833,8 +936,10 @@ export function DiscoverOverlay() {
             )}
             {readerHtml ? (
               <div className="reader-column">
+                <h1 className="text-base font-semibold">{reader.title}</h1>
+                <p className="mt-1 text-xs opacity-60">{formatPublished(reader.publishedAt)}</p>
                 <div
-                  className="reader-content max-w-none text-sm"
+                  className="reader-content mt-3 max-w-none text-sm"
                   onClick={handleReaderClick}
                   dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(readerHtml, blockImages) }}
                 />
@@ -843,7 +948,9 @@ export function DiscoverOverlay() {
               !readerError &&
               reader.snippet && (
                 <div className="reader-column">
-                  <div className="reader-content max-w-none text-sm">
+                  <h1 className="text-base font-semibold">{reader.title}</h1>
+                  <p className="mt-1 text-xs opacity-60">{formatPublished(reader.publishedAt)}</p>
+                  <div className="reader-content mt-3 max-w-none text-sm">
                     <p className="whitespace-pre-wrap">{reader.snippet}</p>
                   </div>
                 </div>

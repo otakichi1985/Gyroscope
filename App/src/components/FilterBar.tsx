@@ -5,7 +5,7 @@ import { useAppearanceStore } from "../stores/appearanceStore";
 import { useUiStore, type Screen } from "../stores/uiStore";
 import { useUpdateStore } from "../stores/updateStore";
 import { ClearableInput } from "./ClearableInput";
-import { ClockIcon, CompassIcon, PaletteIcon, PinIcon, RssIcon, SearchIcon, StarIcon, TrashIcon } from "./icons";
+import { ClockIcon, CompassIcon, PinIcon, RssIcon, SearchIcon, SettingsIcon, StarIcon, TrashIcon } from "./icons";
 
 /**
  * `hue` names a role colour rather than a literal colour. Only skins whose
@@ -27,7 +27,7 @@ const NAV_ICONS: {
   { screen: "trash", label: "ゴミ箱を開く", shortLabel: "ゴミ箱", hue: "pink", Icon: TrashIcon },
   { screen: "feedManager", label: "フィード管理を開く", shortLabel: "フィード", hue: "green", Icon: RssIcon },
   { screen: "discover", label: "サイトを探す", shortLabel: "探す", hue: "coral", Icon: CompassIcon },
-  { screen: "settings", label: "外観設定を開く", shortLabel: "設定", hue: "blue", Icon: PaletteIcon },
+  { screen: "settings", label: "設定を開く", shortLabel: "設定", hue: "blue", Icon: SettingsIcon },
 ];
 
 // Shared so the bookmark/search/refresh toggles (not screen-nav -- see

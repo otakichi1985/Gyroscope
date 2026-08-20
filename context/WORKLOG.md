@@ -22,6 +22,21 @@
 
 <!-- ここから実際の記録 -->
 
+> - **[opencode]** Human指摘の3点を対応（前バッチの未コミット変更に上乗せ）。
+>   1. **設定アイコンを歯車に変更**: `icons.tsx`に`SettingsIcon`(歯車)を新設しFilterBarの設定ボタンを置換（ラベルも「設定を開く」に）。不要になった`PaletteIcon`を削除。RssIconのコメントを「歯車と衝突しない専用マーク」へ更新。
+>   2. **マウスホイール要望の軌道修正**: なめらかスクロールは元要望と異なっていたため**既定OFF化**（`appearanceStore.smoothScroll` false、設定トグルは残す）。代わりに実際の要望を実装 — ①一気に上に戻れる機能: `ScrollToTopButton`(右下フローティング、下に320px以上スクロールで出現、クリックでなめらかにトップへ)を新設しApp.tsxに組み込み。②ページスクロール系キー: `usePageScrollKeys`(Home=先頭/End=末尾/PageUp/PageDown=約1画面、入力欄では無効)をApp.tsxでグローバル適用。③対象パネルの解決: `lib/scrollTarget.ts`(スクロール可能なパネルを登録し、表示中＝inertでないパネルを返す)＋`hooks/useScrollTargetRef.ts`を新設し、EntryList/Reader/Discover(結果+リーダー)/Settings/History/Trash/FeedManagerの全スクロール容器を登録。ボタンとキーは「今見ているパネル」だけを操作する。
+>   3. **探すタブのマウスサイドボタン**: DiscoverOverlayにcapture phaseのauxclick監視を追加。リーダー表示中はサイド戻る(button3)で先にリーダーを閉じて結果へ戻る（TLのReaderOverlayと同じ挙動）。リーダー未表示時は従来どおりApp側が画面遷移。
+>   検証: `npm run build`成功、E2E13スペック全通過（新規`scroll-keys.spec.js`でEnd→最下部＋トップボタン出現→クリックで戻る/非表示、Home→先頭、PageDown/Up→1画面分を検証。seed-reader-data.mjsから`openDb`/`ensureSchema`をexportして共用）。ui-auditは歯車アイコン・タブUI反映のためクリーンデータで`UPDATE_BASELINES=1`再生成（11画面 CLEAR_FAIL=0 AMBIGUOUS=0）。既存スペックの設定ボタンaria-label(外観設定を開く→設定を開く)を一括更新。
+
+> - **[opencode]** 修正3件＋追加機能6件のバッチを実装・検証済み（未コミット）。
+>   1. **探すリーダー表示**: 全文リーダーを通常TL同様の構成へ（本文冒頭にh1タイトル＋公開日を追加、`ReaderOverlay`と同構造。`formatPublished`使用）。`DiscoverOverlay.tsx`。
+>   2. **探す検索ブレ**: キーワード検索の並び順に「関連度」を追加し既定に。はてなRSSは再現順しか返さないため、検索語のタイトル/スニペット/ドメイン出現でローカル再ランク。さらに、検索実行済みキーワードへの二重の文字列フィルタを廃止（`executedQuery` ref。検索欄を消した時と揃うようになった）し、表示数・内容のブレを解消。
+>   3. **更新まわり**: `updateStore`に自動更新モード（おまかせ=自動DL+自動再起動/ダウンロードまでおまかせ=自動DLのみ/確認のみ=通知のみ、localStorage永続）と`downloaded`(バージョン追跡)を追加。`useAutoCheckForUpdate`は起動時必ず1回＋6時間毎の定期確認へ変更。`UpdateNoticePopup`（新バージョン通知、設定で確認/更新して再起動/閉じる）を新設。設定の「今すぐ確認」で更新無しなら「更新はありません」ダイアログ。通知ポップアップの「設定で確認」は`uiStore.openSettingsSection("update")`でアップデートタブを直接開く。
+>   4. **なめらかスクロール**: `useSmoothWheelScroll`新設（easing補間+感度1.6x、外部スクロール検知で追従）。EntryList/Reader/Discover(結果+リーダー)/Settings/History/Trash/FeedManagerへ適用。設定「動作」に「マウスホイールをなめらかに」トグル（`appearanceStore.smoothScroll`、既定ON）。
+>   5. **設定タブ化**: 7アコーディオンを1アクティブタブ方式へ（`lib/settingsTabs.ts`新設、`gyroscope:settings-tab`永続、既定=見た目）。アップデートタブにFilterBarと同じ更新バッジ。`useSettingsController`の`openSections`を`activeSection`へ置換。
+>   6. **文字設定✕**: リーダーの文字設定パネルに「閉じる」✕ボタン追加。`ReaderOverlay.tsx`。
+>   検証: `npm run build`成功、`cargo test`83件成功、`cargo clippy -- -D warnings`成功、E2E(search-focus 4件/reader-readability 1件/regression-check 4件全通過、ui-audit CLEAR_FAIL=0)。設定タブ化のためui-audit基準画像をクリーンデータで`UPDATE_BASELINES=1`再生成（settings系が意図的差分、11画面AMBIGUOUS=0）。
+
 > - **[opencode]** v0.2.9をリリース公開（2026-08-20）。リリースノートは「前回リリース版との差分」ベースで起草し、バグ修正2件（フォント分割が一部フォントで適用されない／全文取得の競合で前の記事の本文に置き換わる）は`git log -S`でv0.2.8に実在を確認してからHuman承認を得た。`npm run package:portable`で配布物を生成し、`gh release create v0.2.9`（zip+exe添付、HEAD=43b4673にタグ）で公開。タグ位置は`git ls-remote`でHEADと一致を確認。URL: https://github.com/otakichi1985/Gyroscope/releases/tag/v0.2.9
 
 > - **[opencode]** 探す画面の提供元URL可視化と全テーマでの見た目統一。カードの提供元ドメインをタイムラインと同じ`accent-text`強調(10px/opacity55→text-xs/無減光)へ。色の不整合(amberハードコード)をアクセント基調へ統一 — ☆・「記事を保存」・チェックボックス(`checkbox-input`新設)・検索欄のfocusリングを撤去。検索ボタンを`accent-bg accent-text`(ライトモードで同色=ほぼ不可視のバグ)から正規プライマリCTA(`accent-bg`+白文字)へ修正。「候補の状態」チップも兄弟チップと同じ`accent-bg-soft`へ。カードを`entry-card`化(タイムラインのガラスカードと同じ背景/ホバー/`active:scale-[0.98]`押下)し、フローティング/スタイル系スキン(カーディナリティ・オーディナリー等)でも見た目が統一されるようにした。配置は不変。RSSバッジの緑(成功=既読✓と同じセマンティック色)と提供元注記は維持。`npm run build`成功、E2E(`bookmark-store.spec.js`)通過。
@@ -96,6 +111,17 @@
 
 
 
+
+**概要:** 「探す」タブの検索・閲覧を改善し、アプリ更新まわりを自動化・可視化した。スクロール操作と設定アイコンも見直した。
+- 「探す」のキーワード検索を関連度順にし、キーワードと関係ない記事が先頭に来る「ブレ」を解消した（前回リリースで実在）。表示件数・内容も検索結果と揃えた。
+- 「探す」で見つけた記事の全文表示を、タイムラインのリーダーと同じ読みやすい構成（タイトル・公開日・列幅・文字設定）に統一した（前回リリースで実在）。
+- アプリ更新を自動化した。起動時と6時間毎に新バージョンを確認し、あればポップアップで通知する。自動更新モードを「インストールまでおまかせ（表示中に再起動することがあります）／ダウンロードまでおまかせ／確認のみ」から選べるようにした。
+- 設定の「今すぐ確認」で更新が無い場合は「更新はありません」と表示するようにした（前回リリースで実在）。
+- 設定画面をタブ表示に整理し、縦に長くスクロールしなくても済むようにした。更新があるときはアップデートタブにマークが出る。設定ボタンのアイコンも歯車に変更した。
+- 長い一覧の先頭に一気に戻れる「一番上に戻る」ボタンを右下に追加した。Home/End/PageUp/PageDownキーでも今見ている一覧をスクロールできる。
+- 記事リーダーの「文字設定」パネルを✕ボタンで閉じられるようにした。
+- 「探す」で記事の全文を読んでいる最中にマウスのサイドボタン（戻る）を押すと、先に読みかけの記事を閉じて結果一覧へ戻るようにした。
+- マウスホイールをなめらかにする設定を追加した（既定OFF。動作設定でONにできる）。
 
 # Uncommitted Archive
 

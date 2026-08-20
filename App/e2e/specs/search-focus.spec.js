@@ -39,7 +39,7 @@ async function clickByAriaLabel(label) {
 
 describe("浮遊スキンの検索欄フォーカス", () => {
   it("設定を開いてカーディナリティへ切り替え、閉じる", async () => {
-    expect(await clickByAriaLabel("外観設定を開く")).toBe(true);
+    expect(await clickByAriaLabel("設定を開く")).toBe(true);
     await browser.pause(300);
     expect(await clickByText("カーディナリティ")).toBe(true);
     await browser.pause(300);
@@ -112,3 +112,4 @@ describe("浮遊スキンの検索欄フォーカス", () => {
     console.log("[search-focus] input value after second keys():", JSON.stringify(value));
   });
 });
+

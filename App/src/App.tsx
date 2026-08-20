@@ -6,14 +6,17 @@ import { FilterBar } from "./components/FilterBar";
 import { HistoryOverlay } from "./components/HistoryOverlay";
 import { ReaderOverlay } from "./components/ReaderOverlay";
 import { ResizeCornerGuides } from "./components/ResizeCornerGuides";
+import { ScrollToTopButton } from "./components/ScrollToTopButton";
 import { SettingsOverlay } from "./components/SettingsOverlay";
 import { TitleBar } from "./components/TitleBar";
 import { TimelineToolbar } from "./components/TimelineToolbar";
 import { TrashOverlay } from "./components/TrashOverlay";
+import { UpdateNoticePopup } from "./components/UpdateNoticePopup";
 import { DevPointer } from "./dev-tools/DevPointer";
 import { useAutoCheckForUpdate } from "./hooks/useAutoCheckForUpdate";
 import { useFeedsUpdatedListener } from "./hooks/useFeedsUpdatedListener";
 import { useIdleTimer } from "./hooks/useIdleTimer";
+import { usePageScrollKeys } from "./hooks/usePageScrollKeys";
 import { useSyncAlwaysOnTop } from "./hooks/useSyncAlwaysOnTop";
 import { useSyncFloatingMode } from "./hooks/useSyncFloatingMode";
 import { useSyncMinimizeToTray } from "./hooks/useSyncMinimizeToTray";
@@ -236,6 +239,10 @@ function App() {
   useSyncAlwaysOnTop(alwaysOnTop);
   useSyncMinimizeToTray(minimizeToTray);
   useAutoCheckForUpdate();
+  // Home/End/PageUp/PageDown scroll the active content pane (see
+  // usePageScrollKeys). Hook-level, not per-screen, so it works everywhere
+  // without each overlay wiring its own key handler.
+  usePageScrollKeys();
 
   const terminalStyle = skin.visualStyle === "terminal";
   const latinSources = latinFontId
@@ -363,6 +370,12 @@ function App() {
         <ReaderOverlay />
         <SettingsOverlay />
       </div>
+      {/* In-app update notice -- a sibling of the overlays so it floats above
+          every screen, not just the settings one. */}
+      <UpdateNoticePopup />
+      {/* Floating "back to top" button, above the overlays but below the
+          update notice. */}
+      <ScrollToTopButton />
       {/* Dev-only pointing tool (src/dev-tools). `import.meta.env.DEV` is
           replaced with a literal at build time, so the whole subtree -- and
           the import above with it -- is dropped from the production bundle;

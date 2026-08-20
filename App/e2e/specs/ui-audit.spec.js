@@ -31,7 +31,7 @@ const J = {
   history: "\u65E2\u8AAD\u5C65\u6B74\u3092\u958B\u304F", // 既読履歴を開く
   trash: "\u30B4\u30DF\u7BB1\u3092\u958B\u304F", // ゴミ箱を開く
   feedManager: "\u30D5\u30A3\u30FC\u30C9\u7BA1\u7406\u3092\u958B\u304F", // フィード管理を開く
-  settings: "\u5916\u89B3\u8A2D\u5B9A\u3092\u958B\u304F", // 外観設定を開く
+  settings: "\u8A2D\u5B9A\u3092\u958B\u304F", // 設定を開く
   close: "\u9589\u3058\u308B", // 閉じる
   system: "\u30B7\u30B9\u30C6\u30E0", // システム
   light: "\u30E9\u30A4\u30C8", // ライト

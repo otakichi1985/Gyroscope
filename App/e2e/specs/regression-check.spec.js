@@ -27,7 +27,7 @@ async function clickByAriaLabel(label) {
 }
 
 async function switchToSkin(skinLabel) {
-  expect(await clickByAriaLabel("外観設定を開く")).toBe(true);
+  expect(await clickByAriaLabel("設定を開く")).toBe(true);
   await browser.pause(300);
   expect(await clickByText(skinLabel)).toBe(true);
   await browser.pause(300);
@@ -139,3 +139,4 @@ describe("回帰チェック: .app-content z-index修正の周辺影響", () => 
     expect(state.appContentZIndex).toBe("auto");
   });
 });
+

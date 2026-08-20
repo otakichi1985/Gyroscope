@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { SettingsSectionId } from "../lib/settingsTabs";
 
 // Single active-screen model rather than 3 independent booleans: the old
 // shape let feedManagerOpen/historyOpen/settingsOpen all be true at once,
@@ -26,8 +27,14 @@ interface UiState {
   // after going back truncates the forward tail, like a browser history.
   navStack: NavEntry[];
   navIndex: number;
+  // One-shot request for the settings screen to open on a specific tab
+  // (e.g. the update notice's "設定で確認" jumping straight to アップデート).
+  // Consumed and cleared by SettingsOverlay.
+  pendingSettingsSection: SettingsSectionId | null;
   toggleScreen: (screen: Exclude<Screen, "timeline" | "reader">) => void;
   openReader: (entryId: number) => void;
+  openSettingsSection: (section: SettingsSectionId) => void;
+  clearPendingSettingsSection: () => void;
   goHome: () => void;
   goBack: () => void;
   goForward: () => void;
@@ -44,6 +51,7 @@ export const useUiStore = create<UiState>((set) => ({
   readerEntryId: null,
   navStack: [{ screen: "timeline", readerEntryId: null }],
   navIndex: 0,
+  pendingSettingsSection: null,
   toggleScreen: (screen) =>
     set((s) => {
       const next: Screen = s.activeScreen === screen ? "timeline" : screen;
@@ -59,6 +67,20 @@ export const useUiStore = create<UiState>((set) => ({
       readerEntryId: entryId,
       ...pushEntry(s, { screen: "reader", readerEntryId: entryId }),
     })),
+  openSettingsSection: (section) =>
+    set((s) => {
+      // Don't push another history entry when settings is already the active
+      // screen -- switching tabs is not a navigation step.
+      const base: Partial<UiState> = {
+        activeScreen: "settings",
+        readerEntryId: null,
+        pendingSettingsSection: section,
+      };
+      return s.activeScreen === "settings"
+        ? base
+        : { ...base, ...pushEntry(s, { screen: "settings", readerEntryId: null }) };
+    }),
+  clearPendingSettingsSection: () => set({ pendingSettingsSection: null }),
   goHome: () =>
     set((s) => {
       if (s.activeScreen === "timeline") return {};

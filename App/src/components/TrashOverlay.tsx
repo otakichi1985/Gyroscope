@@ -1,7 +1,10 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { formatPublished } from "../lib/text";
 import { useTrashStore } from "../stores/trashStore";
 import { useUiStore } from "../stores/uiStore";
+import { useAppearanceStore } from "../stores/appearanceStore";
+import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
+import { useScrollTargetRef } from "../hooks/useScrollTargetRef";
 import { ScreenOverlay } from "./ScreenOverlay";
 import { StatePanel } from "./StatePanel";
 import { TrashIcon } from "./icons";
@@ -9,6 +12,16 @@ import { TrashIcon } from "./icons";
 export function TrashOverlay() {
   const isActive = useUiStore((s) => s.activeScreen === "trash");
   const { entries, loading, error, refresh, restore } = useTrashStore();
+  const smoothScroll = useAppearanceStore((s) => s.smoothScroll);
+  const wheelRef = useSmoothWheelScroll<HTMLDivElement>(smoothScroll);
+  const targetRef = useScrollTargetRef<HTMLDivElement>();
+  const scrollRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      wheelRef(el);
+      targetRef(el);
+    },
+    [wheelRef, targetRef],
+  );
 
   // Re-fetch on every activation, not just first mount: this component
   // stays mounted for the app's lifetime (see ScreenOverlay), so a
@@ -24,7 +37,7 @@ export function TrashOverlay() {
         削除したブックマークは30日間ここに残ります。その後は自動的に完全削除されます
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-2 text-sm">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-2 text-sm">
         {error && <p className="p-1 text-xs text-red-500">{error}</p>}
         {loading && entries.length === 0 ? (
           <p className="p-1 text-xs opacity-60">読み込み中...</p>

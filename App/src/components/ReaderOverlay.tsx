@@ -15,9 +15,11 @@ import {
 } from "../stores/appearanceStore";
 import { useEntriesStore } from "../stores/entriesStore";
 import { useUiStore } from "../stores/uiStore";
+import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
+import { useScrollTargetRef } from "../hooks/useScrollTargetRef";
 import { ScreenOverlay } from "./ScreenOverlay";
 import { ReaderSettingsControls } from "./ReaderSettings";
-import { CopyIcon, ExternalLinkIcon, TypeIcon } from "./icons";
+import { CopyIcon, CloseIcon, ExternalLinkIcon, TypeIcon } from "./icons";
 
 const HTTP_LINK_RE = /^https?:\/\//i;
 // Below this many plain-text characters, treat the article as "probably
@@ -102,6 +104,19 @@ export function ReaderOverlay() {
   // reader opens or the shown entry changes (layout effect so the corrected
   // position lands in the same paint as the new content).
   const scrollRef = useRef<HTMLDivElement>(null);
+  const smoothScroll = useAppearanceStore((s) => s.smoothScroll);
+  // Same callback ref keeps `scrollRef.current` valid for the top-reset below,
+  // attaches the smooth-wheel glide, and registers the pane with the
+  // scrollable registry for the scroll-to-top button / page-scroll keys.
+  const wheelRef = useSmoothWheelScroll(smoothScroll, scrollRef);
+  const targetRef = useScrollTargetRef<HTMLDivElement>();
+  const scrollRefFn = useCallback(
+    (el: HTMLDivElement | null) => {
+      wheelRef(el);
+      targetRef(el);
+    },
+    [wheelRef, targetRef],
+  );
   const isReaderActive = activeScreen === "reader";
   useLayoutEffect(() => {
     if (isReaderActive) scrollRef.current?.scrollTo({ top: 0 });
@@ -335,6 +350,18 @@ export function ReaderOverlay() {
     >
       {settingsOpen && (
         <div className="shrink-0 border-b border-black/10 bg-black/[0.03] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[10px] font-medium opacity-70">文字設定</span>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(false)}
+              aria-label="文字設定を閉じる"
+              className="flex items-center gap-1 rounded bg-black/5 px-1.5 py-0.5 text-[10px] opacity-70 transition-colors duration-150 hover:bg-black/10 hover:opacity-100 active:bg-black/15 dark:bg-white/5 dark:hover:bg-white/10 dark:active:bg-white/15"
+            >
+              <CloseIcon className="h-3 w-3" />
+              閉じる
+            </button>
+          </div>
           <ReaderSettingsControls />
         </div>
       )}
@@ -347,7 +374,7 @@ export function ReaderOverlay() {
           pane per entry starts at scrollTop 0 by construction. */}
       <div
         key={entry?.id ?? "none"}
-        ref={scrollRef}
+        ref={scrollRefFn}
         style={readerVars}
         className="allow-text-selection min-h-0 flex-1 overflow-y-auto p-3 text-sm"
       >

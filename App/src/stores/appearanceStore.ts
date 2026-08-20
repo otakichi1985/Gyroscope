@@ -69,6 +69,7 @@ interface StoredAppearance {
   readerFontFamily: ReaderFontFamily;
   readerCodeFont: ReaderCodeFont;
   readerColors: ReaderColors;
+  smoothScroll: boolean;
 }
 
 function loadAppearance(): StoredAppearance {
@@ -97,6 +98,10 @@ function loadAppearance(): StoredAppearance {
     readerFontFamily: "app",
     readerCodeFont: "mono",
     readerColors: { body: null, heading: null, quote: null, code: null, link: null },
+    // Defaults OFF: the wheel-glide was an addition on top of the actual
+    // request (scroll-to-top + Home/End/page keys), so new installs get the
+    // native wheel behaviour unless the user turns the glide on in Settings.
+    smoothScroll: false,
   };
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return fallback;
@@ -148,6 +153,7 @@ function loadAppearance(): StoredAppearance {
       : fallback.readerColumnWidth;
     const readerKeepOpacity =
       typeof parsed.readerKeepOpacity === "boolean" ? parsed.readerKeepOpacity : fallback.readerKeepOpacity;
+    const smoothScroll = typeof parsed.smoothScroll === "boolean" ? parsed.smoothScroll : fallback.smoothScroll;
     const readerFontFamily = READER_FONT_FAMILIES.includes(parsed.readerFontFamily as ReaderFontFamily)
       ? (parsed.readerFontFamily as ReaderFontFamily)
       : fallback.readerFontFamily;
@@ -185,6 +191,7 @@ function loadAppearance(): StoredAppearance {
       readerFontFamily,
       readerCodeFont,
       readerColors,
+      smoothScroll,
     };
   } catch {
     return fallback;
@@ -219,6 +226,7 @@ interface AppearanceState extends StoredAppearance {
   setReaderCodeFont: (value: ReaderCodeFont) => void;
   /** null returns that element to the current theme's color. */
   setReaderColor: (key: ReaderElementKey, value: ReaderColorPreset | null) => void;
+  setSmoothScroll: (value: boolean) => void;
 }
 
 export const useAppearanceStore = create<AppearanceState>((set, get) => ({
@@ -334,5 +342,10 @@ export const useAppearanceStore = create<AppearanceState>((set, get) => ({
     const readerColors = { ...get().readerColors, [key]: value };
     set({ readerColors });
     save({ ...get(), readerColors });
+  },
+
+  setSmoothScroll: (value: boolean) => {
+    set({ smoothScroll: value });
+    save({ ...get(), smoothScroll: value });
   },
 }));

@@ -151,12 +151,14 @@ if (sample &gt; 0) console.log("コードブロックの例");</code></pre>
 
 const plainBody = `見出し1（記事のタイトル下） この段落は元サイトが色と文字サイズを直書きしています。読書画面では style 属性が取り除かれ、テーマの文字色と、文字設定で選んだサイズ・行間に従います。 見出し2 通常の段落です。文字が読みにくい問題を再現するための長めの文章を並べます。読書画面では行間が広げられ、見出しは本文より大きくなり、引用は枠線で区別され、幅の広い表は専用の横スクロール領域に包まれます。この程度の文字数があれば「要約のみ」判定を回避して全文取得が走ることもありません。 これは引用文です。以前は不透明度0.85でかすんでいましたが、今はアクセントの枠線と薄い背景で強調され、文字はくっきり読めます。 箇条書きの項目その1 箇条書きの項目その2 番号付きリストの1番目 番号付きリストの2番目 const sample = 1; if (sample > 0) console.log("コードブロックの例"); リンクの例。リンクはテーマのアクセント色で下線付きになります。 見出し3 列A 列B セルの値1 セルの値2 末尾の段落です。幅の広い表は専用のスクロール領域に包まれるので、ウィンドウの端で切れて読めなくなることはありません。`;
 
-function openDb() {
+/** Opens the shared E2E DB (creating its directory if needed). */
+export function openDb() {
   mkdirSync(dataDir, { recursive: true });
   return new DatabaseSync(dbPath);
 }
 
-function ensureSchema(db) {
+/** Creates the schema if the DB is fresh. Safe to call from any spec. */
+export function ensureSchema(db) {
   const hasFeeds = db
     .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'feeds'`)
     .get();

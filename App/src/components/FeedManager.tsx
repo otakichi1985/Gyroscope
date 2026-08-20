@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { useFeedsStore } from "../stores/feedsStore";
+import { useAppearanceStore } from "../stores/appearanceStore";
+import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
+import { useScrollTargetRef } from "../hooks/useScrollTargetRef";
 import { BellIcon, BellOffIcon, CloseIcon, RefreshIcon, TrashIcon, WarningIcon } from "./icons";
 import { ClearableInput } from "./ClearableInput";
 
@@ -109,6 +112,16 @@ export function FeedManager() {
     importOpml,
     exportOpml,
   } = useFeedsStore();
+  const smoothScroll = useAppearanceStore((s) => s.smoothScroll);
+  const wheelRef = useSmoothWheelScroll<HTMLDivElement>(smoothScroll);
+  const targetRef = useScrollTargetRef<HTMLDivElement>();
+  const scrollRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      wheelRef(el);
+      targetRef(el);
+    },
+    [wheelRef, targetRef],
+  );
   const [url, setUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -163,7 +176,7 @@ export function FeedManager() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm">
+    <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm">
       <div className="flex gap-1">
         <button
           type="button"
