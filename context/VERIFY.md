@@ -161,6 +161,9 @@ E2Eが起動するアプリは `GYROSCOPE_DATA_DIR`（`%TEMP%\gyroscope-e2e-data
 `X passing`/`X failing`に加え、観測用スペックは`console.log`の出力内容で判断する。
 回帰テストとして残すスペックは恒久名（`zz-temp-`プレフィックスを付けない）で置く。診断用の一時スペック（使い捨て）は`zz-temp-`プレフィックスを付けて**フルスイートから除外**（`wdio.conf.js`の`exclude`）し、セッション中は**保持**する（手戻り・デバッグ時に`npm run test:e2e -- --spec e2e/specs/zz-temp-<名前>.spec.js`で再実行できるように）。破棄はセッション内での即時削除ではなく、適切なタイミング（次回検証時・リリース前）に行う。
 
+**注意（WebDriver要素操作が桁違いに遅い）:**  
+このハーネス（tauri-driver + msedgedriver + WebView2）では、WebDriverの要素操作が異常に遅い（実測: `$()`/findElement約15秒、`element.click()`約23秒。スキン非依存）。一方`browser.execute`（JS実行）と`browser.keys`（キー入力）は数ms〜数十msと高速。**要素の探索・クリックは`browser.execute`＋DOM（`el.click()`）で行い、実入力は`browser.keys`で行う**のが標準。実ユーザー操作（クリップボード等）が本当に必要な場合のみ`element.click()`を残す（`reader-readability.spec.js`参照）。この罠はアプリ性能ではなくハーネス起因なので、スペックが遅くてもアプリを疑わない（詳細はWORKLOGの検証最適化エントリ）。
+
 **限界:**  
 デバッグビルド固定。初回はtauri-driver/msedgedriverの取得に数分かかる。
 対象のGUI変更を確認するスペックが無ければ先に書く必要がある。
