@@ -37,6 +37,30 @@ async function clickByAriaLabel(label) {
   return clicked;
 }
 
+// WebDriver element operations (`$()` findElement and `element.click()`) are
+// pathologically slow on this tauri-driver + msedgedriver + WebView2 harness
+// (~15s / ~23s each, regardless of skin -- measured), while `browser.execute`
+// and `browser.keys` are fast. Click/query through execute + DOM and send real
+// input via keys(), so the search-focus/input path is still exercised without
+// the harness stalls.
+async function waitForSelector(selector, timeout = 10000) {
+  return browser.waitUntil(
+    async () => (await browser.execute((s) => !!document.querySelector(s), selector)) === true,
+    { timeout },
+  );
+}
+async function clickBySelector(selector) {
+  return browser.execute((s) => {
+    const el = document.querySelector(s);
+    if (!el) return false;
+    el.click();
+    return true;
+  }, selector);
+}
+async function readValue(selector) {
+  return browser.execute((s) => document.querySelector(s)?.value ?? "", selector);
+}
+
 describe("浮遊スキンの検索欄フォーカス", () => {
   it("設定を開いてカーディナリティへ切り替え、閉じる", async () => {
     expect(await clickByAriaLabel("設定を開く")).toBe(true);
@@ -53,9 +77,8 @@ describe("浮遊スキンの検索欄フォーカス", () => {
   });
 
   it("検索アイコンをクリックした直後のフォーカス状態を記録する", async () => {
-    const searchButton = await $('button[aria-label="記事を検索"]');
-    await searchButton.waitForClickable({ timeout: 10000 });
-    await searchButton.click();
+    await waitForSelector('button[aria-label="記事を検索"]');
+    await clickBySelector('button[aria-label="記事を検索"]');
 
     // Give the app's own requestAnimationFrame-deferred focus() a real
     // chance to run -- the real window is visible/foregrounded here,
@@ -81,11 +104,10 @@ describe("浮遊スキンの検索欄フォーカス", () => {
   });
 
   it("フォーカスされた状態でキー入力が実際に届くか確認する", async () => {
-    const input = await $('input[placeholder="記事を検索"]');
-    await input.waitForDisplayed({ timeout: 10000 });
+    await waitForSelector('input[placeholder="記事を検索"]');
     await browser.keys(["t", "e", "s", "t"]);
     await browser.pause(200);
-    const value = await input.getValue();
+    const value = await readValue('input[placeholder="記事を検索"]');
     console.log(
       "[search-focus] input value after keys() (no explicit focus/click):",
       JSON.stringify(value),
@@ -93,8 +115,8 @@ describe("浮遊スキンの検索欄フォーカス", () => {
   });
 
   it("検索欄をクリックし直した場合のフォーカス状態を記録する（アイコン経由ではない再フォーカス）", async () => {
-    const input = await $('input[placeholder="記事を検索"]');
-    await input.click();
+    await waitForSelector('input[placeholder="記事を検索"]');
+    await clickBySelector('input[placeholder="記事を検索"]');
     await browser.pause(200);
 
     const state = await browser.execute(() => {
@@ -108,7 +130,7 @@ describe("浮遊スキンの検索欄フォーカス", () => {
 
     await browser.keys(["m", "o", "r", "e"]);
     await browser.pause(200);
-    const value = await input.getValue();
+    const value = await readValue('input[placeholder="記事を検索"]');
     console.log("[search-focus] input value after second keys():", JSON.stringify(value));
   });
 });

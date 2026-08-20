@@ -26,6 +26,27 @@ async function clickByAriaLabel(label) {
   }, label);
 }
 
+// WebDriver element ops (`$()` / `element.click()`) are pathologically slow on
+// this harness (~15s / ~23s, skin-independent -- measured); use execute + DOM
+// for finding/clicking, keys() for real input.
+async function waitForSelector(selector, timeout = 10000) {
+  return browser.waitUntil(
+    async () => (await browser.execute((s) => !!document.querySelector(s), selector)) === true,
+    { timeout },
+  );
+}
+async function clickBySelector(selector) {
+  return browser.execute((s) => {
+    const el = document.querySelector(s);
+    if (!el) return false;
+    el.click();
+    return true;
+  }, selector);
+}
+async function readValue(selector) {
+  return browser.execute((s) => document.querySelector(s)?.value ?? "", selector);
+}
+
 async function switchToSkin(skinLabel) {
   expect(await clickByAriaLabel("設定を開く")).toBe(true);
   await browser.pause(300);
@@ -65,9 +86,11 @@ describe("回帰チェック: .app-content z-index修正の周辺影響", () => 
     // Trigger the "更新はありません" toast path and confirm it's not
     // visually buried (topmost element at its own center should be itself
     // or a descendant, never .entry-list-scroll).
-    const refreshButton = await $('button=記事を更新');
-    if (await refreshButton.isExisting()) {
-      await refreshButton.click();
+    const refreshBtnExists = await browser.execute(
+      () => Array.from(document.querySelectorAll("button")).some((b) => b.textContent.trim() === "記事を更新"),
+    );
+    if (refreshBtnExists) {
+      await clickByText("記事を更新");
       await browser.pause(2500);
       const toastCheck = await browser.execute(() => {
         const toast = Array.from(document.querySelectorAll("div")).find(
@@ -90,9 +113,8 @@ describe("回帰チェック: .app-content z-index修正の周辺影響", () => 
 
   it("オーディナリー: 同じ重なりが再発していないことを確認する", async () => {
     await switchToSkin("オーディナリー");
-    const searchButton = await $('button[aria-label="記事を検索"]');
-    await searchButton.waitForClickable({ timeout: 10000 });
-    await searchButton.click();
+    await waitForSelector('button[aria-label="記事を検索"]');
+    await clickBySelector('button[aria-label="記事を検索"]');
     await browser.pause(500);
 
     const state = await browser.execute(() => {
@@ -113,11 +135,10 @@ describe("回帰チェック: .app-content z-index修正の周辺影響", () => 
     expect(state.appContentZIndex).toBe("auto");
     expect(state.topElementIsInput).toBe(true);
 
-    const input = await $('input[placeholder="記事を検索"]');
-    await input.click();
+    await clickBySelector('input[placeholder="記事を検索"]');
     await browser.keys(["o", "k"]);
     await browser.pause(200);
-    const value = await input.getValue();
+    const value = await readValue('input[placeholder="記事を検索"]');
     console.log("[regression] ordinary re-click + type value:", JSON.stringify(value));
     expect(value.length).toBeGreaterThan(0);
   });
