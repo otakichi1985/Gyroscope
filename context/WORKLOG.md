@@ -22,7 +22,7 @@
 
 <!-- ここから実際の記録 -->
 
-
+> - **[opencode]** v0.2.9をリリース公開（2026-08-20）。リリースノートは「前回リリース版との差分」ベースで起草し、バグ修正2件（フォント分割が一部フォントで適用されない／全文取得の競合で前の記事の本文に置き換わる）は`git log -S`でv0.2.8に実在を確認してからHuman承認を得た。`npm run package:portable`で配布物を生成し、`gh release create v0.2.9`（zip+exe添付、HEAD=43b4673にタグ）で公開。タグ位置は`git ls-remote`でHEADと一致を確認。URL: https://github.com/otakichi1985/Gyroscope/releases/tag/v0.2.9
 
 > - **[opencode]** 探す画面の提供元URL可視化と全テーマでの見た目統一。カードの提供元ドメインをタイムラインと同じ`accent-text`強調(10px/opacity55→text-xs/無減光)へ。色の不整合(amberハードコード)をアクセント基調へ統一 — ☆・「記事を保存」・チェックボックス(`checkbox-input`新設)・検索欄のfocusリングを撤去。検索ボタンを`accent-bg accent-text`(ライトモードで同色=ほぼ不可視のバグ)から正規プライマリCTA(`accent-bg`+白文字)へ修正。「候補の状態」チップも兄弟チップと同じ`accent-bg-soft`へ。カードを`entry-card`化(タイムラインのガラスカードと同じ背景/ホバー/`active:scale-[0.98]`押下)し、フローティング/スタイル系スキン(カーディナリティ・オーディナリー等)でも見た目が統一されるようにした。配置は不変。RSSバッジの緑(成功=既読✓と同じセマンティック色)と提供元注記は維持。`npm run build`成功、E2E(`bookmark-store.spec.js`)通過。
 > - **[opencode]** 探すタブのブックマーク保存をタイムラインのブックマーク一覧と統合。ユーザー要望4点を実装した。
@@ -136,6 +136,16 @@
 
 <!-- ここから実際の記録 -->
 
+## 43b4673 — 2026-08-20
+**環境:** opencode
+
+v0.2.9リリースのバージョン番号バンプ。`package.json`/`Cargo.toml`/`Cargo.lock`/`tauri.conf.json`を0.2.9へ変更。
+
+## 9ca12bc — 2026-08-20
+**環境:** opencode
+
+WORKLOG圧縮。コミット済みのリーダー作業エントリをCurrent Workから除去し、Recent Commitsを直近5件へ整理。
+
 ## e0a6cd3 — 2026-08-20
 **環境:** opencode
 
@@ -150,17 +160,6 @@
 **環境:** opencode
 
 セッション振り返りの改善候補A〜D（リリースノート起草・空ツリーゲート・WORKLOG書式・Portableビルド注意）をWORKLOGへ記録（適用本体は78ae337）。
-
-## 78ae337 — 2026-08-20
-**環境:** opencode
-
-本セッション振り返りから改善候補A〜Dを適用（Human承認済み）。A: リリースノートを「前回リリース版との差分」ベースで起草し、バグ修正は`git log -S`で前回リリースに実在したかを確認、`gh release create`前にHuman承認を必須化（`VERIFY.md`ノート確認・リリース実行）。B: リリースの空ツリーゲートに`context/workflows/*`（共有フォルダのジャンクション由来）の除外を明記。C: `Unreleased Changes`を「**概要:**＋段落」の複数行書式に変更し、バグ修正には「前回リリースで実在」の有無を明記するルールを追加（長行エントリの編集破損対策）。D: `Portable Package Build`に「`gyroscope.exe`は直接実行しない（GUIでシェルがハング）」を追記。
-
-## 0811023 — 2026-08-20
-**環境:** opencode
-
-公開済みリリースノートの訂正（a25a09dの内容）をWORKLOGへ記録。
-
 
 # Rotation
 
