@@ -1,6 +1,6 @@
 [package]
 name = "gyroscope"
-version = "0.2.9"
+version = "0.2.10"
 description = "Windows 11 desktop RSS/Atom widget"
 authors = ["you"]
 edition = "2021"
