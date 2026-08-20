@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useUiStore, type Screen } from "../stores/uiStore";
 import { CloseIcon } from "./icons";
 
@@ -22,16 +22,20 @@ interface ScreenOverlayProps {
   title: ReactNode;
   /** Extra controls placed to the left of the close button. */
   headerActions?: ReactNode;
+  /** Optional inline styles for the overlay root -- used by the reader to
+   * raise `--float-alpha` (floating skins' opacity) while reading. */
+  style?: CSSProperties;
   children: ReactNode;
 }
 
-export function ScreenOverlay({ screen, title, headerActions, children }: ScreenOverlayProps) {
+export function ScreenOverlay({ screen, title, headerActions, style, children }: ScreenOverlayProps) {
   const activeScreen = useUiStore((s) => s.activeScreen);
   const goHome = useUiStore((s) => s.goHome);
   const isActive = activeScreen === screen;
 
   return (
     <div
+      style={style}
       className={`screen-overlay panel-bg absolute inset-0 z-10 flex flex-col transition-all duration-200 ease-out ${
         isActive ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0 pointer-events-none"
       }`}

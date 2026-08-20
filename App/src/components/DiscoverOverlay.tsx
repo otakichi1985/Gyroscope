@@ -3,13 +3,22 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useFeedsStore } from "../stores/feedsStore";
 import { useUiStore } from "../stores/uiStore";
-import { useAppearanceStore } from "../stores/appearanceStore";
+import {
+  useAppearanceStore,
+  type ReaderColumnWidth,
+  type ReaderElementKey,
+  type ReaderFontFamily,
+  type ReaderFontSize,
+  type ReaderLineHeight,
+} from "../stores/appearanceStore";
 import { sanitizeArticleHtml } from "../lib/sanitize";
+import { getSkin } from "../lib/skins";
+import { readerPresetVar } from "../lib/readerTheme";
 import type { ScoredSource, SearchCategory } from "../lib/types";
 import { MarqueeTitle } from "./MarqueeTitle";
 import { ScreenOverlay } from "./ScreenOverlay";
 import { ClearableInput } from "./ClearableInput";
-import { ImageOffIcon, StarIcon } from "./icons";
+import { ExternalLinkIcon, ImageOffIcon, StarIcon } from "./icons";
 
 const HTTP_LINK_RE = /^https?:\/\//i;
 
@@ -50,6 +59,43 @@ const AVAILABILITIES: [ResultAvailability, string][] = [
 // as a per-card tag.
 const NOISE_REASON = /users以上ブックマーク$/;
 
+// Mirrors ReaderOverlay's reader-settings maps: the full-text view here is a
+// reader too, so it honours the same 文字設定 instead of rendering with the
+// app's default typography.
+const FONT_SIZE_MAP: Record<ReaderFontSize, string> = {
+  small: "13px",
+  medium: "15px",
+  large: "17px",
+  xlarge: "19px",
+};
+const LINE_HEIGHT_MAP: Record<ReaderLineHeight, string> = {
+  tight: "1.5",
+  normal: "1.75",
+  loose: "2.05",
+};
+const COLUMN_WIDTH_MAP: Record<ReaderColumnWidth, string> = {
+  narrow: "32em",
+  normal: "40em",
+  wide: "50em",
+};
+
+// Same font/color maps as ReaderOverlay -- keep the two reader surfaces in
+// lockstep so 文字設定 behaves identically in both. "app" follows the global
+// font (see ReaderOverlay for the rationale).
+const FONT_FAMILY_MAP: Record<ReaderFontFamily, string> = {
+  app: "inherit",
+  sans: `system-ui, -apple-system, "Segoe UI", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif`,
+  serif: `"Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", "MS PMincho", serif`,
+};
+const CODE_FONT_MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+const ELEMENT_COLOR_KEYS: Record<ReaderElementKey, string> = {
+  body: "--reader-color-body",
+  heading: "--reader-color-heading",
+  quote: "--reader-color-quote",
+  code: "--reader-color-code",
+  link: "--reader-color-link",
+};
+
 // Feeds are stored by their *feed* URL (e.g. foo.example/feed) while search
 // hits carry the *article* URL (e.g. foo.example/entry/1) -- two URLs for
 // the same site that never string-match. Compare by host (minus an optional
@@ -86,6 +132,14 @@ function hostOf(url: string): string {
 export function DiscoverOverlay() {
   const { addFeed, feeds } = useFeedsStore();
   const blockImages = useAppearanceStore((s) => s.blockImages);
+  const readerFontSize = useAppearanceStore((s) => s.readerFontSize);
+  const readerLineHeight = useAppearanceStore((s) => s.readerLineHeight);
+  const readerColumnWidth = useAppearanceStore((s) => s.readerColumnWidth);
+  const readerKeepOpacity = useAppearanceStore((s) => s.readerKeepOpacity);
+  const readerFontFamily = useAppearanceStore((s) => s.readerFontFamily);
+  const readerCodeFont = useAppearanceStore((s) => s.readerCodeFont);
+  const readerColors = useAppearanceStore((s) => s.readerColors);
+  const skinId = useAppearanceStore((s) => s.skinId);
 
   const [query, setQuery] = useState("");
   const [categories, setCategories] = useState<SearchCategory[]>([]);
@@ -121,6 +175,9 @@ export function DiscoverOverlay() {
   const [readerHtml, setReaderHtml] = useState<string | null>(null);
   const [readerFetching, setReaderFetching] = useState(false);
   const [readerError, setReaderError] = useState<string | null>(null);
+  // URL of the in-flight full-text fetch (if any); a late reply for a target
+  // the reader has since left is dropped (see handleReadFullText).
+  const fullTextFetchRef = useRef<string | null>(null);
 
   const existingHosts = new Set(
     feeds.flatMap((f) => [f.url, f.site_url ?? ""]).map(hostOf).filter(Boolean),
@@ -326,13 +383,19 @@ export function DiscoverOverlay() {
     setReaderHtml(null);
     setReaderError(null);
     setReaderFetching(true);
+    // Guard against stale replies: if the reader moves to a different article
+    // (or is closed) while this fetch is in flight, a late result must not
+    // overwrite the view the user is actually looking at.
+    fullTextFetchRef.current = source.url;
     try {
       const result = await invoke<{ html: string }>("fetch_article_full_text", { url: source.url });
+      if (fullTextFetchRef.current !== source.url) return;
       setReaderHtml(result.html);
     } catch (err) {
+      if (fullTextFetchRef.current !== source.url) return;
       setReaderError(String(err));
     } finally {
-      setReaderFetching(false);
+      if (fullTextFetchRef.current === source.url) setReaderFetching(false);
     }
   }
 
@@ -346,6 +409,23 @@ export function DiscoverOverlay() {
     const href = anchor.getAttribute("href");
     if (href && HTTP_LINK_RE.test(href)) void openUrl(href);
   }
+
+  const readerColorVars = {} as Record<string, string>;
+  for (const key of Object.keys(ELEMENT_COLOR_KEYS) as ReaderElementKey[]) {
+    const preset = readerColors[key];
+    if (preset) readerColorVars[ELEMENT_COLOR_KEYS[key]] = readerPresetVar(preset);
+  }
+  const readerVars = {
+    "--reader-font-size": FONT_SIZE_MAP[readerFontSize],
+    "--reader-line-height": LINE_HEIGHT_MAP[readerLineHeight],
+    "--reader-max-width": COLUMN_WIDTH_MAP[readerColumnWidth],
+    "--reader-font-family": FONT_FAMILY_MAP[readerFontFamily],
+    "--reader-code-font-family":
+      readerCodeFont === "mono" ? CODE_FONT_MONO : "var(--reader-font-family)",
+    ...readerColorVars,
+  } as React.CSSProperties;
+  const keepOpacityStyle =
+    reader && getSkin(skinId).floating && readerKeepOpacity ? ({ "--float-alpha": "1" } as React.CSSProperties) : undefined;
 
   return (
     <ScreenOverlay screen="discover" title="サイトを探す">
@@ -652,13 +732,15 @@ export function DiscoverOverlay() {
                           この記事の全文を読む
                         </button>
                         <div className="flex gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenArticle(source)}
-                            className="flex-1 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
-                          >
-                            ブラウザで開く
-                          </button>
+<button
+            type="button"
+            onClick={() => handleOpenArticle(source)}
+            title="既定のブラウザで開く"
+            className="flex flex-1 items-center justify-center gap-1 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
+          >
+            <ExternalLinkIcon className="h-3.5 w-3.5" />
+            ブラウザで開く
+          </button>
                           <button
                             type="button"
                             onClick={() => handleRegister(source)}
@@ -699,11 +781,14 @@ export function DiscoverOverlay() {
           snippet renders as a readable reader view right away (title, source,
           body); the fetched full text then replaces the snippet in place. */}
       {reader && (
-        <div className="panel-bg absolute inset-0 z-20 flex flex-col p-3">
+        <div style={keepOpacityStyle} className="panel-bg absolute inset-0 z-20 flex flex-col p-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setReader(null)}
+              onClick={() => {
+                fullTextFetchRef.current = null;
+                setReader(null);
+              }}
               aria-label="全文表示を閉じる"
               className="shrink-0 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
             >
@@ -719,12 +804,14 @@ export function DiscoverOverlay() {
             <button
               type="button"
               onClick={() => void openUrl(reader.url)}
-              className="shrink-0 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
+              title="既定のブラウザで開く"
+              className="flex shrink-0 items-center gap-1 rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
             >
+              <ExternalLinkIcon className="h-3.5 w-3.5" />
               ブラウザで開く
             </button>
           </div>
-          <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+          <div style={readerVars} className="mt-3 min-h-0 flex-1 overflow-y-auto">
             {readerFetching && (
               <p className="mb-2 text-xs opacity-60" role="status">
                 全文を取得中...
@@ -736,23 +823,29 @@ export function DiscoverOverlay() {
                 <button
                   type="button"
                   onClick={() => void openUrl(reader.url)}
-                  className="w-fit rounded bg-black/10 px-3 py-1.5 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
+                  title="既定のブラウザで開く"
+                  className="flex w-fit items-center gap-1 rounded bg-black/10 px-3 py-1.5 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
                 >
+                  <ExternalLinkIcon className="h-3.5 w-3.5" />
                   ブラウザで開く
                 </button>
               </div>
             )}
             {readerHtml ? (
-              <div
-                className="reader-content max-w-none text-sm"
-                onClick={handleReaderClick}
-                dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(readerHtml, blockImages) }}
-              />
+              <div className="reader-column">
+                <div
+                  className="reader-content max-w-none text-sm"
+                  onClick={handleReaderClick}
+                  dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(readerHtml, blockImages) }}
+                />
+              </div>
             ) : (
               !readerError &&
               reader.snippet && (
-                <div className="reader-content max-w-none text-sm">
-                  <p className="whitespace-pre-wrap">{reader.snippet}</p>
+                <div className="reader-column">
+                  <div className="reader-content max-w-none text-sm">
+                    <p className="whitespace-pre-wrap">{reader.snippet}</p>
+                  </div>
                 </div>
               )
             )}

@@ -136,6 +136,7 @@ pub fn run() {
             opacity::set_always_on_top,
             tray::set_minimize_to_tray,
             fonts::list_system_fonts,
+            fonts::list_font_face_names,
             commands::feeds::add_feed,
             commands::feeds::list_feeds,
             commands::feed_settings::delete_feed,

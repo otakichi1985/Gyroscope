@@ -7,6 +7,7 @@ import type { DataDirInfo } from "../lib/types";
 import { useUpdateStore } from "../stores/updateStore";
 import { FontPicker } from "./FontPicker";
 import { ScreenOverlay } from "./ScreenOverlay";
+import { ReaderSettingsControls } from "./ReaderSettings";
 import { ChevronDownIcon } from "./icons";
 import { useSettingsController } from "./useSettingsController";
 
@@ -557,6 +558,14 @@ export function SettingsOverlay() {
             </p>
           )}
         </div>
+        </SettingsSection>
+
+        <SettingsSection
+          title="リーダー"
+          open={openSections.reader}
+          onToggle={() => toggleSection("reader")}
+        >
+        <ReaderSettingsControls />
         </SettingsSection>
 
         <SettingsSection
