@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { mkdirSync, existsSync } from "node:fs";
 import { auditPage, classify, formatReport, installConsoleCollector, drainConsoleErrors } from "../helpers/visual.js";
 import { diffPngs } from "../helpers/pixeldiff.js";
+import { clearE2eData } from "../seed-reader-data.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const baselineDir = path.join(__dirname, "..", "baselines");
@@ -72,6 +73,15 @@ async function auditAndShot(name) {
 }
 
 describe("UI audit: computational visual verification (no model vision)", () => {
+  // The pixel baselines are an empty-timeline snapshot, but the shared E2E DB
+  // accumulates data (bookmarks, read history, feeds) from specs that ran
+  // earlier in the full suite. Clear it so the audit is deterministic and
+  // never renders leftover content over the baseline (which showed up as
+  // bookmarks/history AMBIGUOUS). Safe: specs run sequentially.
+  before(async () => {
+    await clearE2eData();
+  });
+
   it("walks all screens/overlays/themes, audits invariants, captures+diff screenshots", async function () {
     this.timeout(240000);
     try {

@@ -22,6 +22,13 @@ const appBinaryPath = path.resolve(
 export const config = {
   runner: "local",
   specs: ["./specs/**/*.spec.js"],
+  // In-session disposable/diagnostic specs (prefixed zz-temp-) are kept for
+  // rollback/debug safety but excluded from the default full-suite run so
+  // they don't slow every verification. Run them explicitly when needed:
+  //   npm run test:e2e -- --spec e2e/specs/zz-temp-<name>.spec.js
+  // Discard them at an appropriate later timing (next verification, before a
+  // release) rather than immediately after use -- see VERIFY.md.
+  exclude: ["./specs/**/zz-temp-*.spec.js"],
   maxInstances: 1,
 
   services: [
