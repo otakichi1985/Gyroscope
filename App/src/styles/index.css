@@ -370,7 +370,7 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   opacity: 0;
   transition: opacity 300ms ease-out;
   background: radial-gradient(
-    circle 200px at var(--spot-x, 50%) var(--spot-y, 50%),
+    circle 130px at var(--spot-x, 50%) var(--spot-y, 50%),
     rgb(var(--accent-rgb-light) / 0.08),
     transparent 70%
   );
@@ -380,7 +380,7 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 }
 .dark .mouse-spotlight {
   background: radial-gradient(
-    circle 200px at var(--spot-x, 50%) var(--spot-y, 50%),
+    circle 130px at var(--spot-x, 50%) var(--spot-y, 50%),
     rgb(var(--accent-rgb-dark) / 0.1),
     transparent 70%
   );
@@ -515,7 +515,7 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   --plate-fill-alpha: 0.82;
   --plate-border: 255 255 255;
   --plate-border-alpha: 0.5;
-  --plate-blur: 14px;
+  --plate-blur: 9px;
   --plate-inset: 8px;
   /* Elevation WITHOUT a soft drop shadow, and this is not a style choice --
      a drop shadow is structurally broken once the window is transparent.
@@ -629,8 +629,8 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   border: 1px solid rgb(var(--plate-border) / calc(var(--plate-border-alpha) * var(--float-alpha, 1)));
   border-radius: var(--plate-radius);
   background-color: rgb(var(--plate-fill) / calc(0.96 * var(--float-alpha, 1)));
-  -webkit-backdrop-filter: blur(22px) saturate(1.2);
-  backdrop-filter: blur(22px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
   box-shadow: var(--plate-shadow);
 }
 
