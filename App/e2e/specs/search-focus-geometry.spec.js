@@ -32,7 +32,7 @@ async function clickByAriaLabel(label) {
 
 describe("検索欄と記事リストの重なりを計測する", () => {
   it("カーディナリティへ切り替え、検索を開いた状態を作る", async () => {
-    expect(await clickByAriaLabel("外観設定を開く")).toBe(true);
+    expect(await clickByAriaLabel("設定を開く")).toBe(true);
     await browser.pause(300);
     expect(await clickByText("カーディナリティ")).toBe(true);
     await browser.pause(300);
@@ -81,3 +81,4 @@ describe("検索欄と記事リストの重なりを計測する", () => {
     console.log("[search-geometry]", JSON.stringify(report, null, 2));
   });
 });
+

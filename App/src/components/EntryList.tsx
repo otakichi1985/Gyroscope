@@ -4,6 +4,8 @@ import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
 import { useAppearanceStore, type CardSize } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
+import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
+import { useScrollTargetRef } from "../hooks/useScrollTargetRef";
 import { EntryRow } from "./EntryRow";
 import { RssIcon, SearchIcon, StarIcon, WarningIcon } from "./icons";
 import { StatePanel } from "./StatePanel";
@@ -156,6 +158,19 @@ export function EntryList() {
   }, [loading]);
 
   const parentRef = useRef<HTMLDivElement>(null);
+  const smoothScroll = useAppearanceStore((s) => s.smoothScroll);
+  // The same callback ref feeds the virtualizer (via parentRef, set inside
+  // the hook), attaches the smooth-wheel glide, and registers the pane with
+  // the scrollable registry for the scroll-to-top button / page-scroll keys.
+  const wheelRef = useSmoothWheelScroll(smoothScroll, parentRef);
+  const targetRef = useScrollTargetRef<HTMLDivElement>();
+  const scrollRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      wheelRef(el);
+      targetRef(el);
+    },
+    [wheelRef, targetRef],
+  );
 
   const baseSize = viewMode === "card" ? CARD_BASE_SIZE[cardSize] : OTHER_BASE_SIZE[viewMode];
 
@@ -252,7 +267,7 @@ export function EntryList() {
     // Settings/History/etc. already animates).
     <div
       key={starredOnly ? "starred" : "all"}
-      ref={parentRef}
+      ref={scrollRef}
       className={`timeline-enter entry-list-scroll h-full overflow-y-auto px-2 py-1 text-sm ${
         revealing ? "list-reveal" : ""
       }`}

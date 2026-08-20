@@ -45,8 +45,8 @@ export function ClockIcon(props: IconProps) {
 }
 
 // The classic RSS/feed glyph (bottom-left dot + two concentric quarter
-// arcs) -- used for the feed-management button instead of a generic gear,
-// which reads as "settings" and collides with the appearance-settings icon.
+// arcs) -- used for the feed-management button. A gear would collide with the
+// settings button's icon, hence the dedicated RSS mark.
 export function RssIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -57,21 +57,22 @@ export function RssIcon(props: IconProps) {
   );
 }
 
-// A paint palette (outline + a few color dots) reads more directly as
-// "appearance/look" than a generic sliders icon, which is easily mistaken
-// for an equalizer or unrelated preferences.
-export function PaletteIcon(props: IconProps) {
+// A gear -- the universal "settings" glyph (user request: the settings button
+// is the place for everything, so it should read as settings, not "appearance
+// only"). Central hub with short teeth radiating outward.
+export function SettingsIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      <path d="M2 8.2c0-3.1 2.7-5.7 6.2-5.7 3.3 0 5.8 2.3 5.8 4.9 0 2.1-1.5 3.1-3 2.9-.8-.1-1.4.5-1.1 1.2.3.8-.3 1.5-1.1 1.5-3.8 0-6.8-2.1-6.8-4.8Z" />
-      <circle cx="4.8" cy="7.6" r="0.85" fill="currentColor" stroke="none" />
-      <circle cx="6.6" cy="5.4" r="0.85" fill="currentColor" stroke="none" />
-      <circle cx="9.3" cy="5" r="0.85" fill="currentColor" stroke="none" />
-      <circle cx="11.4" cy="6.8" r="0.85" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="8" r="2.6" />
+      <path d="M8 2.3v1.9M8 11.8v1.9M13.7 8h-1.9M4.2 8H2.3" />
+      <path d="M12 4 10.7 5.3M5.3 10.7 4 12M12 12l-1.3-1.3M5.3 5.3 4 4" />
     </Icon>
   );
 }
 
+// A paint palette (outline + a few color dots) reads more directly as
+// "appearance/look" than a generic sliders icon, which is easily mistaken
+// for an equalizer or unrelated preferences.
 export function TrashIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -139,6 +140,16 @@ export function ChevronDownIcon(props: IconProps) {
   return (
     <Icon {...props}>
       <path d="M4 6.5 8 10.5 12 6.5" />
+    </Icon>
+  );
+}
+
+// Single upward-pointing arrow -- used by the floating scroll-to-top button.
+export function ArrowUpIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <line x1="8" y1="13" x2="8" y2="3.5" />
+      <path d="M4.5 7 8 3.5 11.5 7" />
     </Icon>
   );
 }

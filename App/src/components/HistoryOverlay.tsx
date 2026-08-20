@@ -1,8 +1,11 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { formatPublished } from "../lib/text";
 import { useHistoryStore } from "../stores/historyStore";
 import { useUiStore } from "../stores/uiStore";
+import { useAppearanceStore } from "../stores/appearanceStore";
+import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
+import { useScrollTargetRef } from "../hooks/useScrollTargetRef";
 import { ScreenOverlay } from "./ScreenOverlay";
 import { StatePanel } from "./StatePanel";
 import { ClockIcon } from "./icons";
@@ -12,6 +15,16 @@ const HTTP_LINK_RE = /^https?:\/\//i;
 export function HistoryOverlay() {
   const isActive = useUiStore((s) => s.activeScreen === "history");
   const { entries, loading, error, refresh, clear } = useHistoryStore();
+  const smoothScroll = useAppearanceStore((s) => s.smoothScroll);
+  const wheelRef = useSmoothWheelScroll<HTMLDivElement>(smoothScroll);
+  const targetRef = useScrollTargetRef<HTMLDivElement>();
+  const scrollRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      wheelRef(el);
+      targetRef(el);
+    },
+    [wheelRef, targetRef],
+  );
 
   // Was `useEffect(() => { refresh(); }, [refresh])` -- since `refresh` is a
   // stable Zustand action reference, that effect only ever ran once, on this
@@ -44,7 +57,7 @@ export function HistoryOverlay() {
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-2 text-sm">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-2 text-sm">
         {error && <p className="p-1 text-xs text-red-500">{error}</p>}
         {loading && entries.length === 0 ? (
           <p className="p-1 text-xs opacity-60">読み込み中...</p>

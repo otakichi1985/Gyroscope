@@ -41,7 +41,7 @@ describe("検索欄/記事リスト重なりの原因切り分け", () => {
     }
     await browser.pause(300);
 
-    expect(await clickByAriaLabel("外観設定を開く")).toBe(true);
+    expect(await clickByAriaLabel("設定を開く")).toBe(true);
     await browser.pause(300);
     expect(await clickByText("カーディナリティ")).toBe(true);
     await browser.pause(300);
@@ -100,3 +100,4 @@ describe("検索欄/記事リスト重なりの原因切り分け", () => {
     console.log("[layout-diagnose]", JSON.stringify(report, null, 2));
   });
 });
+

@@ -1,15 +1,20 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { type CardGap, type CardSize, type ClickBehavior, type ThemeMode } from "../stores/appearanceStore";
 import { SKINS } from "../lib/skins";
+import { SETTINGS_TABS } from "../lib/settingsTabs";
 import type { DataDirInfo } from "../lib/types";
-import { useUpdateStore } from "../stores/updateStore";
+import { UPDATE_MODE_LABELS, useUpdateStore, type UpdateMode } from "../stores/updateStore";
+import { useUiStore } from "../stores/uiStore";
+import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
+import { useScrollTargetRef } from "../hooks/useScrollTargetRef";
 import { FontPicker } from "./FontPicker";
 import { ScreenOverlay } from "./ScreenOverlay";
 import { ReaderSettingsControls } from "./ReaderSettings";
-import { ChevronDownIcon } from "./icons";
 import { useSettingsController } from "./useSettingsController";
+
+const UPDATE_MODES: UpdateMode[] = ["auto", "download", "manual"];
 
 const CARD_SIZES: { id: CardSize; label: string }[] = [
   { id: "small", label: "小" },
@@ -39,37 +44,6 @@ const SKIN_GROUPS = [
   { id: "contrast", label: "コントラスト" },
   { id: "style", label: "スタイル" },
 ] as const;
-
-function SettingsSection({
-  title,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <section className="border-b border-black/10 pb-3 last:border-b-0 dark:border-white/10">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={onToggle}
-        className="group flex w-full items-center justify-between rounded px-1 py-1.5 text-left transition-colors duration-150 hover:bg-black/[0.035] dark:hover:bg-white/[0.05]"
-      >
-        <h2 className="text-xs font-semibold tracking-wide opacity-70">{title}</h2>
-        <ChevronDownIcon
-          className={`h-3.5 w-3.5 shrink-0 opacity-55 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-      <div hidden={!open} className="flex flex-col gap-4 px-1 pt-3">
-        {children}
-      </div>
-    </section>
-  );
-}
 
 function ToggleRow({
   label,
@@ -253,9 +227,22 @@ function formatPublishedAt(iso: string): string {
   }
 }
 
-function UpdateSection() {
-  const { currentVersion, backupVersion, status, phase, error, loadStatic, check, download, apply, rollback } =
-    useUpdateStore();
+function UpdateSection({ onNoUpdate }: { onNoUpdate: () => void }) {
+  const {
+    currentVersion,
+    backupVersion,
+    status,
+    phase,
+    error,
+    downloaded,
+    updateMode,
+    loadStatic,
+    check,
+    download,
+    apply,
+    rollback,
+    setUpdateMode,
+  } = useUpdateStore();
 
   useEffect(() => {
     // `useAutoCheckForUpdate` already runs `loadStatic` once at startup,
@@ -269,13 +256,51 @@ function UpdateSection() {
 
   const busy = phase !== "idle";
 
+  // 今すぐ確認: run the check, and if it turns out we're already current,
+  // tell the user with the "更新はありません" dialog instead of leaving the
+  // press to end in a silent "最新バージョンです" line.
+  const handleCheck = async () => {
+    await check();
+    if (useUpdateStore.getState().status?.kind === "upToDate") {
+      onNoUpdate();
+    }
+  };
+
   const handleUpdate = async () => {
-    await download();
+    if (!downloaded) {
+      const ok = await download();
+      if (!ok) return;
+    }
     await apply();
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
+      <div>
+        <div className="mb-1.5 text-xs font-medium opacity-70">自動更新</div>
+        <div className="flex flex-col gap-1">
+          {UPDATE_MODES.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={updateMode === mode}
+              onClick={() => setUpdateMode(mode)}
+              className={`rounded border px-2 py-1.5 text-left text-xs transition-colors duration-150 ${
+                updateMode === mode
+                  ? "accent-border accent-bg-soft accent-text"
+                  : "border-black/10 hover:border-black/20 hover:bg-black/[0.03] dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-white/[0.04]"
+              }`}
+            >
+              {UPDATE_MODE_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-xs leading-relaxed opacity-70">
+          おまかせは新しいバージョンが見つかった時点で自動でダウンロードし、再起動して適用します（表示中に再起動することがあります）。
+          ダウンロードまでおまかせは取得だけを自動で行い、適用はこの画面から行います
+        </p>
+      </div>
+
       <div>
         <div className="mb-1.5 text-xs font-medium opacity-70">現在のバージョン</div>
         <p className="allow-text-selection rounded bg-black/5 px-2 py-1.5 font-mono text-[11px] dark:bg-white/5">
@@ -295,7 +320,7 @@ function UpdateSection() {
           )}
           <button
             type="button"
-            onClick={handleUpdate}
+            onClick={() => void handleUpdate()}
             disabled={busy}
             className={`${OUTLINE_BUTTON} accent-border self-start`}
           >
@@ -303,12 +328,19 @@ function UpdateSection() {
               ? "ダウンロード中..."
               : phase === "applying"
                 ? "再起動しています..."
-                : "更新して再起動"}
+                : downloaded
+                  ? "再起動して更新"
+                  : "更新して再起動"}
           </button>
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
-          <button type="button" onClick={check} disabled={busy} className={`${OUTLINE_BUTTON} self-start`}>
+          <button
+            type="button"
+            onClick={() => void handleCheck()}
+            disabled={busy}
+            className={`${OUTLINE_BUTTON} self-start`}
+          >
             {phase === "checking" ? "確認中..." : "今すぐ確認"}
           </button>
           {status?.kind === "upToDate" && <p className="text-xs opacity-60">最新バージョンです</p>}
@@ -350,6 +382,7 @@ export function SettingsOverlay() {
     clickBehavior,
     showIconLabels,
     titleMarquee,
+    smoothScroll,
     setOpacity,
     setSkin,
     setCardSize,
@@ -364,6 +397,7 @@ export function SettingsOverlay() {
     setClickBehavior,
     setShowIconLabels,
     setTitleMarquee,
+    setSmoothScroll,
     setThemeMode,
     selectedSkin,
     terminalSelected,
@@ -372,19 +406,74 @@ export function SettingsOverlay() {
     themeModeLocked,
     displayedThemeMode,
     opacityDisabled,
-    openSections,
-    toggleSection,
+    activeSection,
+    setActiveSection,
     systemFonts,
   } = useSettingsController();
 
+  // Settings shows one section at a time (tabs) -- the 7 accordions had made
+  // the panel scroll-heavy, and the update-notice popup can also jump straight
+  // to the アップデート tab via uiStore.
+  const pendingSettingsSection = useUiStore((s) => s.pendingSettingsSection);
+  const clearPendingSettingsSection = useUiStore((s) => s.clearPendingSettingsSection);
+  useEffect(() => {
+    if (!pendingSettingsSection) return;
+    setActiveSection(pendingSettingsSection);
+    clearPendingSettingsSection();
+  }, [pendingSettingsSection, setActiveSection, clearPendingSettingsSection]);
+
+  // "更新はありません" dialog, raised by UpdateSection's 今すぐ確認 when the
+  // check finds nothing new. Auto-dismisses after a moment so it can't block.
+  const [noUpdateOpen, setNoUpdateOpen] = useState(false);
+  const noUpdateTimer = useRef<number | null>(null);
+  const showNoUpdate = () => {
+    setNoUpdateOpen(true);
+    if (noUpdateTimer.current) window.clearTimeout(noUpdateTimer.current);
+    noUpdateTimer.current = window.setTimeout(() => setNoUpdateOpen(false), 3500);
+  };
+
+  const updateAvailable = useUpdateStore((s) => s.status?.kind === "available");
+  const wheelRef = useSmoothWheelScroll<HTMLDivElement>(smoothScroll);
+  const targetRef = useScrollTargetRef<HTMLDivElement>();
+  const settingsScrollRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      wheelRef(el);
+      targetRef(el);
+    },
+    [wheelRef, targetRef],
+  );
+
   return (
     <ScreenOverlay screen="settings" title="設定">
-      <div className="flex flex-col gap-3 overflow-y-auto p-3 text-sm">
-        <SettingsSection
-          title="見た目"
-          open={openSections.appearance}
-          onToggle={() => toggleSection("appearance")}
-        >
+      <div ref={settingsScrollRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 text-sm">
+        {/* Section tabs: one active at a time, so the panel stays short enough
+            to browse without scrolling through every section. The アップデート
+            tab carries the same "update available" dot as the settings icon in
+            FilterBar, so where to go is visible before opening the panel. */}
+        <div className="flex flex-wrap items-center gap-1 border-b border-black/10 pb-2 dark:border-white/10">
+          {SETTINGS_TABS.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={activeSection === id}
+              onClick={() => setActiveSection(id)}
+              className={`relative flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors duration-150 ${
+                activeSection === id
+                  ? "accent-bg-soft accent-text font-medium"
+                  : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
+              }`}
+            >
+              {label}
+              {id === "update" && updateAvailable && (
+                <span className="accent-bg h-1.5 w-1.5 rounded-full" aria-hidden="true" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {activeSection === "appearance" && (
+        <div className="flex flex-col gap-4 px-1">
         <div>
           <div className="mb-1.5 text-xs font-medium opacity-70">表示モード</div>
           <div className={`flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5 ${themeModeLocked ? "opacity-45" : ""}`}>
@@ -558,21 +647,17 @@ export function SettingsOverlay() {
             </p>
           )}
         </div>
-        </SettingsSection>
+        </div>
+        )}
 
-        <SettingsSection
-          title="リーダー"
-          open={openSections.reader}
-          onToggle={() => toggleSection("reader")}
-        >
+        {activeSection === "reader" && (
+        <div className="flex flex-col gap-4 px-1">
         <ReaderSettingsControls />
-        </SettingsSection>
+        </div>
+        )}
 
-        <SettingsSection
-          title="アクセシビリティ"
-          open={openSections.accessibility}
-          onToggle={() => toggleSection("accessibility")}
-        >
+        {activeSection === "accessibility" && (
+        <div className="flex flex-col gap-4 px-1">
         <div className="flex flex-col gap-2">
           <ToggleRow label="アイコンにテキストラベルを表示" value={showIconLabels} onChange={setShowIconLabels} />
           <p className="max-w-[72ch] text-xs leading-relaxed opacity-70">
@@ -589,13 +674,11 @@ export function SettingsOverlay() {
             動く文字が気になる場合はOFFにしてください（OFFでも「…」で省略表示されます）
           </p>
         </div>
-        </SettingsSection>
+        </div>
+        )}
 
-        <SettingsSection
-          title="動作"
-          open={openSections.behavior}
-          onToggle={() => toggleSection("behavior")}
-        >
+        {activeSection === "behavior" && (
+        <div className="flex flex-col gap-4 px-1">
         <div>
           <div className="mb-1.5 text-xs font-medium opacity-70">記事を開く方法</div>
           <div className="flex gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
@@ -635,13 +718,24 @@ export function SettingsOverlay() {
               : "×ボタンで閉じるとアプリを終了します"}
           </p>
         </div>
-        </SettingsSection>
 
-        <SettingsSection
-          title="プライバシー"
-          open={openSections.privacy}
-          onToggle={() => toggleSection("privacy")}
-        >
+        <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
+          <div className="text-xs font-medium opacity-70">スクロール</div>
+          <ToggleRow
+            label="マウスホイールをなめらかに"
+            value={smoothScroll}
+            onChange={setSmoothScroll}
+          />
+          <p className="max-w-[72ch] text-xs leading-relaxed opacity-70">
+            ホイールの回転をなめらかにしながら進みを大きくして、同じ距離を少ない回転で移動できるようにします。
+            慣性の動きが気になる場合はOFFにしてください
+          </p>
+        </div>
+        </div>
+        )}
+
+        {activeSection === "privacy" && (
+        <div className="flex flex-col gap-4 px-1">
         <div className="flex flex-col gap-2">
           <ToggleRow label="外部画像を読み込まない" value={blockImages} onChange={setBlockImages} />
           <p className="max-w-[72ch] text-xs leading-relaxed opacity-70">
@@ -650,25 +744,41 @@ export function SettingsOverlay() {
             それを避けたい場合にONにしてください
           </p>
         </div>
-        </SettingsSection>
+        </div>
+        )}
 
-        <SettingsSection
-          title="データ管理"
-          open={openSections.data}
-          onToggle={() => toggleSection("data")}
-        >
+        {activeSection === "data" && (
+        <div className="flex flex-col gap-4 px-1">
         <HistoryRetentionSection />
         <DataDirSection />
-        </SettingsSection>
+        </div>
+        )}
 
-        <SettingsSection
-          title="アップデート"
-          open={openSections.update}
-          onToggle={() => toggleSection("update")}
-        >
-        <UpdateSection />
-        </SettingsSection>
+        {activeSection === "update" && (
+        <div className="flex flex-col gap-4 px-1">
+        <UpdateSection onNoUpdate={showNoUpdate} />
+        </div>
+        )}
       </div>
+
+      {/* 更新はありません -- transient confirmation for 今すぐ確認 when the
+          check finds nothing new. Centered over the settings panel so it
+          can't be missed, and auto-dismisses (or OK) shortly after. */}
+      {noUpdateOpen && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-4">
+          <div className="panel-bg flex flex-col items-stretch gap-2 rounded-lg border border-black/15 p-4 text-sm shadow-xl ring-1 ring-black/5 dark:border-white/15 dark:ring-white/5">
+            <p className="font-semibold">更新はありません</p>
+            <p className="text-xs opacity-70">お使いのバージョンは最新です</p>
+            <button
+              type="button"
+              onClick={() => setNoUpdateOpen(false)}
+              className="accent-bg mt-1 rounded px-3 py-1.5 text-xs font-medium text-white transition-opacity duration-150 hover:opacity-90 active:opacity-80"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </ScreenOverlay>
   );
 }
