@@ -230,8 +230,15 @@ describe("reader readability: theme wins + adjustable typography", () => {
     }
 
     // 9. リンクをコピー: a trusted click copies the article URL to the OS
-    // clipboard and the button briefly shows コピーしました.
-    await browser.$('[data-testid="reader-copy-link"]').click();
+    // clipboard and the button briefly shows コピーしました. (DOM click via
+    // execute -- WebDriver element.click() is pathologically slow on this
+    // harness, and the copy handler itself still runs navigator.clipboard.)
+    await browser.execute(() => {
+      const b = document.querySelector('[data-testid="reader-copy-link"]');
+      if (!b) throw new Error("copy link button missing");
+      b.click();
+      return true;
+    });
     await browser.pause(400);
     const copyLabel = await browser.execute(S.copyButtonText);
     if (copyLabel !== "コピーしました") throw new Error(`copy feedback missing: ${copyLabel}`);
