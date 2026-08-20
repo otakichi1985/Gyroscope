@@ -84,7 +84,7 @@
 **用途:** リリース作成前に、今回のセッションでの作業だけでなく前回リリース以降の全変更が反映されているか確認する。
 
 **実行:**  
-`git log --oneline <前回タグ>..HEAD` で全コミットを列挙し、`WORKLOG.md`のRecent Commitsと突き合わせる。ノートはこのコミット単位で「エンドユーザー向けか」を判定して起草し、各項目は**前回リリース版との差分（最終状態）**として書く。「バグ修正」項目は`git log -S <修正対象>`等で該当バグが前回リリース版に実在したかを確認する。起草後、`gh release create`**前にHumanの承認**を受ける。
+前回タグがローカルに無い場合（`git tag -l`で出ない場合）は、先に`git fetch --tags`で取得してから、`git log --oneline <前回タグ>..HEAD` で全コミットを列挙し、`WORKLOG.md`のRecent Commitsと突き合わせる。ノートはこのコミット単位で「エンドユーザー向けか」を判定して起草し、各項目は**前回リリース版との差分（最終状態）**として書く。「バグ修正」項目は`git log -S <修正対象>`等で該当バグが前回リリース版に実在したかを確認する。起草後、`gh release create`**前にHumanの承認**を受ける。
 
 **確認:**  
 他セッション・Human分を含む前回リリース以降の全コミットがリリースノートに反映され、実機で無関係と分かった変更（開発環境限定の不具合など）は含めていないこと。公開前にHumanがノートを承認していること。
@@ -117,6 +117,7 @@
 **用途:** タグが実際のリリースコミットを指すことを保証する。`main`未pushのまま`gh release create`すると、GitHubは存在しないタグをリモートのデフォルトブランチ先端（古いコミット）へ張ってしまう（v0.2.7で実発生日→手動でタグを付け直した）。
 
 **実行:**  
+リリースバージョンへの更新は、`package.json`・`src-tauri/Cargo.toml`・`src-tauri/tauri.conf.json`・`src-tauri/Cargo.lock` の4ファイルを更新する。`Cargo.lock`は手編集せず、`cargo check`等でCargo.tomlと同期させて差分を確認する。バンプは`chore(release): bump v0.x.y`としてコミットする。
 リリース前に `git status --short` が空であること（`context/workflows/*`のジャンクション由来の変更は対象外。下記「限界」参照）と、`git rev-parse HEAD` と `git rev-parse origin/main` が一致していること（一致しなければ先に `git push origin main`）を確認してから `gh release create` する。リリースノートは「GitHub Release ノート確認」の手順で起草・Human承認済みのものを使う。公開後、`git ls-remote --tags origin <タグ>` が `HEAD` と一致することを確認する。
 
 **確認:**  
@@ -163,6 +164,7 @@ E2Eが起動するアプリは `GYROSCOPE_DATA_DIR`（`%TEMP%\gyroscope-e2e-data
 **限界:**  
 デバッグビルド固定。初回はtauri-driver/msedgedriverの取得に数分かかる。
 対象のGUI変更を確認するスペックが無ければ先に書く必要がある。
+`browser.mock`（WebdriverIOのネットワークモック）はブラウザモード専用で、実機Tauriモードでは注入されない。決定的な応答を要するテストは、ローカルHTTPサーバ（例: `e2e/seed-reader-race-data.mjs`）を立てて応答タイミング・内容を制御する方式を使う。
 
 
 ## UI視覚監査（計算ベース・モデル視覚非依存）

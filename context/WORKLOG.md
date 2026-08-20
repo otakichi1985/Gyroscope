@@ -166,6 +166,7 @@ WORKLOG圧縮。コミット済みのリーダー作業エントリをCurrent Wo
 - `Current Work` が肥大化 → まずHumanへコミットを提案
 - まだコミットしない → 古い部分を `Uncommitted Archive` へ圧縮
 - 現行版のバグ修正・新機能追加 → `Unreleased Changes` に記録し、コミット後もリリースまで残す
+- `Current Work` をコミットして `Recent Commits` へ圧縮するとき、コミット内容にユーザーに見える変更（バグ修正・新機能）が含まれていれば、同時に `Unreleased Changes` へも転記する（リリースノートの拾い漏れ防止。`VERIFY.md`「GitHub Release ノート確認」の再発防止①と連動）
 - リリース → リリースノートへ転記してから、リリース済み項目を `Unreleased Changes` から削除
 - その他の一時的な作業記録をコミット → 該当する記録を `Recent Commits` へ圧縮
 - `Recent Commits` → 最大5件
