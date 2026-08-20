@@ -47,6 +47,55 @@ pub fn list_system_fonts() -> Vec<String> {
     names.into_iter().collect()
 }
 
+/// Maps every installed font family to the real face names (PostScript names,
+/// nameID 6) that `@font-face src:local()` resolves on this machine. Chromium
+/// matches local() against a font's *face* name, not reliably against its
+/// family name -- families whose full name differs from the family name (the
+/// Yu family, the per-user SAO UI family, ...) silently drop out unless the
+/// face names are supplied. fontdb reads the name tables directly, and on
+/// Windows scans the per-user font directory too, so HKCU-registered fonts
+/// like SAO UI are included. Runs off-thread because loading the database
+/// parses every installed font (hundreds of files).
+#[cfg(target_os = "windows")]
+#[tauri::command]
+pub async fn list_font_face_names() -> std::collections::HashMap<String, Vec<String>> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let mut db = fontdb::Database::new();
+        db.load_system_fonts();
+
+        let mut by_family: std::collections::HashMap<String, std::collections::BTreeSet<String>> =
+            std::collections::HashMap::new();
+        for face in db.faces() {
+            let ps_name = face.post_script_name.trim().to_string();
+            if ps_name.is_empty() {
+                continue;
+            }
+            // A face can carry several family names (typographic + legacy +
+            // localized); register the face name under each so the lookup
+            // matches whichever name the picker's family list uses.
+            for (family, _) in &face.families {
+                by_family
+                    .entry(family.clone())
+                    .or_default()
+                    .insert(ps_name.clone());
+            }
+        }
+
+        by_family
+            .into_iter()
+            .map(|(family, names)| (family, names.into_iter().collect()))
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+pub fn list_font_face_names() -> std::collections::HashMap<String, Vec<String>> {
+    std::collections::HashMap::new()
+}
+
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
 pub fn list_system_fonts() -> Vec<String> {

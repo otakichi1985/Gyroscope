@@ -5,9 +5,42 @@ export type CardSize = "small" | "medium" | "large";
 export type CardGap = "compact" | "normal" | "relaxed";
 export type ClickBehavior = "browser" | "reader";
 export type ThemeMode = "system" | "light" | "dark";
+export type ReaderFontSize = "small" | "medium" | "large" | "xlarge";
+export type ReaderLineHeight = "tight" | "normal" | "loose";
+export type ReaderColumnWidth = "narrow" | "normal" | "wide";
+/** The article body's typeface: follow the app font, gothic (sans) or
+ * mincho (serif). "app" inherits the global font setting so the reader does
+ * not override a font the user chose for the whole app. */
+export type ReaderFontFamily = "app" | "sans" | "serif";
+/** Whether code/pre in the article keeps its own monospace face or follows
+ * the body font. */
+export type ReaderCodeFont = "mono" | "body";
+/** A preset tint an element can be given (null = follow the current theme).
+ * Presets are theme-adaptive so any choice stays readable on the current
+ * surface -- see the `--reader-preset-*` palette in index.css. */
+export type ReaderColorPreset = "accent" | "text" | "muted" | "danger" | "warning" | "info" | "success";
+/** The reader elements whose meaning is inferred from the article HTML, each
+ * independently colorable by the user (null = follow the current theme). */
+export type ReaderElementKey = "body" | "heading" | "quote" | "code" | "link";
+export type ReaderColors = Record<ReaderElementKey, ReaderColorPreset | null>;
 
 const CARD_SIZES: CardSize[] = ["small", "medium", "large"];
 const CARD_GAPS: CardGap[] = ["compact", "normal", "relaxed"];
+const READER_FONT_SIZES: ReaderFontSize[] = ["small", "medium", "large", "xlarge"];
+const READER_LINE_HEIGHTS: ReaderLineHeight[] = ["tight", "normal", "loose"];
+const READER_COLUMN_WIDTHS: ReaderColumnWidth[] = ["narrow", "normal", "wide"];
+const READER_FONT_FAMILIES: ReaderFontFamily[] = ["app", "sans", "serif"];
+const READER_CODE_FONTS: ReaderCodeFont[] = ["mono", "body"];
+const READER_ELEMENT_KEYS: ReaderElementKey[] = ["body", "heading", "quote", "code", "link"];
+const READER_COLOR_PRESET_IDS: ReaderColorPreset[] = [
+  "accent",
+  "text",
+  "muted",
+  "danger",
+  "warning",
+  "info",
+  "success",
+];
 
 const STORAGE_KEY = "gyroscope:appearance";
 const MIN_OPACITY = 0.5;
@@ -29,6 +62,13 @@ interface StoredAppearance {
   showIconLabels: boolean;
   titleMarquee: boolean;
   themeMode: ThemeMode;
+  readerFontSize: ReaderFontSize;
+  readerLineHeight: ReaderLineHeight;
+  readerColumnWidth: ReaderColumnWidth;
+  readerKeepOpacity: boolean;
+  readerFontFamily: ReaderFontFamily;
+  readerCodeFont: ReaderCodeFont;
+  readerColors: ReaderColors;
 }
 
 function loadAppearance(): StoredAppearance {
@@ -50,6 +90,13 @@ function loadAppearance(): StoredAppearance {
     showIconLabels: true,
     titleMarquee: true,
     themeMode: "system",
+    readerFontSize: "medium",
+    readerLineHeight: "normal",
+    readerColumnWidth: "normal",
+    readerKeepOpacity: false,
+    readerFontFamily: "app",
+    readerCodeFont: "mono",
+    readerColors: { body: null, heading: null, quote: null, code: null, link: null },
   };
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return fallback;
@@ -90,6 +137,31 @@ function loadAppearance(): StoredAppearance {
       parsed.themeMode === "system" || parsed.themeMode === "light" || parsed.themeMode === "dark"
         ? parsed.themeMode
         : fallback.themeMode;
+    const readerFontSize = READER_FONT_SIZES.includes(parsed.readerFontSize as ReaderFontSize)
+      ? (parsed.readerFontSize as ReaderFontSize)
+      : fallback.readerFontSize;
+    const readerLineHeight = READER_LINE_HEIGHTS.includes(parsed.readerLineHeight as ReaderLineHeight)
+      ? (parsed.readerLineHeight as ReaderLineHeight)
+      : fallback.readerLineHeight;
+    const readerColumnWidth = READER_COLUMN_WIDTHS.includes(parsed.readerColumnWidth as ReaderColumnWidth)
+      ? (parsed.readerColumnWidth as ReaderColumnWidth)
+      : fallback.readerColumnWidth;
+    const readerKeepOpacity =
+      typeof parsed.readerKeepOpacity === "boolean" ? parsed.readerKeepOpacity : fallback.readerKeepOpacity;
+    const readerFontFamily = READER_FONT_FAMILIES.includes(parsed.readerFontFamily as ReaderFontFamily)
+      ? (parsed.readerFontFamily as ReaderFontFamily)
+      : fallback.readerFontFamily;
+    const readerCodeFont = READER_CODE_FONTS.includes(parsed.readerCodeFont as ReaderCodeFont)
+      ? (parsed.readerCodeFont as ReaderCodeFont)
+      : fallback.readerCodeFont;
+    const rawColors = (parsed.readerColors ?? {}) as Partial<ReaderColors>;
+    const readerColors = { ...fallback.readerColors };
+    for (const key of READER_ELEMENT_KEYS) {
+      const value = rawColors[key];
+      if (typeof value === "string" && (READER_COLOR_PRESET_IDS as readonly string[]).includes(value)) {
+        readerColors[key] = value as ReaderColorPreset;
+      }
+    }
     return {
       opacity,
       skinId,
@@ -106,6 +178,13 @@ function loadAppearance(): StoredAppearance {
       showIconLabels,
       titleMarquee,
       themeMode,
+      readerFontSize,
+      readerLineHeight,
+      readerColumnWidth,
+      readerKeepOpacity,
+      readerFontFamily,
+      readerCodeFont,
+      readerColors,
     };
   } catch {
     return fallback;
@@ -132,6 +211,14 @@ interface AppearanceState extends StoredAppearance {
   setShowIconLabels: (value: boolean) => void;
   setTitleMarquee: (value: boolean) => void;
   setThemeMode: (value: ThemeMode) => void;
+  setReaderFontSize: (value: ReaderFontSize) => void;
+  setReaderLineHeight: (value: ReaderLineHeight) => void;
+  setReaderColumnWidth: (value: ReaderColumnWidth) => void;
+  setReaderKeepOpacity: (value: boolean) => void;
+  setReaderFontFamily: (value: ReaderFontFamily) => void;
+  setReaderCodeFont: (value: ReaderCodeFont) => void;
+  /** null returns that element to the current theme's color. */
+  setReaderColor: (key: ReaderElementKey, value: ReaderColorPreset | null) => void;
 }
 
 export const useAppearanceStore = create<AppearanceState>((set, get) => ({
@@ -211,5 +298,41 @@ export const useAppearanceStore = create<AppearanceState>((set, get) => ({
   setThemeMode: (value: ThemeMode) => {
     set({ themeMode: value });
     save({ ...get(), themeMode: value });
+  },
+
+  setReaderFontSize: (value: ReaderFontSize) => {
+    set({ readerFontSize: value });
+    save({ ...get(), readerFontSize: value });
+  },
+
+  setReaderLineHeight: (value: ReaderLineHeight) => {
+    set({ readerLineHeight: value });
+    save({ ...get(), readerLineHeight: value });
+  },
+
+  setReaderColumnWidth: (value: ReaderColumnWidth) => {
+    set({ readerColumnWidth: value });
+    save({ ...get(), readerColumnWidth: value });
+  },
+
+  setReaderKeepOpacity: (value: boolean) => {
+    set({ readerKeepOpacity: value });
+    save({ ...get(), readerKeepOpacity: value });
+  },
+
+  setReaderFontFamily: (value: ReaderFontFamily) => {
+    set({ readerFontFamily: value });
+    save({ ...get(), readerFontFamily: value });
+  },
+
+  setReaderCodeFont: (value: ReaderCodeFont) => {
+    set({ readerCodeFont: value });
+    save({ ...get(), readerCodeFont: value });
+  },
+
+  setReaderColor: (key: ReaderElementKey, value: string | null) => {
+    const readerColors = { ...get().readerColors, [key]: value };
+    set({ readerColors });
+    save({ ...get(), readerColors });
   },
 }));

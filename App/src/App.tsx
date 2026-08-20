@@ -20,6 +20,8 @@ import { useSyncMinimizeToTray } from "./hooks/useSyncMinimizeToTray";
 import { useSyncWindowOpacity } from "./hooks/useSyncWindowOpacity";
 import { useVibrancyMode } from "./hooks/useVibrancyMode";
 import { getSkin } from "./lib/skins";
+import { fetchFontFaceNames } from "./lib/systemFonts";
+import type { FontFaceNameMap } from "./lib/systemFonts";
 import { useAppearanceStore } from "./stores/appearanceStore";
 import { useFeedsStore } from "./stores/feedsStore";
 import { useUiStore } from "./stores/uiStore";
@@ -37,12 +39,31 @@ const JAPANESE_UNICODE_RANGE =
 const TERMINAL_LATIN_FONTS = ["Cascadia Mono", "Consolas"];
 const TERMINAL_JAPANESE_FONTS = ["BIZ UDGothic", "Yu Gothic UI", "MS Gothic"];
 
+// Chromium matches @font-face src:local() against a font *face* name (full or
+// PostScript name), not reliably against the family name. The Yu family is a
+// known casualty -- verified on the dev machine's WebView2 (v151): the plain
+// family names "Yu Gothic UI" / "Yu Gothic" / "Yu Mincho" all fail to resolve
+// through local(), silently dropping the chosen font (the user's "changed the
+// font but nothing happens" report). The per-user SAO UI family hits the same
+// trap. Instead of a hand-maintained alias table, the real face names are
+// fetched once from Rust (list_font_face_names, which reads each font's name
+// table) and each family's src is expanded with them; the plain family name is
+// kept last as a fallback, and every font whose family name doubles as its
+// face name (Arial, Meiryo, MS Gothic, BIZ UDGothic, ...) still resolves
+// through that alone.
 function safeFontName(name: string) {
   return name.replace(/[\\"<>\r\n]/g, "").trim();
 }
 
-function fontFaceRule(alias: string, names: string[], unicodeRange: string) {
-  const sources = names.map(safeFontName).filter(Boolean).map((name) => `local("${name}")`);
+function fontFaceRule(alias: string, names: string[], unicodeRange: string, faceNames: FontFaceNameMap) {
+  const sources = Array.from(
+    new Set(
+      names
+        .map(safeFontName)
+        .filter(Boolean)
+        .flatMap((name) => [...(faceNames[name] ?? []), name].map(safeFontName).filter(Boolean)),
+    ),
+  ).map((name) => `local("${name}")`);
   if (sources.length === 0) return "";
   return `@font-face{font-family:"${alias}";src:${sources.join(",")};font-display:swap;unicode-range:${unicodeRange};}`;
 }
@@ -124,6 +145,22 @@ function App() {
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
+  // Real face names per installed font family (see src/lib/systemFonts.ts),
+  // fetched once at startup so the split-font @font-face src lists can carry
+  // the names local() actually matches -- not just the family names, which
+  // silently fail for Yu/SAO-style families. Until this resolves (a few
+  // hundred ms), src falls back to the plain family name, then re-renders
+  // with the face names when the map arrives.
+  const [faceNames, setFaceNames] = useState<FontFaceNameMap>({});
+  useEffect(() => {
+    let cancelled = false;
+    void fetchFontFaceNames().then((map) => {
+      if (!cancelled) setFaceNames(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const skin = getSkin(skinId);
   // Terminal is designed as a dark CRT surface. Resolve it as dark without
   // overwriting the user's saved display-mode preference, so switching to a
@@ -212,8 +249,8 @@ function App() {
       ? TERMINAL_JAPANESE_FONTS
       : [];
   const splitFontCss = [
-    fontFaceRule("RssWidgetLatin", latinSources, LATIN_UNICODE_RANGE),
-    fontFaceRule("RssWidgetJapanese", japaneseSources, JAPANESE_UNICODE_RANGE),
+    fontFaceRule("RssWidgetLatin", latinSources, LATIN_UNICODE_RANGE, faceNames),
+    fontFaceRule("RssWidgetJapanese", japaneseSources, JAPANESE_UNICODE_RANGE, faceNames),
   ].join("");
   const resolvedFontFamilies = [
     latinSources.length > 0 ? '"RssWidgetLatin"' : "",

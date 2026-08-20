@@ -2091,15 +2091,74 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
    `dangerouslySetInnerHTML` output -- Tailwind's preflight resets all of
    these tags to no visual styling at all, and this project has no
    typography plugin, so without this the sanitized HTML would render as an
-   unreadable wall of unstyled text. */
+   unreadable wall of unstyled text.
+
+   The three `--reader-*` custom properties are set by the reader screens
+   (ReaderOverlay.tsx / DiscoverOverlay.tsx) from the user's reader settings
+   -- font size, line height, column width, font family and element colors.
+   Defaults here keep the CSS self-contained so any consumer that doesn't set
+   them still gets readable typography.
+
+   The preset palette below is shared with the 配色 swatches (lib/readerTheme.ts
+   mirrors these exact colors per theme) -- the two must stay in lockstep so
+   the swatch a user taps is the color that lands on the text. Accent follows
+   the skin, the rest are fixed hues that stay readable on light and dark. */
+:root {
+  --reader-preset-accent: rgb(var(--accent-rgb-light));
+  --reader-preset-text: #111827;
+  --reader-preset-muted: #6b7280;
+  --reader-preset-danger: #dc2626;
+  --reader-preset-warning: #ea580c;
+  --reader-preset-info: #2563eb;
+  --reader-preset-success: #16a34a;
+}
+.dark {
+  --reader-preset-accent: rgb(var(--accent-rgb-dark));
+  --reader-preset-text: #f3f4f6;
+  --reader-preset-muted: #9ca3af;
+  --reader-preset-danger: #f87171;
+  --reader-preset-warning: #fb923c;
+  --reader-preset-info: #93c5fd;
+  --reader-preset-success: #86efac;
+}
+.reader-content {
+  font-size: var(--reader-font-size, 15px);
+  line-height: var(--reader-line-height, 1.75);
+  /* Default follows the app/global font; the 本文フォント setting overrides
+     it with a gothic or mincho stack via --reader-font-family. */
+  font-family: var(--reader-font-family, inherit);
+  color: var(--reader-color-body, inherit);
+}
 .reader-content :where(p, ul, ol, blockquote, pre, table) {
   margin-top: 0.75em;
   margin-bottom: 0.75em;
 }
+/* Preflight flattens every heading to body size; the reader needs a visible
+   hierarchy or a long article reads as one unbroken block. Sized in `em`
+   (relative to the configured body size) so heading scale follows the user's
+   font-size setting. */
 .reader-content :where(h1, h2, h3, h4, h5, h6) {
-  margin-top: 1em;
+  margin-top: 1.1em;
   margin-bottom: 0.5em;
   font-weight: 600;
+  line-height: 1.4;
+  color: var(--reader-color-heading);
+}
+.reader-content h1 {
+  font-size: 1.4em;
+}
+.reader-content h2 {
+  font-size: 1.25em;
+}
+.reader-content h3 {
+  font-size: 1.15em;
+}
+.reader-content h4 {
+  font-size: 1.05em;
+}
+.reader-content h5,
+.reader-content h6 {
+  font-size: 1em;
 }
 .reader-content :where(ul, ol) {
   padding-left: 1.5em;
@@ -2109,6 +2168,10 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 }
 .reader-content ol {
   list-style: decimal;
+}
+.reader-content li {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
 }
 .reader-content img {
   max-width: 100%;
@@ -2125,16 +2188,86 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   border-radius: 0.375rem;
 }
 .reader-content a {
+  color: var(--reader-color-link, rgb(var(--accent-rgb-light)));
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.dark .reader-content a {
+  color: var(--reader-color-link, rgb(var(--accent-rgb-dark)));
+}
+/* Blockquotes were dimmed with `opacity: 0.85` for decoration, which
+   quietly removed contrast from a passage meant to be quoted. Distinguished
+   by the accent rule and a faint tint instead -- emphasis without losing
+   legibility. */
 .reader-content blockquote {
-  border-left: 2px solid rgb(0 0 0 / 0.15);
-  padding-left: 0.75em;
-  opacity: 0.85;
+  border-left: 3px solid rgb(var(--accent-rgb-light) / 0.45);
+  padding: 0.25em 0 0.25em 0.75em;
+  background-color: rgb(0 0 0 / 0.03);
+  color: var(--reader-color-quote);
 }
 .dark .reader-content blockquote {
-  border-left-color: rgb(255 255 255 / 0.15);
+  border-left-color: rgb(var(--accent-rgb-dark) / 0.5);
+  background-color: rgb(255 255 255 / 0.05);
+}
+.reader-content :where(code) {
+  padding: 0.15em 0.35em;
+  border-radius: 0.25rem;
+  font-family: var(
+    --reader-code-font-family,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace
+  );
+  font-size: 0.9em;
+  background-color: rgb(0 0 0 / 0.06);
+  color: var(--reader-color-code);
+}
+.dark .reader-content :where(code) {
+  background-color: rgb(255 255 255 / 0.09);
+}
+.reader-content pre {
+  padding: 0.75em 1em;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  background-color: rgb(0 0 0 / 0.05);
+}
+.dark .reader-content pre {
+  background-color: rgb(255 255 255 / 0.06);
+}
+.reader-content pre :where(code) {
+  padding: 0;
+  border-radius: 0;
+  background-color: transparent;
+}
+/* Tables get wrapped in a scrollable `.reader-table-wrap` at sanitize time
+   (see lib/sanitize.ts) so wide tables scroll instead of being cut off at
+   the window edge. */
+.reader-content .reader-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.reader-content table {
+  max-width: 100%;
+  border-collapse: collapse;
+}
+.reader-content :where(th, td) {
+  padding: 0.375em 0.75em;
+  border: 1px solid rgb(0 0 0 / 0.15);
+  text-align: left;
+}
+.dark .reader-content :where(th, td) {
+  border-color: rgb(255 255 255 / 0.2);
+}
+/* Centered, width-capped reading column. The reader screens set
+   `--reader-max-width` (from the "列幅" setting); the default here keeps the
+   article from running edge-to-edge even if nothing sets the variable. */
+.reader-column {
+  width: 100%;
+  max-width: var(--reader-max-width, 40em);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Plays a one-shot slide+fade whenever the element it's on gets a fresh

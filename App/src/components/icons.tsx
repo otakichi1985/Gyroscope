@@ -198,3 +198,40 @@ export function StarIcon({ filled, ...props }: IconProps & { filled?: boolean })
     </Icon>
   );
 }
+
+// Reader-view typography control: a large "A" next to a small "a" -- the
+// canonical text-size glyph (same device as reader modes in browsers/ebooks).
+export function TypeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.2 3.5 2.9 12.5" />
+      <path d="M4.2 3.5 5.5 12.5" />
+      <path d="M3.4 9.3h1.6" />
+      <circle cx="10.6" cy="9.8" r="1.4" />
+      <path d="M10.6 11.2v1.2" />
+    </Icon>
+  );
+}
+
+// Arrow leaving a box through the top-right corner -- the standard
+// "open in external browser / new tab" glyph.
+export function ExternalLinkIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M13.5 2.5V6" />
+      <path d="M13.5 2.5 8.5 7.5" />
+      <path d="M4.5 3H8" />
+      <path d="M3 4.5v6a2.5 2.5 0 0 0 2.5 2.5h5A2.5 2.5 0 0 0 13 10.5V7.5" />
+    </Icon>
+  );
+}
+
+// Two overlapping pages -- the standard "copy" glyph (used for リンクをコピー).
+export function CopyIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" />
+      <rect x="6.5" y="6.5" width="9" height="9" rx="1.5" />
+    </Icon>
+  );
+}

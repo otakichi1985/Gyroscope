@@ -63,6 +63,14 @@ raw-window-handle = "0.6"
 # Pinned to match the version already resolved transitively via wry/webview2-com-sys,
 # to avoid compiling a second copy of windows-sys.
 windows-sys = { version = "0.60.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging"] }
+# Reads the real face names (PostScript names, nameID 6) out of every
+# installed font's name table so the renderer can build @font-face src:local()
+# lists that Chromium/WebView2 actually matches. local() looks up *face* names,
+# not reliably family names (the Yu / SAO UI bug), and fontdb scans both the
+# system and per-user font directories on Windows, so HKCU-registered fonts
+# (like SAO UI) are covered. On Windows `load_system_fonts` is the only API
+# used; `memmap` just makes that scan faster.
+fontdb = { version = "0.24", default-features = false, features = ["std", "fs", "memmap"] }
 
 [dev-dependencies]
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros"] }

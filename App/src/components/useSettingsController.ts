@@ -7,11 +7,12 @@ import {
   type ThemeMode,
 } from "../stores/appearanceStore";
 
-export type SettingsSectionId = "appearance" | "accessibility" | "behavior" | "privacy" | "data" | "update";
+export type SettingsSectionId = "appearance" | "reader" | "accessibility" | "behavior" | "privacy" | "data" | "update";
 
 const SETTINGS_SECTIONS_STORAGE_KEY = "gyroscope:settings-sections";
 const DEFAULT_OPEN_SECTIONS: Record<SettingsSectionId, boolean> = {
   appearance: true,
+  reader: false,
   accessibility: false,
   behavior: false,
   privacy: false,
