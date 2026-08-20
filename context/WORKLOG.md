@@ -22,15 +22,7 @@
 
 <!-- ここから実際の記録 -->
 
-> - **[opencode]** 全文取得の競合バグ修正（未コミット）。Human実機報告「本文を取得できずに途中で別の記事を見に行った場合、今見ている記事が遅れて取得された前に開いていた記事の内容で置き換えられてしまう」。原因: 要約のみ記事を開くと全文を自動取得するが、記事Aを開いたまま（取得中）記事Bへ移動した場合、Aの取得結果が遅れて戻った際に`await`後に**無条件で**`setFetchedHtml`していたためAの本文でBが上書きされていた（タイムラインリーダー`ReaderOverlay.tsx`と探す画面の全文リーダー`DiscoverOverlay.tsx`の両方に同一パターン）。**修正**: 取得対象の記事ID/URLを`useRef`で保持し、記事切替のリセット時にnull化、`await`後に「現在の表示対象==取得対象」のときだけ状態更新するガードを両方に実装（`finally`のfetching解除もガード付き）。**検証**: 決定的な回帰E2E `e2e/specs/reader-race.spec.js`+`e2e/seed-reader-race-data.mjs`（新規恒久）を追加 — ローカルHTTPサーバで記事Aの全文応答を4秒遅延、Bは即応、A→B移動後に「Aの遅延応答がBを上書きしない」ことを実機検証。ガードを外したバグ版で**テストが失敗する**こと（fail→pass）を確認し、恒久回帰として有効。`npm run build`成功、フルスイート12ファイル29テスト全通過。Human実機確認後にコミット予定（上記フォント修正と同梱）。
 
-> - **[opencode]** グローバルフォント分割の不具合修正（未コミット、上記リーダー追加機能の続き）。Human実機報告「英数字・記号のみ変更しても日本語側が等幅のまま英数字が変わらない。逆も同様」を調査。診断E2E（一時spec、終了後削除済み）で**根本原因を特定**: `App.tsx`の`@font-face src:local(...)`はChromium(WebView2 v151)が**フォントface名（フルネーム/PostScript名）とマッチ**させるため、**Yu系フォント（Yu Gothic UI / Yu Gothic / Yu Mincho / 游ゴシック）のファミリー名は`local()`で解決せずface status=error**になり、選んだフォントが黙って無視される（既定のYu Gothic UIはWindows標準で最も選ばれやすいため実質「フォント変更が効かない」）。Arial/Meiryo/MS Gothic/BIZ UDGothic等の他フォントはファミリー名で成功。**修正**: `FONT_LOCAL_ALIASES`テーブルを追加し、Yu系の`src`に`local("Yu Gothic UI Regular")`等のマッチする名前を先に並べて解決（`src`は複数`local()`を順に試す）。確定版E2E `e2e/specs/font-split.spec.js`（新規恒久回帰）でLatin=Yu Gothic UI / Japanese=Yu Mincho / 両方の3シナリオを実機確認 — 修正前face=error、修正後face=loaded+`document.fonts.check`=true。`npm run build`成功、フルスイート11ファイル27テスト全通過。**続報（SAO UI）**: Human報告「saouiというフォントがうまく適用されない」＝**SAO UI**（ユーザー個別導入のSword Art Online系フォント、英数字専用）。fontToolsでface名を抽出し、診断E2Eで`local("SAO UI")`=reject / `local("SAO UI Regular")`=loaded を実測確認（Yu系と同一原因）。`FONT_LOCAL_ALIASES`にSAO UI / SAO UI TT / SAO Welcome / SAO Welcome TTの4ファミリを追加し、font-split.spec.jsへ「SAO UI導入時のみ実行（未導入時skip）」の回帰テストを追加。フルスイート11ファイル28テスト全通過。**一般化（根本対策）**: Human質問「他のシステムフォント以外でも起こりうる？」→ fontToolsでnameID 1/4/6比較（Arial/Segoe UI/MS Gothic/Meiryoはfamily=fullで成功、Yu系・SAO系は「◯◯ Regular」式=family≠fullで失敗）→ システム・ユーザー導入フォント問わず**全フォント共通の問題**と判明。Humanが選択肢2（OSから実face名を自動取得する一般解）を選択し実装: 静的`FONT_LOCAL_ALIASES`を撤去、Rust新コマンド`list_font_face_names`（fontdb@0.24追加、システム+ユーザーFontsフォルダ直スキャンで各faceのPostScript名=nameID 6をfamily名ごとに集約、spawn_blockingで非同期）→`src/lib/systemFonts.ts`（セッション内キャッシュ付きfetchFontFaceNames）→App.tsxが起動時に取得して`@font-face src`をface名で動的展開（family名は末尾フォールバック）。font-split.spec.jsの`expectFaceLoaded`をポーリング化（動的取得完了待ち）し、Yu 3シナリオ+SAO UIを実機確認。フルスイート11ファイル28テスト全通過。Human実機確認後にコミット予定。
-
-> - **[opencode]** リーダー追加機能+ボタン改善（未コミット、上記リーダー読みやすさ改善の続き）。①**記事内限定の書体選択**: 本文=アプリのフォント（既定）/ゴシック/明朝（`readerFontFamily`）、コード文だけ別に等幅/本文（`readerCodeFont`）をappearanceStoreへ追加しCSS変数`--reader-font-family`/`--reader-code-font-family`で適用。**回帰修正**: 「アプリのフォント」を既定にすることで、グローバルのフォント設定（latinFontId/japaneseFontId）が読書画面の本文に効かなくなっていた問題（`.reader-content`がsansスタックを固定適用していた）を解消。②**配色（要素ごと）**: 本文/見出し/引用/コード/リンクの5要素をネイティブ色ピッカーから**テーマ適応プリセットのスウォッチ選択**（`readerColors`にプリセットidを保存、`--reader-color-*`→`--reader-preset-*`でライト/ダーク両テーマで読める色をCSS解決、`lib/readerTheme.ts`がスウォッチ色とCSSをロックステップ維持、空スウォッチ「テーマの色」でリセット）へ変更 — Human実機フィードバック「素早く読みやすい状態に変えたい」に対応。③**リンクをコピー**: リーダーヘッダーに「リンクをコピー」ボタン（Clipboard API+`execCommand`フォールバック、一時フィードバック表示）。併せて「文字設定」「ブラウザで開く」をチップ風ボタン化+アイコン+ツールチップで判りやすく改善（DiscoverOverlayの全文リーダーにも同適用）。`npm run build`成功。E2Eは配色検証をプリセットスウォッチの`data-color`（アクティブテーマでの実色）とcomputed colorの突き合わせに書き換え、`reader-readability.spec.js`通過。フルスイート10ファイル24テスト全通過。
-
-> - **[opencode]** リーダーの読みやすさ改善（未コミット）。原因調査: 元サイトのインライン`style`/`color`/`bgcolor`等の装飾属性がDOMPurify(3.4.13)のデフォルト許可リストを通過してテーマに被さるため「記事により発生が変わる」。A: `sanitize.ts`に`afterSanitizeAttributes`フックを追加しstyle/align/bgcolor等を除去（IMG/VIDEO/SOURCE/SVGの`width`/`height`のみアスペクト比維持で保持）、`table`を`.reader-table-wrap`(overflow-x:auto)へラップ。B: `.reader-content`をCSS変数駆動（`--reader-font-size`/`--reader-line-height`）の組版へ刷新 — 見出しをem相対で階層化、blockquoteの`opacity:0.85`撤廃（アクセント枠線+薄背景）、code/pre/リンクのスタイル追加、`.reader-column`（`--reader-max-width`中央寄せ）新設。C: 表の横スクロール化（Aに含む）。D: フローティング系スキンの`--float-alpha`をreader画面のみ上書き。E: 「記事を開いている間は不透明度を保つ」を浮動スキン時のみ表示する限定設定として実装。**文字設定**（文字サイズsmall13/medium15/large17/xlarge19px・行間tight1.5/normal1.75/loose2.05・列幅narrow32em/normal40em/wide50em、appearanceStoreに永続化）をReaderOverlayの「文字設定」パネルとSettingsOverlayの「リーダー」セクション、DiscoverOverlayの全文リーダーへ適用。`npm run build`成功。E2E `e2e/specs/reader-readability.spec.js`（新規恒久回帰）を`e2e/seed-reader-data.mjs`（新規、specのbefore/afterでシード/クリーンアップする冪等なmodule+手動CLI）と統合 — 他のスペック（ui-auditの空タイムライン基準画像）を汚さず順序非依存。フルスイート10ファイル24テスト全通過、ui-auditはCLEAR_FAIL=0（historyのAMBIGUOUS1件は今回の変更対象外）。
-
-> - **[opencode]** モデル視覚・Human視覚に依存しない計算ベースのUI視覚監査を新設（未コミット）。`pngjs@7.0.0`追加。`e2e/helpers/visual.js`（DOM監査: 可視性・はみ出し・重なり`elementFromPoint`・コントラストを数値化、CLEAR_PASS/FAIL/AMBIGUOUSの3値分類。閉じたオーバーレイ・折りたたみセクション内の非表示コントロールは`skipped-in-closed`として誤検知を除外）、`e2e/helpers/pixeldiff.js`（基準画像とのピクセル差分を数値のみで報告）、`e2e/specs/ui-audit.spec.js`（11画面を歩行して各画面をDOM監査+基準画像`e2e/baselines/*.png`と差分、`UPDATE_BASELINES=1`で再生成、error1件でも失敗のハードゲート）。単独実行で全11画面CLEAR_PASS、フルスイート（10ファイル23テスト）全通過。VERIFY.mdにプリセット「UI視覚監査（計算ベース・モデル視覚非依存）」を追記。フルスイート時は先行スペックが残す保存記事でbookmarks画面がAMBIGUOUSになり得る（情報・ハードゲートはCLEAR_FAILのみ）。
 
 > - **[opencode]** 探す画面の提供元URL可視化と全テーマでの見た目統一。カードの提供元ドメインをタイムラインと同じ`accent-text`強調(10px/opacity55→text-xs/無減光)へ。色の不整合(amberハードコード)をアクセント基調へ統一 — ☆・「記事を保存」・チェックボックス(`checkbox-input`新設)・検索欄のfocusリングを撤去。検索ボタンを`accent-bg accent-text`(ライトモードで同色=ほぼ不可視のバグ)から正規プライマリCTA(`accent-bg`+白文字)へ修正。「候補の状態」チップも兄弟チップと同じ`accent-bg-soft`へ。カードを`entry-card`化(タイムラインのガラスカードと同じ背景/ホバー/`active:scale-[0.98]`押下)し、フローティング/スタイル系スキン(カーディナリティ・オーディナリー等)でも見た目が統一されるようにした。配置は不変。RSSバッジの緑(成功=既読✓と同じセマンティック色)と提供元注記は維持。`npm run build`成功、E2E(`bookmark-store.spec.js`)通過。
 > - **[opencode]** 探すタブのブックマーク保存をタイムラインのブックマーク一覧と統合。ユーザー要望4点を実装した。
@@ -144,48 +136,30 @@
 
 <!-- ここから実際の記録 -->
 
+## e0a6cd3 — 2026-08-20
+**環境:** opencode
+
+リーダー一括改善（本バッチ本体、Human実機確認済み）。①グローバルフォント分割の不具合修正の一般解: `src:local()`はファミリー名でなく**face名（フルネーム/PostScript名）**とマッチするためYu系・ユーザー導入フォントで黙って無視されていた問題を、fontdb@0.24の新コマンド`list_font_face_names`（システム+ユーザーFonts直スキャンで各faceのPostScript名=nameID 6をfamily名ごとに集約）→`src/lib/systemFonts.ts`（キャッシュ付き）→App.tsxが起動時に`@font-face src`をface名で動的展開する方式で解消（静的`FONT_LOCAL_ALIASES`は撤去）。font-split.spec.js（Yu 3シナリオ+SAO UI）で実機確認。②全文取得の競合バグ修正: 要約のみ記事Aの取得が遅れて戻ったとき前の記事の本文で今見ている記事Bが上書きされる問題を、取得対象ID/URLのref照合で古い応答を破棄するガードで修正（ReaderOverlay/DiscoverOverlay）。決定的回帰E2E `reader-race.spec.js`（ローカルHTTPサーバでAの応答を遅延）を追加し、バグ版で失敗→修正版で成功を確認。③リーダー読みやすさ（先行未コミット分を回収）: 記事内書体（本文/コード）、要素ごとのテーマ適応配色プリセット、リンクをコピー、文字設定パネル/設定のリーダーセクション、組版改善（sanitize/index.css）。検証: `npm run build`/`cargo build`成功、フルスイート12ファイル29テスト全通過。
+
+## 124da6b — 2026-08-20
+**環境:** opencode
+
+モデル・Humanの視覚に依存しない計算ベースのUI視覚監査を新設。pngjs@7でピクセル差分、DOM監査（可視性・はみ出し・重なり・コントラスト）を数値化しCLEAR_PASS/FAIL/AMBIGUOUSで判定、11画面を基準画像と比較するハードゲート（`e2e/helpers/visual.js`/`pixeldiff.js`、`e2e/specs/ui-audit.spec.js`、`UPDATE_BASELINES=1`で再生成）。
+
+## 0d5eaf1 — 2026-08-20
+**環境:** opencode
+
+セッション振り返りの改善候補A〜D（リリースノート起草・空ツリーゲート・WORKLOG書式・Portableビルド注意）をWORKLOGへ記録（適用本体は78ae337）。
+
 ## 78ae337 — 2026-08-20
 **環境:** opencode
 
 本セッション振り返りから改善候補A〜Dを適用（Human承認済み）。A: リリースノートを「前回リリース版との差分」ベースで起草し、バグ修正は`git log -S`で前回リリースに実在したかを確認、`gh release create`前にHuman承認を必須化（`VERIFY.md`ノート確認・リリース実行）。B: リリースの空ツリーゲートに`context/workflows/*`（共有フォルダのジャンクション由来）の除外を明記。C: `Unreleased Changes`を「**概要:**＋段落」の複数行書式に変更し、バグ修正には「前回リリースで実在」の有無を明記するルールを追加（長行エントリの編集破損対策）。D: `Portable Package Build`に「`gyroscope.exe`は直接実行しない（GUIでシェルがハング）」を追記。
 
-## a25a09d — 2026-08-20
+## 0811023 — 2026-08-20
 **環境:** opencode
 
-リリースノートの再発防止策を強化（v0.2.8公開後の訂正）。公開済みノートの「『全文を取得して読む』ボタンを廃止」が、v0.2.7以降の開発版で新設→撤廃されたためエンドユーザーが一度も見ていないUIへの言及だったため、`gh release edit`で「記事を開くと自動で全文を取得」のみの記述へ訂正した。`VERIFY.md`の「混入の原因②（開発中のUIへの言及）」「再発防止②（記述の基準は前回リリース版。『廃止』『変更』は前回リリース版に実在した場合のみ）」を追記し、`WORKLOG.md`の`Unreleased Changes`定義にも反映した。
-
-## 02fb1b6 — 2026-08-20
-**環境:** opencode
-
-v0.2.8としてリリース（`package.json`/`tauri.conf.json`/`Cargo.toml`のバージョン更新、ロックファイル同期）。ポータブル版をビルドし、GitHub Releaseに`gyroscope-portable-v0.2.8.zip`と単体`gyroscope.exe`を添付して公開。Discord通知は`discord-release-notify.yml`ワークフローが自動投稿（成功確認済み）。v0.2.7の事故対策どおり`main`をpush済みで、タグはバンプコミット02fb1b6へ正しく付いた（`git ls-remote --tags`で確認）。リリースノートはエンドユーザー向けの変更のみで構成し、開発工程の変更（E2E・開発版バッジ等）は`VERIFY.md`の「対象外」ルールで除外。
-
-## a2a3b9d — 2026-08-20
-**環境:** opencode
-
-リリースノート起草で開発工程だけの変更が混ざった件の原因と再発防止を記述手順へ追記。`VERIFY.md`「GitHub Release ノート確認」に「対象外（開発工程のみの変更）」の定義（E2E・テスト用設定・開発版バッジ・内部リファクタ等）、混入の原因、再発防止（ユーザーに見える変更かを判定して転記し、完成後に対象外の有無を確認）を追加。`WORKLOG.md`の`Unreleased Changes`定義にも「転記はエンドユーザー向けのみ」を明記。
-
-## be06ac6 — 2026-08-20
-**環境:** opencode
-
-リーダー・ブックマーク・UIの一括改善（v0.2.8本体）。①リーダーを開いたら自動で全文取得（「全文を取得して読む」ボタン廃止）＋JSON-LD `articleBody`フォールバックでJS描画・非セマンティックなページにも対応。②動画埋め込み表示（既知プレイヤーのiframe許可＋CSP拡張）・SNS/関連ノイズ除去・lazy画像/srcset解決。③サムネを`og:image`等から自動補完（`fetch_article_image`＋`articleThumb.ts`キャッシュ）。④ブックマーク・探すの開き方を通常記事と同じ仕様へ統一し、保存記事の合成SQLのlink列ズレ（開けないバグ）を修正。⑤✕クリア入力・ジャンル/フィードの明示ラベル・マウスサイドボタン・開発版バッジ等。検証: `cargo test`83件、clippy警告なし、E2Eフルスイート8ファイル22テスト全通過。
-
-## 91c6dfa — 2026-08-14
-**環境:** opencode
-
-UIの見た目規約を`context/UI_CONVENTIONS.md`として新設（配色システム・意味色・レシピ・実装手順・決定済み判断・共通化候補）。AGENTS.mdのContextにルーティング追加、共有`IMPLEMENTATION.md`(#2 Inspect)に「UI変更時は`../UI_CONVENTIONS.md`を参照し既存色システム/共通クラスを流用、直書き・独自装飾をしない」を追記（ジャンクション経由で共有本体へ反映）。
-グローバル層は独立文書/skill化せず、共有ワークフローの一文として埋め込む形にし、共通化候補の昇格は2つ目のプロジェクトでの実証後とする。
-
-## 4df6e05 — 2026-08-14
-**環境:** opencode
-
-開発基盤の改善チェック候補A〜Dを適用。A: `VERIFY.md`へ「GitHub Release 実行」プリセットを追加（v0.2.7でタグが古いコミットに張られた事故の再発防止）。B: 恒久回帰テストを`bookmark-store.spec.js`へ改名、診断用`zz-temp-`スペックを削除し「使い捨て=zz-temp名・残す回帰テストは恒久名」をE2Eプリセットへ追記。C: 共有`IMPLEMENTATION.md`(#1 Understand)へ「曖昧なUI要望はHumanへ確認してから実装」を追記。D: `effective_data_dir`を`#[cfg(debug_assertions)]`限定にしreleaseビルドの`dead_code`警告を解消。
-`cargo check --release`で警告なし、E2Eフルスイート7件通過。
-
-## 4df6e05 — 2026-08-14
-**環境:** opencode
-
-開発基盤の改善チェック候補A〜Dを適用。A: `VERIFY.md`へ「GitHub Release 実行」プリセットを追加（v0.2.7でタグが古いコミットに張られた事故の再発防止）。B: 恒久回帰テストを`bookmark-store.spec.js`へ改名、診断用`zz-temp-`スペックを削除し「使い捨て=zz-temp名・残す回帰テストは恒久名」をE2Eプリセットへ追記。C: 共有`IMPLEMENTATION.md`(#1 Understand)へ「曖昧なUI要望はHumanへ確認してから実装」を追記。D: `effective_data_dir`を`#[cfg(debug_assertions)]`限定にしreleaseビルドの`dead_code`警告を解消。
-`cargo check --release`で警告なし、E2Eフルスイート7件通過。
+公開済みリリースノートの訂正（a25a09dの内容）をWORKLOGへ記録。
 
 
 # Rotation
