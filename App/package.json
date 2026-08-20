@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "package:portable": "node scripts/make-portable.mjs",
+    "test:unit": "node --test \"tests/**/*.test.ts\"",
     "test:e2e": "node scripts/run-e2e.mjs"
   },
   "dependencies": {
