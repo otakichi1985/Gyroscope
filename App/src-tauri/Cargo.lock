@@ -1585,7 +1585,7 @@ dependencies = [
 
 [[package]]
 name = "gyroscope"
-version = "0.2.10"
+version = "0.2.11"
 dependencies = [
  "chrono",
  "ego-tree",
