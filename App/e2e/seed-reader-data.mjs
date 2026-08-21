@@ -211,6 +211,77 @@ export function unseedReaderData() {
   }
 }
 
+/* Generic scroll-seat helpers, shared by scroll-related specs (and the
+   disposable zz-temp diagnostics). These let a spec get a definitely-scrollable
+   timeline without depending on a particular window height, and clean up after
+   itself -- the two bits of boilerplate every scroll spec used to copy. */
+
+/**
+ * Adds a feed with `count` articles (published a minute apart going back from
+ * `now`), then returns the feed url. Rows are idempotent for a
+ * (feedUrl, guidPrefix) pair and are removed by `unseedScrollableFeed`. Retried
+ * briefly on "database is locked" like the other seeders.
+ */
+export async function seedScrollableFeed({ feedUrl, guidPrefix, count, now = "2026-08-20T09:00:00.000Z" }) {
+  const deadline = Date.now() + 5000;
+  const sleep = () => new Promise((r) => setTimeout(r, 150));
+  for (;;) {
+    try {
+      const db = openDb();
+      try {
+        ensureSchema(db);
+        db.prepare(`DELETE FROM entries WHERE guid LIKE ?`).run(`${guidPrefix}%`);
+        db.prepare(`DELETE FROM feeds WHERE url = ?`).run(feedUrl);
+        const feedId = db
+          .prepare(
+            `INSERT INTO feeds
+              (url, site_url, title, custom_title, icon_path, folder, interval_min, notify_enabled, sort_order, etag, last_modified, last_fetched_at, last_error, created_at, source_type)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .run(feedUrl, "https://scroll.example.com/", "Scroll Example Feed", null, null, null, null, 0, 0, null, null, null, null, now, "rss").lastInsertRowid;
+        const insert = db.prepare(
+          `INSERT INTO entries
+            (feed_id, guid, title, link, author, summary, content_html, thumbnail_url, published_at, fetched_at, is_read, is_starred, body_text)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)`,
+        );
+        for (let i = 0; i < count; i++) {
+          const published = new Date(Date.parse(now) - i * 60000).toISOString();
+          insert.run(feedId, `${guidPrefix}${i}`, `記事 ${i}`, `${feedUrl.replace(/\/feed\.xml.*/, "")}/article/${i}`, "Author", `要約${i}`, `<p>本文${i}</p>`, null, published, now, `本文${i}`);
+        }
+        return feedUrl;
+      } finally {
+        db.close();
+      }
+    } catch (err) {
+      if (Date.now() > deadline) throw err;
+      await sleep();
+    }
+  }
+}
+
+/** Removes every row a `seedScrollableFeed` call created. Safe while the app
+ * holds the DB; retried briefly on "database is locked". */
+export async function unseedScrollableFeed({ feedUrl, guidPrefix }) {
+  const deadline = Date.now() + 5000;
+  const sleep = () => new Promise((r) => setTimeout(r, 150));
+  for (;;) {
+    try {
+      const db = openDb();
+      try {
+        ensureSchema(db);
+        db.prepare(`DELETE FROM entries WHERE guid LIKE ?`).run(`${guidPrefix}%`);
+        db.prepare(`DELETE FROM feeds WHERE url = ?`).run(feedUrl);
+        return;
+      } finally {
+        db.close();
+      }
+    } catch (err) {
+      if (Date.now() > deadline) throw err;
+      await sleep();
+    }
+  }
+}
+
 /**
  * Ensures exactly one seed feed/article is present (idempotent; does NOT wipe
  * unrelated data). Retries briefly in case the running app's SQLite connection

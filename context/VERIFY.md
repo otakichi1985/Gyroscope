@@ -136,6 +136,7 @@
 
 **実行:**  
 プロジェクトルートで `git status --short` と `git diff --stat`。必要なファイルは `git diff -- <path>` で確認する。
+`context/workflows/*` と `context/.shared-workflows` は共有フォルダへのジャンクションで常に別プロジェクトの変更が混ざって見えるため、こちらの変更だけを見たい場合は `scripts/status-clean.ps1`（このノイズを除外して表示）を使う。コミット時はこれらをステージしない。
 
 **確認:**  
 変更対象が依頼範囲内で、既存のHuman作業を上書きしていないこと。
@@ -168,6 +169,9 @@ E2Eが起動するアプリは `GYROSCOPE_DATA_DIR`（`%TEMP%\gyroscope-e2e-data
 デバッグビルド固定。初回はtauri-driver/msedgedriverの取得に数分かかる。
 対象のGUI変更を確認するスペックが無ければ先に書く必要がある。
 `browser.mock`（WebdriverIOのネットワークモック）はブラウザモード専用で、実機Tauriモードでは注入されない。決定的な応答を要するテストは、ローカルHTTPサーバ（例: `e2e/seed-reader-race-data.mjs`）を立てて応答タイミング・内容を制御する方式を使う。
+
+**窓サイズは不定（スクロール系チェックの注意）:**  
+アプリは `tauri-plugin-window-state` で最後の窓サイズ・位置を保存復元するため、E2Eの窓サイズは環境（前回の手動作業）に依存し不定（例: 縦1114px）。**スクロールに依存するチェックは「窓が小さい・`End`キーで必ずスクロールする」を仮定せず、`browser.execute`で`.entry-list-scroll`の`scrollTop`を直接`scrollHeight`に設定する**（`e2e/specs/to-top-button-position.spec.js`が実例）。種まきも`seedScrollableFeed`（`seed-reader-data.mjs`）で十分な件数を入れてから`scrollTop`を設定する。
 
 
 ## UI視覚監査（計算ベース・モデル視覚非依存）

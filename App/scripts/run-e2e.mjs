@@ -134,7 +134,12 @@ async function main() {
 
     // wdio's own extra CLI args (e.g. `--spec e2e/specs/foo.spec.js`) are
     // forwarded as-is via `npm run test:e2e -- --spec ...`.
-    const wdioArgs = ["wdio", "run", "e2e/wdio.conf.js", ...process.argv.slice(2)];
+    const forwarded = process.argv.slice(2);
+    // A single `--spec` run is a targeted debug/diagnostic invocation, so let
+    // it also run zz-temp specs (which the full-suite run excludes); otherwise
+    // the exclude pattern silently filters the very spec being asked for.
+    if (forwarded.includes("--spec")) process.env.E2E_INCLUDE_TEMP = "1";
+    const wdioArgs = ["wdio", "run", "e2e/wdio.conf.js", ...forwarded];
     const result = spawnSync("npx", wdioArgs, { cwd: root, stdio: "inherit", shell: true });
     exitCode = result.status ?? 1;
   } catch (err) {

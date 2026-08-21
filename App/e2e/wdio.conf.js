@@ -26,9 +26,12 @@ export const config = {
   // rollback/debug safety but excluded from the default full-suite run so
   // they don't slow every verification. Run them explicitly when needed:
   //   npm run test:e2e -- --spec e2e/specs/zz-temp-<name>.spec.js
+  // (run-e2e.mjs sets E2E_INCLUDE_TEMP=1 when a single `--spec` is passed, so
+  // that path drops this exclude and the temp spec runs without an extra
+  // `--exclude` override.)
   // Discard them at an appropriate later timing (next verification, before a
   // release) rather than immediately after use -- see VERIFY.md.
-  exclude: ["./specs/**/zz-temp-*.spec.js"],
+  exclude: process.env.E2E_INCLUDE_TEMP === "1" ? [] : ["./specs/**/zz-temp-*.spec.js"],
   maxInstances: 1,
 
   services: [
