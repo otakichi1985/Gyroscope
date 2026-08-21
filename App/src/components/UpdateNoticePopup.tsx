@@ -53,7 +53,7 @@ export function UpdateNoticePopup() {
     <div
       role="dialog"
       aria-label="新しいバージョンのお知らせ"
-      className="panel-bg absolute inset-x-3 bottom-3 z-50 flex max-w-sm flex-col gap-2 rounded-lg border border-black/15 p-3 text-xs shadow-xl ring-1 ring-black/5 dark:border-white/15 dark:ring-white/5"
+      className="update-notice panel-bg absolute inset-x-3 bottom-3 z-50 flex max-w-sm flex-col gap-2 rounded-lg border border-black/15 p-3 text-xs shadow-xl ring-1 ring-black/5 dark:border-white/15 dark:ring-white/5"
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold">新しいバージョンがあります</p>

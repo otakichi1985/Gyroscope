@@ -466,7 +466,7 @@ export function SettingsOverlay() {
             >
               {label}
               {id === "update" && updateAvailable && (
-                <span className="accent-bg h-1.5 w-1.5 rounded-full" aria-hidden="true" />
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500 dark:bg-red-400" aria-hidden="true" />
               )}
             </button>
           ))}

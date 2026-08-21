@@ -90,8 +90,13 @@ function IconButton({
     >
       <Icon className="h-4 w-4" />
       {showLabel && <span className="text-[9px] leading-none">{shortLabel}</span>}
+      {/* Update-available badge. Deliberately red (not the skin accent) and
+          identical to the アップデート tab's dot in SettingsOverlay, so an
+          update reads as something worth acting on wherever it appears; red
+          is this app's visibility-first alarm colour. Rule recorded in
+          context/UI_CONVENTIONS.md. */}
       {showBadge && (
-        <span className="accent-bg absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full" aria-hidden="true" />
+        <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-red-500 dark:bg-red-400" aria-hidden="true" />
       )}
     </button>
   );

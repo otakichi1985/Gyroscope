@@ -848,7 +848,7 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
    it -- clicks meant for the input landed on the article list underneath
    (confirmed via WebdriverIO: `elementFromPoint` on the overlap band
    returned `.entry-list-scroll`, not the input). */
-.skin-cardinality > :not(.app-content) {
+.skin-cardinality > :not(.app-content):not(.scroll-to-top-btn):not(.update-notice):not(.resize-corner-guides) {
   position: relative;
   z-index: 1;
 }
@@ -1184,7 +1184,7 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 }
 /* Also excludes `.app-content` -- same reasoning as `.skin-cardinality`'s
    equivalent rule above. */
-.skin-ordinary > :not(.ordinary-hud):not(.app-content) {
+.skin-ordinary > :not(.ordinary-hud):not(.app-content):not(.scroll-to-top-btn):not(.update-notice):not(.resize-corner-guides) {
   position: relative;
   z-index: 1;
 }
@@ -2032,7 +2032,7 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
 /* Slow, low-contrast data columns add motion to Terminal without competing
    with article text. The real element is aria-hidden in App.tsx and sits
    under every interactive child of the root. */
-.skin-terminal > :not(.terminal-data-stream) {
+.skin-terminal > :not(.terminal-data-stream):not(.scroll-to-top-btn):not(.update-notice):not(.resize-corner-guides) {
   position: relative;
   z-index: 1;
 }
