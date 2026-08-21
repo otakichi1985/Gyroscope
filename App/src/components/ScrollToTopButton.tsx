@@ -48,7 +48,7 @@ export function ScrollToTopButton() {
       onClick={handleClick}
       aria-label="一番上に戻る"
       title="一番上に戻る"
-      className="accent-bg fixed right-4 bottom-4 z-40 flex h-9 w-9 items-center justify-center rounded-full text-white shadow-lg transition-opacity duration-150 hover:opacity-90 active:opacity-70"
+      className="scroll-to-top-btn accent-bg fixed right-4 bottom-4 z-40 flex h-9 w-9 items-center justify-center rounded-full text-white shadow-lg transition-opacity duration-150 hover:opacity-90 active:opacity-70"
     >
       <ArrowUpIcon className="h-4 w-4" />
     </button>
