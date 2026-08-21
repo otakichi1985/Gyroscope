@@ -36,3 +36,7 @@ qa-screenshots
 *.njsproj
 *.sln
 *.sw?
+
+# Shared workflow junction and marker (managed by _recovery)
+context/workflows/
+context/.shared-workflows
