@@ -37,6 +37,9 @@ qa-screenshots
 *.sln
 *.sw?
 
-# Shared workflow junction and marker (managed by _recovery)
-context/workflows/
-context/.shared-workflows
+# AI共同開発用の内部文書（公開リポジトリには含めない）
+context/
+context_archive/
+AGENTS.md
+CLAUDE.md
+NEXT_IMPLEMENTATION_INSTRUCTIONS.md
