@@ -5,6 +5,7 @@ use crate::error::{AppError, AppResult};
 use crate::parse::feed::parse_feed;
 
 use super::client::{fetch_conditional, FetchOutcome};
+use super::youtube;
 
 pub struct DiscoveredFeed {
     pub feed_url: String,
@@ -18,6 +19,9 @@ pub struct DiscoveredFeed {
 /// follows `<link rel="alternate" type="application/{rss,atom}+xml">`
 /// (SPEC §2.1).
 pub async fn discover(client: &Client, input_url: &Url) -> AppResult<DiscoveredFeed> {
+    if youtube::is_youtube_url(input_url) {
+        return youtube::resolve(client, input_url).await;
+    }
     let (body, etag, last_modified) = fetch_once(client, input_url.as_str()).await?;
 
     if parse_feed(&body, Some(input_url.as_str())).is_ok() {

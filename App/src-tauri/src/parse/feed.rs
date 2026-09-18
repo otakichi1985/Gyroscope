@@ -43,7 +43,21 @@ pub fn parse_feed(bytes: &[u8], base_uri: Option<&str>) -> AppResult<ParsedFeed>
 fn convert_entry(entry: feed_rs::model::Entry) -> NewEntry {
     let link = entry.links.first().map(|l| l.href.clone());
     let title = entry.title.as_ref().map(|t| t.content.clone());
-    let summary = entry.summary.as_ref().map(|s| s.content.clone());
+    // YouTube's videos.xml carries the video description as
+    // <media:description>, which feed-rs parses into MediaObject.description
+    // rather than entry.summary -- without this fallback video entries would
+    // permanently show no snippet at all.
+    let summary = entry
+        .summary
+        .as_ref()
+        .map(|s| s.content.clone())
+        .or_else(|| {
+            entry
+                .media
+                .iter()
+                .find_map(|m| m.description.as_ref())
+                .map(|d| d.content.clone())
+        });
     let content_html = entry
         .content
         .as_ref()
@@ -120,5 +134,29 @@ mod tests {
     fn rejects_garbage_input() {
         let result = parse_feed(b"not a feed", None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn falls_back_to_media_description_for_summary() {
+        let sample = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+          <title>Example Channel</title>
+          <entry>
+            <id>yt:video:abc123</id>
+            <title>Hello video</title>
+            <link rel="alternate" href="https://www.youtube.com/watch?v=abc123"/>
+            <published>2026-09-01T00:00:00+00:00</published>
+            <media:group>
+              <media:thumbnail url="https://i.ytimg.com/vi/abc123/hqdefault.jpg" width="480" height="360"/>
+              <media:description>Video overview text here</media:description>
+            </media:group>
+          </entry>
+        </feed>"#;
+        let parsed = parse_feed(sample.as_bytes(), None).unwrap();
+        assert_eq!(parsed.entries.len(), 1);
+        assert_eq!(
+            parsed.entries[0].summary.as_deref(),
+            Some("Video overview text here")
+        );
     }
 }

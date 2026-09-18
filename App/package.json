@@ -4,11 +4,13 @@
   "version": "0.2.11",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/dev-clean.mjs && vite",
+    "dev": "vite",
     "dev:clean": "node scripts/dev-clean.mjs",
+    "verify:ui": "node scripts/verify-ui.mjs",
+    "verify:real-data": "node scripts/verify-ui.mjs --real-data",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri": "node scripts/dev-clean.mjs && tauri",
     "package:portable": "node scripts/make-portable.mjs",
     "test:unit": "node --test \"tests/**/*.test.ts\"",
     "test:e2e": "node scripts/run-e2e.mjs"

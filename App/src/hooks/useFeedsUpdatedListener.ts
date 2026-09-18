@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { useEntriesStore } from "../stores/entriesStore";
+import { refreshAllEntriesStores } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
 
 /**
@@ -23,7 +23,8 @@ export function useFeedsUpdatedListener() {
     const unlistenDone = listen("feeds-updated", () => {
       useFeedsStore.setState({ backgroundRefreshing: false });
       useFeedsStore.getState().refresh();
-      useEntriesStore.getState().refresh();
+      // All timeline panes resync (each keeps its own filter).
+      refreshAllEntriesStores();
     });
     return () => {
       unlistenStart.then((f) => f());

@@ -62,6 +62,24 @@ pub async fn add_feed(
     let discovered = discovery::discover(&client.0, &parsed_url).await?;
     let parsed = parse_feed(&discovered.body, Some(&discovered.feed_url))?;
 
+    // YouTube等は入力URLと解決後のfeed URLが異なるため、解決後にも重複確認する。
+    // 別表記の同一チャンネル（@handleと/channel/UC...）を二重登録しないため。
+    {
+        let conn = db.0.lock().unwrap();
+        let existing: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM feeds WHERE url = ?1",
+                params![discovered.feed_url],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if existing.is_some() {
+            return Err(AppError::Other(
+                "このフィードは既に登録されています".to_string(),
+            ));
+        }
+    }
+
     // Best-effort: a feed with no discoverable site icon just keeps
     // icon_path NULL (frontend shows no thumbnail substitute for it),
     // same as any other missing-image case -- never fails the add itself.

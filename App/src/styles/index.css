@@ -239,6 +239,19 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   }
 }
 
+/* Narrow windows: the timeline chrome collapses to icons instead of clipping
+   (user report: controls became unreachable when shrunk sideways). flex-wrap
+   (set in the components) is the backstop -- controls flow onto a second line
+   -- and under ~560px the long text labels drop out entirely, leaving icon +
+   short segmented labels. The sort button keeps its title attribute, so the
+   current order stays discoverable via tooltip. */
+@media (max-width: 560px) {
+  .timeline-toolbar .toolbar-label,
+  .pane-bar .pane-hint {
+    display: none;
+  }
+}
+
 /* Hover-triggered "marquee" for truncated entry titles used to live here
    as a `@keyframes`/CSS-class pair, but a *fixed* end-of-title pause
    (independent of how long the scroll itself takes) needs keyframe offsets
@@ -548,7 +561,8 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
    source UIs actually use. */
 .skin-floating .app-titlebar,
 .skin-floating .app-filterbar,
-.skin-floating .timeline-toolbar {
+.skin-floating .timeline-toolbar,
+.skin-floating .pane-bar {
   position: relative;
   /* `backdrop-filter` makes each plate its own stacking context, so its
      z-index is compared as a whole against siblings like `.entry-list-scroll`
@@ -1368,6 +1382,13 @@ body :where(input, textarea, [contenteditable="true"], .allow-text-selection) {
   background-image: none;
   border-color: rgb(var(--ord-amber));
   box-shadow: none;
+}
+/* The dev-build pill floats over the bare desktop here (no plate behind the
+   filter bar in this skin), so the translucent amber reads as muddy dark and
+   the dark ink on top is unreadable (user report). Solid fill, same ink. */
+.skin-ordinary .dev-pill {
+  background-color: rgb(var(--ord-amber));
+  text-shadow: none;
 }
 
 /* Article rows are the information cards: white, high radius, and a single

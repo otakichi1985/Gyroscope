@@ -201,8 +201,8 @@ export function FeedManager() {
         <ClearableInput
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://example.com/feed.xml"
-          aria-label="フィードのURL"
+          placeholder="https://example.com/feed.xml / YouTubeチャンネルURL"
+          aria-label="フィード・YouTubeチャンネルのURL"
           clearLabel="フィードのURLをクリア"
           onClear={() => setUrl("")}
           wrapperClassName="min-w-0 flex-1"
@@ -220,7 +220,8 @@ export function FeedManager() {
       {error && <p className="text-xs text-red-500">{error}</p>}
       <p className="text-xs opacity-60">
         記事系サイト以外や、一部サイトからはRSSを取得できない場合があります。BOOTHショップのURL（例:
-        https://example.booth.pm/）にも対応しています
+        https://example.booth.pm/）やYouTubeチャンネルのURL（例:
+        https://www.youtube.com/@example）にも対応しています
       </p>
 
       {/* Genre-first, folder-like organization: create a genre here, then

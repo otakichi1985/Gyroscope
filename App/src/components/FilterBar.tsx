@@ -155,7 +155,7 @@ export function FilterBar() {
           here guarantees a dev build can't be mistaken for a release one. */}
       {import.meta.env.DEV && (
         <span
-          className="shrink-0 rounded bg-accent-bg-soft px-1.5 py-0.5 text-[10px] font-semibold leading-none text-accent-text"
+          className="dev-pill shrink-0 rounded accent-bg-soft accent-text px-1.5 py-0.5 text-[10px] font-semibold leading-none"
           title="開発ビルドです"
         >
           開発版

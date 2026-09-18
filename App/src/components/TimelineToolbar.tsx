@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
+import { useEntriesStore, type EntriesStoreHook, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
 import { FeedPicker } from "./FeedPicker";
 import { RefreshIcon, SortIcon } from "./icons";
@@ -16,7 +16,7 @@ const VIEW_MODES: { mode: ViewMode; label: string }[] = [
 // what the timeline shows and how it's arranged, and conventionally a
 // list's own scope/display controls sit right on top of the list itself
 // (user feedback).
-export function TimelineToolbar() {
+export function TimelineToolbar({ useStore = useEntriesStore }: { useStore?: EntriesStoreHook }) {
   const feeds = useFeedsStore((s) => s.feeds);
   const refreshFeeds = useFeedsStore((s) => s.refresh);
   const refreshingAll = useFeedsStore((s) => s.refreshingAll);
@@ -31,7 +31,7 @@ export function TimelineToolbar() {
     setViewMode,
     sortOrder,
     setSortOrder,
-  } = useEntriesStore();
+  } = useStore();
   // Transient "更新はありません" toast -- a manual refresh that silently
   // finds nothing new was indistinguishable from a broken/no-op button
   // (user feedback). Only for the manual trigger; the scheduler's silent
@@ -54,7 +54,10 @@ export function TimelineToolbar() {
   }
 
   return (
-    <div className="timeline-toolbar flex shrink-0 items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10">
+    // flex-wrap: narrow windows wrap the controls onto a second line instead
+    // of clipping them unreachable (user report). Long labels additionally
+    // collapse to icons under ~560px via `.toolbar-label` (index.css).
+    <div className="timeline-toolbar flex shrink-0 flex-wrap items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10">
       {/* Moved here from FilterBar's icon cluster -- an icon-only button
           sitting among bookmark/search/nav icons was too easy to hit by
           accident (user feedback). Paired with a text label and given its
@@ -66,7 +69,7 @@ export function TimelineToolbar() {
           className="pill-button accent-text flex min-h-7 shrink-0 items-center gap-1 rounded px-1.5 py-1 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
         >
           <RefreshIcon className={`h-4 w-4 ${refreshingAll ? "animate-spin" : ""}`} />
-          記事を更新
+          <span className="toolbar-label">記事を更新</span>
           {/* Background-activity pulse, moved here next to the button it's
               actually about (was floating in FilterBar's icon row, which
               read as unrelated to this button -- user feedback). Reserves
@@ -119,7 +122,7 @@ export function TimelineToolbar() {
         className="pill-button flex min-h-7 shrink-0 items-center gap-1 rounded px-1.5 py-1 transition-colors duration-150 hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
       >
         <SortIcon className={`h-3.5 w-3.5 transition-transform duration-150 ${sortOrder === "asc" ? "rotate-180" : ""}`} />
-        {sortOrder === "asc" ? "昇順" : "降順"}
+        <span className="toolbar-label">{sortOrder === "asc" ? "昇順" : "降順"}</span>
       </button>
 
       <div className="segmented flex shrink-0 gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">

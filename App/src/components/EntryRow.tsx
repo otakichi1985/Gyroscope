@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
+import { useEntriesStore, type EntriesStoreHook, type ViewMode } from "../stores/entriesStore";
 import { entrySnippet, formatPublished } from "../lib/text";
+import { ENTRY_LAMP_LABEL, getEntryLamp } from "../lib/entryStatus";
 import { useAppearanceStore, type CardSize } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
 import { fetchArticleThumb } from "../lib/articleThumb";
@@ -10,6 +11,24 @@ import { ImageOffIcon, StarIcon, TrashIcon } from "./icons";
 import { MarqueeTitle } from "./MarqueeTitle";
 
 const HTTP_LINK_RE = /^https?:\/\//i;
+
+const VIDEO_LINK_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "youtu.be",
+  "www.youtu.be",
+]);
+
+/** YouTube動画の行か。動画は記事リーダーを開かず、カード展開＋ブラウザ遷移で扱う。 */
+export function isVideoEntry(entry: Pick<Entry, "link">): boolean {
+  if (!entry.link) return false;
+  try {
+    return VIDEO_LINK_HOSTS.has(new URL(entry.link).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 
 // Card mode only, per the request that prompted this ("カードのサイズ") --
 // list/compact stay at their existing fixed sizing.
@@ -47,12 +66,14 @@ interface EntryRowProps {
   // is scoped to "curating my bookmarks", not a general per-entry action, so
   // the button doesn't show up in the regular timeline.
   showDelete: boolean;
+  /** Which timeline pane this row belongs to (dual-pane mode). */
+  useStore?: EntriesStoreHook;
 }
 
-export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDelete }: EntryRowProps) {
-  const markRead = useEntriesStore((s) => s.markRead);
-  const toggleStar = useEntriesStore((s) => s.toggleStar);
-  const deleteEntry = useEntriesStore((s) => s.deleteEntry);
+export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDelete, useStore = useEntriesStore }: EntryRowProps) {
+  const markRead = useStore((s) => s.markRead);
+  const toggleStar = useStore((s) => s.toggleStar);
+  const deleteEntry = useStore((s) => s.deleteEntry);
   const blockImages = useAppearanceStore((s) => s.blockImages);
   const clickBehavior = useAppearanceStore((s) => s.clickBehavior);
   // Covers both "no thumbnail_url at all" and "had one but it failed to
@@ -61,6 +82,10 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
   // feed-icon fallback below.
   const [thumbFailed, setThumbFailed] = useState(false);
   const [feedIconFailed, setFeedIconFailed] = useState(false);
+  // Video entries (YouTube) expand inline instead of opening the reader --
+  // most videos are watched in the browser, so the card itself only previews.
+  const [expanded, setExpanded] = useState(false);
+  const isVideo = isVideoEntry(entry);
 
   // Lazily fetch a real thumbnail (og:image etc.) for entries whose feed
   // provided none -- previously those rows dropped to the favicon / image-off
@@ -122,6 +147,12 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     // and the "browser" click behavior is the option that opens the default
     // browser instead.
     if (!entry.is_read && entry.id >= 0) markRead(entry.id, true);
+    // Video entries never enter the reader: the click only expands the inline
+    // preview (bigger thumbnail, full title, description, open-in-browser).
+    if (isVideo) {
+      setExpanded((v) => !v);
+      return;
+    }
     if (clickBehavior === "reader") {
       useUiStore.getState().openReader(entry.id);
       return;
@@ -208,6 +239,25 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     </button>
   );
 
+  // Read-state lamp: fresh (unread, <24h) / unread / read at a glance,
+  // without opening the row (user request). Fixed hues (not skin accent)
+  // so the three states stay distinguishable in every skin and theme.
+  const lamp = getEntryLamp(entry);
+  const lampDot = (
+    <span
+      role="img"
+      aria-label={ENTRY_LAMP_LABEL[lamp]}
+      title={ENTRY_LAMP_LABEL[lamp]}
+      className={`status-lamp h-2 w-2 shrink-0 self-center rounded-full ${
+        lamp === "fresh"
+          ? "bg-amber-500 dark:bg-amber-400"
+          : lamp === "unread"
+            ? "bg-sky-500 dark:bg-sky-400"
+            : "bg-black/20 dark:bg-white/25"
+      }`}
+    />
+  );
+
   // A single outer <button> would nest the star <button> inside it, which is
   // invalid HTML (interactive content inside interactive content) and makes
   // click targeting unreliable — use a div with button semantics instead.
@@ -216,7 +266,112 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     tabIndex: 0,
     onClick: handleOpen,
     onKeyDown: handleKeyDown,
+    ...(isVideo ? { "aria-expanded": expanded } : {}),
   };
+
+  async function handleOpenBrowser(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (entry.link && HTTP_LINK_RE.test(entry.link)) {
+      await openUrl(entry.link);
+    }
+  }
+
+  // Inline preview for video entries: bigger thumbnail, full (wrapped) title,
+  // channel + date, description, and the open-in-browser button. Rendered
+  // inside the clicked row for every view mode; clicks inside never toggle.
+  const videoDetail = isVideo && expanded && (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="mt-1 w-full border-t border-black/5 pt-1.5 dark:border-white/10"
+    >
+      {!blockImages && thumbUrl && !thumbFailed && (
+        <img
+          src={thumbUrl}
+          alt=""
+          onError={() => setThumbFailed(true)}
+          className="aspect-video w-full rounded object-cover"
+        />
+      )}
+      <p className="mt-1 text-sm font-medium break-words">{title}</p>
+      {meta && <div className="mt-0.5 text-xs">{meta}</div>}
+      {entrySnippet(entry, 400) && (
+        <p className="allow-text-selection mt-1 text-xs break-words opacity-80">
+          {entrySnippet(entry, 400)}
+        </p>
+      )}
+      <div className="mt-1.5 flex gap-1 pb-0.5">
+        <button
+          type="button"
+          onClick={handleOpenBrowser}
+          className="rounded bg-black/10 px-2 py-1 text-xs transition-colors duration-150 hover:bg-black/20 active:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 dark:active:bg-white/30"
+        >
+          ブラウザで開く
+        </button>
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="rounded px-2 py-1 text-xs opacity-60 transition-colors duration-150 hover:bg-black/5 hover:opacity-100 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/10"
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+  );
+
+  // Video entries in card/list mode: a roomier collapsed row (16:9 preview,
+  // fully wrapped title, channel + date) instead of the fixed-height article
+  // card. The click expands the inline preview below, never the reader.
+  if (isVideo && mode !== "compact") {
+    return (
+      <div
+        {...rowProps}
+        title={expanded ? "クリックで折りたたむ" : "クリックで展開してプレビュー"}
+        className="entry-card flex w-full cursor-pointer flex-col gap-1 rounded-lg border border-black/5 bg-black/[0.03] px-2 py-2 shadow-sm transition duration-150 hover:bg-black/[0.06] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10"
+      >
+        <div className="flex w-full items-start gap-2">
+          {lampDot}
+          {blockImages || !thumbUrl || thumbFailed ? (
+            <div className="flex aspect-video w-32 shrink-0 items-center justify-center rounded bg-black/5 dark:bg-white/5">
+              <ImageOffIcon className="h-6 w-6 opacity-30" />
+            </div>
+          ) : (
+            <img
+              src={thumbUrl}
+              alt=""
+              onError={() => setThumbFailed(true)}
+              className="aspect-video w-32 shrink-0 rounded object-cover"
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium break-words">{title}</p>
+            {meta && <div className="mt-0.5 text-xs">{meta}</div>}
+          </div>
+          {readCheck}
+          {starButton}
+          {deleteButton}
+        </div>
+        {videoDetail}
+      </div>
+    );
+  }
+
+  if (isVideo && mode === "compact") {
+    return (
+      <div className="entry-compact flex w-full flex-col rounded border-b border-black/5 px-2 py-1 dark:border-white/5">
+        <div {...rowProps} className="flex w-full cursor-pointer items-baseline gap-2">
+          {lampDot}
+          <MarqueeTitle text={title} className="flex-1" textClassName={entry.is_read ? "" : "font-medium"} />
+          {feedTitle && (
+            <span className="accent-text max-w-[30%] shrink-0 truncate text-[10px]">{feedTitle}</span>
+          )}
+          {readCheck}
+          {starButton}
+          {deleteButton}
+        </div>
+        {videoDetail}
+      </div>
+    );
+  }
 
   if (mode === "compact") {
     return (
@@ -237,6 +392,7 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
         // skin's card treatment to a density mode that does not want it.
         className="entry-compact flex w-full cursor-pointer items-baseline gap-2 rounded border-b border-black/5 px-2 py-1 text-sm transition duration-150 hover:bg-black/5 active:scale-[0.98] active:bg-black/10 dark:border-white/5 dark:hover:bg-white/5 dark:active:bg-white/10"
       >
+        {lampDot}
         <MarqueeTitle text={title} className="flex-1" textClassName={entry.is_read ? "" : "font-medium"} />
         {feedTitle && (
           <span className="accent-text max-w-[30%] shrink-0 truncate text-[10px]">{feedTitle}</span>
@@ -282,6 +438,7 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
         // "animate literally every property".
         className="entry-card flex w-full cursor-pointer items-start gap-2 rounded-lg border border-black/5 bg-black/[0.03] px-2 py-1.5 transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10"
       >
+        {lampDot}
         <div className="min-w-0 flex-1">
           <MarqueeTitle text={title} textClassName={`text-sm ${entry.is_read ? "" : "font-medium"}`} />
           {meta && <div className="truncate text-xs">{meta}</div>}
@@ -303,6 +460,7 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
       // See list mode above for `entry-card`/`transition`/`active:scale`.
       className={`entry-card ${CARD_ROW_HEIGHT[cardSize]} flex w-full cursor-pointer gap-2 overflow-hidden rounded-lg border border-black/5 bg-black/[0.03] px-2 py-2 shadow-sm transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10`}
     >
+      {lampDot}
       {blockImages ? (
         // Block at the element level, not just visually -- an <img> that's
         // merely hidden with CSS still fires the network request (the exact

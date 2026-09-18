@@ -2,7 +2,11 @@ import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppearanceStore } from "../stores/appearanceStore";
 
-const appWindow = getCurrentWindow();
+// The browser preview does not provide Tauri's runtime bridge. Keep the
+// visual chrome renderable there, while leaving the native window controls
+// active in the desktop build.
+const isTauriRuntime = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const appWindow = isTauriRuntime ? getCurrentWindow() : null;
 
 export function TitleBar() {
   const positionLocked = useAppearanceStore((s) => s.positionLocked);
@@ -18,7 +22,7 @@ export function TitleBar() {
   // behave identically otherwise, and both target the same user data).
   const isDev = import.meta.env.DEV;
   useEffect(() => {
-    if (isDev) {
+    if (isDev && appWindow) {
       void appWindow.setTitle("Gyroscope (開発版)");
     }
   }, [isDev]);
@@ -31,7 +35,7 @@ export function TitleBar() {
       <span data-tauri-drag-region={dragRegion} className="flex items-center gap-1.5 text-xs font-medium opacity-70">
         Gyroscope
         {isDev && (
-          <span className="rounded bg-accent-bg-soft px-1 py-px text-[10px] font-semibold leading-none text-accent-text">
+          <span className="dev-pill rounded accent-bg-soft accent-text px-1 py-px text-[10px] font-semibold leading-none">
             開発版
           </span>
         )}
@@ -40,7 +44,7 @@ export function TitleBar() {
         <button
           type="button"
           aria-label="Minimize"
-          onClick={() => appWindow.minimize()}
+          onClick={() => void appWindow?.minimize()}
           className="flex h-6 w-6 items-center justify-center rounded hover:bg-black/10 dark:hover:bg-white/10"
         >
           <svg viewBox="0 0 10 10" className="h-2.5 w-2.5">
@@ -50,7 +54,7 @@ export function TitleBar() {
         <button
           type="button"
           aria-label="Close"
-          onClick={() => appWindow.close()}
+          onClick={() => void appWindow?.close()}
           className="flex h-6 w-6 items-center justify-center rounded hover:bg-red-500 hover:text-white"
         >
           <svg viewBox="0 0 10 10" className="h-2.5 w-2.5">

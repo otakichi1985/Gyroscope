@@ -698,24 +698,19 @@ export function DiscoverOverlay() {
                     key={source.url}
                     className="entry-card flex flex-col overflow-hidden rounded-lg border border-black/5 bg-black/[0.03] transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10"
                   >
-                    {/* A single outer <button> would nest the star <button>
-                        inside it (invalid HTML, unreliable click targeting) --
-                        use a div with button semantics instead, as EntryRow does. */}
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={expanded}
-                      onClick={() => setExpandedUrl(expanded ? null : source.url)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setExpandedUrl(expanded ? null : source.url);
-                        }
-                      }}
-                      className={`flex w-full cursor-pointer items-start gap-2 rounded px-2 text-left ${
-                        resultSize === "compact" ? "py-1" : resultSize === "large" ? "py-2.5" : "py-1.5"
-                      }`}
-                    >
+                    {/* Keep the expandable information control and the star
+                        control as sibling buttons. A button with another
+                        button inside it is invalid HTML and confusing for
+                        keyboard and assistive-technology users. */}
+                    <div className="flex w-full items-start gap-2">
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        onClick={() => setExpandedUrl(expanded ? null : source.url)}
+                        className={`flex min-w-0 flex-1 cursor-pointer items-start gap-2 rounded px-2 text-left ${
+                          resultSize === "compact" ? "py-1" : resultSize === "large" ? "py-2.5" : "py-1.5"
+                        }`}
+                      >
                       {source.thumbnail_url ? (
                         <img
                           src={source.thumbnail_url}
@@ -766,6 +761,7 @@ export function DiscoverOverlay() {
                           </div>
                         )}
                       </div>
+                      </button>
                       <button
                         type="button"
                         onClick={(event) => {

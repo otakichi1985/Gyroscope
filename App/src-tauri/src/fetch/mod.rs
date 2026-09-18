@@ -3,6 +3,7 @@ pub mod booth;
 pub mod client;
 pub mod discovery;
 pub mod favicon;
+pub mod youtube;
 
 /// App-managed shared `reqwest::Client` (connection pooling, single place
 /// the User-Agent/timeout config lives).

@@ -4,6 +4,7 @@ import { EntryList } from "./components/EntryList";
 import { FeedManagerOverlay } from "./components/FeedManagerOverlay";
 import { FilterBar } from "./components/FilterBar";
 import { HistoryOverlay } from "./components/HistoryOverlay";
+import { PaneBar } from "./components/PaneBar";
 import { ReaderOverlay } from "./components/ReaderOverlay";
 import { ResizeCornerGuides } from "./components/ResizeCornerGuides";
 import { ScrollToTopButton } from "./components/ScrollToTopButton";
@@ -27,6 +28,7 @@ import { fetchFontFaceNames } from "./lib/systemFonts";
 import type { FontFaceNameMap } from "./lib/systemFonts";
 import { useAppearanceStore } from "./stores/appearanceStore";
 import { useFeedsStore } from "./stores/feedsStore";
+import { getSecondaryEntriesStore, usePanesStore } from "./stores/panesStore";
 import { useUiStore } from "./stores/uiStore";
 
 // One of these gets picked at random each time idle starts (see the effect
@@ -104,6 +106,9 @@ function App() {
     themeMode,
   } = useAppearanceStore();
   const isTimeline = useUiStore((s) => s.activeScreen === "timeline");
+  const dualPane = usePanesStore((s) => s.dual);
+  const paneDirection = usePanesStore((s) => s.direction);
+  const secondaryStore = getSecondaryEntriesStore();
   useFeedsUpdatedListener();
   const refreshFeeds = useFeedsStore((s) => s.refresh);
   const refreshGenres = useFeedsStore((s) => s.refreshGenres);
@@ -355,28 +360,59 @@ function App() {
             never disabled it, so Tab-focus (and, before FilterBar's own fix,
             stray clicks) could still reach hidden rows underneath. */}
         <div className="timeline-pane absolute inset-0 flex flex-col" inert={!isTimeline}>
-          <TimelineToolbar />
-          {/* `idle-mode` cascades down to every `.entry-card` (EntryRow.tsx)
-              for the idle sway -- see index.css. `onMouseMove` here (not on
-              a separate overlay) is what lets the spotlight track the
-              cursor without ever sitting on top of the rows and blocking
-              their own hover/click handling: this container has normal
-              pointer-events, the rows stay directly interactive, and
-              mousemove simply bubbles up through them to this handler. */}
+          <PaneBar />
+          {/* Dual-pane split (see panesStore): single-pane DOM stays a single
+              flex column, so rendering and scrolling are unchanged until the
+              second pane is opened. Each pane owns its own entries store
+              (filter + list); the top FilterBar search/bookmark keeps driving
+              the first (left/top) pane. */}
           <div
-            className={`relative min-h-0 flex-1 ${isIdle ? "idle-mode" : ""}`}
-            onMouseMove={handleSpotlightMove}
-            onMouseEnter={() => setSpotlightActive(true)}
-            onMouseLeave={() => setSpotlightActive(false)}
+            className={`flex min-h-0 flex-1 ${dualPane && paneDirection === "column" ? "flex-col" : "flex-row"}`}
           >
-            <EntryList />
-            <div ref={spotlightRef} className={`mouse-spotlight ${spotlightActive ? "spotlight-active" : ""}`} aria-hidden="true" />
-            {/* Ambient idle background -- the timeline looked a little
-                lifeless left untouched for a while (user feedback). Always
-                mounted, just faded to opacity-0 until useIdleTimer flips
-                true, and pointer-events-none so it can never intercept a
-                click/hover meant for the rows underneath. */}
-            <div className={`idle-bg ${idlePattern} ${isIdle ? "idle-bg-active" : ""}`} aria-hidden="true" />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <TimelineToolbar />
+              {/* `idle-mode` cascades down to every `.entry-card` (EntryRow.tsx)
+                  for the idle sway -- see index.css. `onMouseMove` here (not on
+                  a separate overlay) is what lets the spotlight track the
+                  cursor without ever sitting on top of the rows and blocking
+                  their own hover/click handling: this container has normal
+                  pointer-events, the rows stay directly interactive, and
+                  mousemove simply bubbles up through them to this handler. */}
+              <div
+                className={`relative min-h-0 flex-1 ${isIdle ? "idle-mode" : ""}`}
+                onMouseMove={handleSpotlightMove}
+                onMouseEnter={() => setSpotlightActive(true)}
+                onMouseLeave={() => setSpotlightActive(false)}
+              >
+                <EntryList />
+                <div ref={spotlightRef} className={`mouse-spotlight ${spotlightActive ? "spotlight-active" : ""}`} aria-hidden="true" />
+                {/* Ambient idle background -- the timeline looked a little
+                    lifeless left untouched for a while (user feedback). Always
+                    mounted, just faded to opacity-0 until useIdleTimer flips
+                    true, and pointer-events-none so it can never intercept a
+                    click/hover meant for the rows underneath. */}
+                <div className={`idle-bg ${idlePattern} ${isIdle ? "idle-bg-active" : ""}`} aria-hidden="true" />
+              </div>
+            </div>
+            {dualPane && (
+              <>
+                <div
+                  aria-hidden="true"
+                  className={
+                    paneDirection === "column"
+                      ? "h-px w-full shrink-0 bg-black/10 dark:bg-white/10"
+                      : "w-px shrink-0 self-stretch bg-black/10 dark:bg-white/10"
+                  }
+                />
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                  <TimelineToolbar useStore={secondaryStore} />
+                  <div className={`relative min-h-0 flex-1 ${isIdle ? "idle-mode" : ""}`}>
+                    <EntryList useStore={secondaryStore} />
+                    <div className={`idle-bg ${idlePattern} ${isIdle ? "idle-bg-active" : ""}`} aria-hidden="true" />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
         {/* Always mounted (not conditionally rendered): each overlay reads

@@ -13,12 +13,8 @@ const appBinaryPath = path.resolve(
 // see, since a hidden/backgrounded browser tab throttles things like
 // requestAnimationFrame that the real app depends on.
 //
-// driverProvider 'external' (tauri-driver + msedgedriver) was chosen over
-// the default 'embedded' provider specifically because 'embedded' requires
-// adding tauri-plugin-wdio-webdriver to src-tauri/Cargo.toml and the app's
-// Rust entrypoint -- a real product dependency change. 'external' needs no
-// Rust/Cargo.toml edits at all; tauri-driver and msedgedriver are managed
-// as external, swappable dev tools instead.
+// The external provider keeps the product free of test-only Rust dependencies;
+// run-e2e.mjs manages tauri-driver and msedgedriver for the verification run.
 export const config = {
   runner: "local",
   specs: ["./specs/**/*.spec.js"],

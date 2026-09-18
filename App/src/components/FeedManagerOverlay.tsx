@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useEntriesStore } from "../stores/entriesStore";
+import { refreshAllEntriesStores } from "../stores/entriesStore";
 import { useUiStore } from "../stores/uiStore";
 import { FeedManager } from "./FeedManager";
 import { ScreenOverlay } from "./ScreenOverlay";
@@ -16,7 +16,7 @@ export function FeedManagerOverlay() {
   const wasActive = useRef(false);
   useEffect(() => {
     if (wasActive.current && !isActive) {
-      useEntriesStore.getState().refresh();
+      refreshAllEntriesStores();
     }
     wasActive.current = isActive;
   }, [isActive]);

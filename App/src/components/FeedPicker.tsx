@@ -133,7 +133,12 @@ export function FeedPicker({ feeds, filterFeedId, filterFolder, onSelectAll, onS
         // fully opaque solid colour, so blurring it returns the same colour
         // (see EntryRow.tsx for the full note). The popup below is the one
         // place it earns its cost, since that really does overlap content.
-        className="picker-trigger flex min-w-0 flex-1 items-center justify-between gap-1 rounded border border-black/10 bg-black/5 px-2 py-1 text-left text-xs outline-none dark:border-white/10 dark:bg-white/5"
+        // `min-w-36` (not min-w-0): in a narrow window the siblings keep their
+        // width (shrink-0) and would otherwise squeeze this trigger down to
+        // nothing, hiding the selected feed/genre (user report). With a floor
+        // it wraps onto its own line instead (the toolbar wraps) and stretches
+        // full width there via flex-1.
+        className="picker-trigger flex min-w-36 flex-1 items-center justify-between gap-1 rounded border border-black/10 bg-black/5 px-2 py-1 text-left text-xs outline-none dark:border-white/10 dark:bg-white/5"
       >
         <span className="truncate">{selectedLabel}</span>
         <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />

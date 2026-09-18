@@ -20,6 +20,39 @@ use db::Db;
 use fetch::HttpClient;
 use window::{fonts, opacity, vibrancy};
 
+fn ensure_startup_window_visible(window: &tauri::WebviewWindow) {
+    let on_screen = window
+        .outer_position()
+        .ok()
+        .zip(window.outer_size().ok())
+        .and_then(|(position, size)| {
+            let right = position.x.saturating_add(size.width.min(i32::MAX as u32) as i32);
+            let bottom = position.y.saturating_add(size.height.min(i32::MAX as u32) as i32);
+            window.available_monitors().ok().map(|monitors| {
+                monitors.into_iter().any(|monitor| {
+                    let monitor_position = monitor.position();
+                    let monitor_size = monitor.size();
+                    let monitor_right = monitor_position
+                        .x
+                        .saturating_add(monitor_size.width.min(i32::MAX as u32) as i32);
+                    let monitor_bottom = monitor_position
+                        .y
+                        .saturating_add(monitor_size.height.min(i32::MAX as u32) as i32);
+                    let overlap_width = right.min(monitor_right) - position.x.max(monitor_position.x);
+                    let overlap_height = bottom.min(monitor_bottom) - position.y.max(monitor_position.y);
+                    overlap_width >= 40 && overlap_height >= 40
+                })
+            })
+        })
+        .unwrap_or(false);
+
+    if !window.is_visible().unwrap_or(false) || !on_screen {
+        let _ = window.center();
+        let _ = window.show();
+    }
+    let _ = window.set_focus();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -79,6 +112,14 @@ pub fn run() {
             // needed here -- the retry path works by itself once the tray
             // lives on the pumping thread.
             let _ = tray::setup(app.handle());
+
+            // A stale window-state position or a hidden launch parent can
+            // leave the process alive without giving the user a usable
+            // window. Recover the startup path before background work begins;
+            // normal visible windows keep their saved position and size.
+            ensure_startup_window_visible(&window);
+            diag::log(app.handle(), "startup_window: shown_and_focused");
+
             scheduler::start(app.handle());
 
             // Catch-up for feeds added before favicon discovery existed

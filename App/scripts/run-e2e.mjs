@@ -29,6 +29,7 @@
 // else on a dev machine is plausibly named tauri-driver.exe or
 // msedgedriver.exe, so there's no ownership ambiguity to worry about here.
 
+import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import http from "node:http";
 import os from "node:os";
@@ -45,6 +46,7 @@ const DEV_SERVER_START_TIMEOUT_MS = 30000;
 // real one -- otherwise the E2E's app instance and the human's manually
 // opened app would be writing the same SQLite file at the same time.
 const E2E_DATA_DIR = path.join(os.tmpdir(), "gyroscope-e2e-data");
+const E2E_SOURCE_DATA_DIR = process.env.GYROSCOPE_SOURCE_DATA_DIR;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const viteBin = path.join(root, "node_modules", "vite", "bin", "vite.js");
 
@@ -70,6 +72,23 @@ function cleanDrivers(label) {
       console.log(`[run-e2e] ${label}: 残っていた ${name}.exe を終了した`);
     }
   }
+}
+
+function snapshotSourceData() {
+  if (!E2E_SOURCE_DATA_DIR) return;
+  const sourceDb = path.join(E2E_SOURCE_DATA_DIR, "gyroscope.sqlite3");
+  const targetDb = path.join(E2E_DATA_DIR, "gyroscope.sqlite3");
+  if (!existsSync(sourceDb)) {
+    throw new Error(`[run-e2e] 実データDBが見つからない: ${sourceDb}`);
+  }
+  rmSync(E2E_DATA_DIR, { recursive: true, force: true });
+  mkdirSync(E2E_DATA_DIR, { recursive: true });
+  copyFileSync(sourceDb, targetDb);
+  for (const suffix of ["-wal", "-shm"]) {
+    const sourceSidecar = `${sourceDb}${suffix}`;
+    if (existsSync(sourceSidecar)) copyFileSync(sourceSidecar, `${targetDb}${suffix}`);
+  }
+  console.log(`[run-e2e] 実DBのスナップショットを使用: ${E2E_SOURCE_DATA_DIR}（元DBは変更しない）`);
 }
 
 // Returns true when the app's page is actually being served -- HTTP 200 and
@@ -126,6 +145,7 @@ async function main() {
 
   process.env.GYROSCOPE_DATA_DIR = E2E_DATA_DIR;
   console.log(`[run-e2e] E2E用データディレクトリ: ${E2E_DATA_DIR}（人間の実データとは分離）`);
+  snapshotSourceData();
 
   let viteProcess = null;
   let exitCode = 0;

@@ -14,6 +14,7 @@ import {
   type ReaderLineHeight,
 } from "../stores/appearanceStore";
 import { useEntriesStore } from "../stores/entriesStore";
+import { getSecondaryEntriesStore } from "../stores/panesStore";
 import { useUiStore } from "../stores/uiStore";
 import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
 import { useScrollTargetRef } from "../hooks/useScrollTargetRef";
@@ -87,6 +88,7 @@ export function ReaderOverlay() {
   const readerEntryId = useUiStore((s) => s.readerEntryId);
   const activeScreen = useUiStore((s) => s.activeScreen);
   const entries = useEntriesStore((s) => s.entries);
+  const secondaryEntries = getSecondaryEntriesStore()((s) => s.entries);
   const blockImages = useAppearanceStore((s) => s.blockImages);
   const readerFontSize = useAppearanceStore((s) => s.readerFontSize);
   const readerLineHeight = useAppearanceStore((s) => s.readerLineHeight);
@@ -122,7 +124,9 @@ export function ReaderOverlay() {
     if (isReaderActive) scrollRef.current?.scrollTo({ top: 0 });
   }, [isReaderActive, readerEntryId]);
 
-  const entry = entries.find((e) => e.id === readerEntryId) ?? null;
+  // Dual-pane mode may open the reader from the secondary pane, whose entry
+  // lives in that pane's own list rather than the main one.
+  const entry = entries.find((e) => e.id === readerEntryId) ?? secondaryEntries.find((e) => e.id === readerEntryId) ?? null;
 
   // Full-text fetch for summary-only feeds (commands::article). Lives in
   // component state so it survives the scroll pane's per-entry remount

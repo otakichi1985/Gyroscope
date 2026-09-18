@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEntriesStore, type ViewMode } from "../stores/entriesStore";
+import { useEntriesStore, type EntriesStoreHook, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
 import { useAppearanceStore, type CardSize } from "../stores/appearanceStore";
 import { useUiStore } from "../stores/uiStore";
@@ -33,9 +33,9 @@ const GAP_PX: Record<string, number> = {
  * show a bare "記事がありません" with no hint that feeds are what is
  * missing or where to add them.
  */
-function EmptyState() {
+function EmptyState({ useStore = useEntriesStore }: { useStore?: EntriesStoreHook }) {
   const feeds = useFeedsStore((s) => s.feeds);
-  const { searchQuery, starredOnly } = useEntriesStore();
+  const { searchQuery, starredOnly } = useStore();
   const toggleScreen = useUiStore((s) => s.toggleScreen);
 
   if (feeds.length === 0) {
@@ -99,9 +99,9 @@ function EntrySkeleton({ mode, cardSize, gap }: { mode: ViewMode; cardSize: Card
   );
 }
 
-export function EntryList() {
+export function EntryList({ useStore = useEntriesStore }: { useStore?: EntriesStoreHook }) {
   const { entries, loading, loadingMore, hasMore, error, viewMode, starredOnly, refresh, fetchMore } =
-    useEntriesStore();
+    useStore();
   const feeds = useFeedsStore((s) => s.feeds);
   const cardSize = useAppearanceStore((s) => s.cardSize);
   const cardGap = useAppearanceStore((s) => s.cardGap);
@@ -254,7 +254,7 @@ export function EntryList() {
   }
 
   if (entries.length === 0) {
-    return <EmptyState />;
+    return <EmptyState useStore={useStore} />;
   }
 
   return (
@@ -294,6 +294,7 @@ export function EntryList() {
               <EntryRow
                 entry={entry}
                 mode={viewMode}
+                useStore={useStore}
                 // Discover-saved bookmarks are synthesized with feed_id 0
                 // (see commands::entries) and belong to no real feed -- label
                 // them as such instead of showing a blank source.

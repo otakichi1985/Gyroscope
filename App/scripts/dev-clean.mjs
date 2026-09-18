@@ -9,8 +9,10 @@
 // Vite into a hard block on the next run. There is nothing obvious in the UI
 // to fix by hand.
 //
-// Runs from `npm run dev`, which is Tauri's beforeDevCommand, so it happens on
-// every `npm run tauri dev` without anyone remembering to.
+// `npm run tauri dev` runs this once before handing control to Tauri. It must
+// not run from Vite's beforeDevCommand: Tauri starts that command in parallel
+// with the Rust process, so cleaning there can mistake the new app for an old
+// orphan and kill it during startup.
 //
 // Deliberately conservative: it only kills node holding the port, and only a
 // gyroscope.exe that is the debug build from this checkout. An installed copy
