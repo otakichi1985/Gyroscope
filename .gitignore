@@ -43,3 +43,7 @@ context_archive/
 AGENTS.md
 CLAUDE.md
 NEXT_IMPLEMENTATION_INSTRUCTIONS.md
+
+# ローカルのSkill接続と再生成できるGraphify出力
+/.agents/
+/graphify-out/
