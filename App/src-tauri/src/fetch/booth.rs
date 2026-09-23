@@ -1,26 +1,3 @@
-//! BOOTH shop monitoring.
-//!
-//! BOOTH shop pages have no RSS/Atom feed, and a plain `reqwest` GET gets an
-//! unsolvable Cloudflare "Just a moment..." 403 (confirmed while
-//! prototyping this feature). This app's own WebView2-backed
-//! `WebviewWindow` gets past that challenge, since it's a real Chromium
-//! engine rather than a bare HTTP client -- so a shop page is scraped by
-//! opening one (invisible to the user) and reading the DOM back out.
-//!
-//! IPC (`invoke` from inside that window) is deliberately not used to get
-//! the extracted data back to Rust: enabling that would mean granting
-//! `booth.pm` (a third-party, remote origin) the ability to call this app's
-//! commands via `dangerousRemoteDomainIpcAccess`, which is a much bigger
-//! trust grant than this single-site feature is worth. Instead, the
-//! injected script writes its result into the URL fragment via
-//! `history.replaceState` (same-document, no reload, no IPC, and far
-//! roomier than `document.title`), and Rust polls `window.url()` for it.
-//!
-//! Produces the same shape (`BoothItem`, converted to `NewEntry` by the
-//! caller) that `parse::feed::parse_feed` produces for RSS, so
-//! `commands::feeds::refresh_feed_inner` can push either through the same
-//! `upsert_entries`/notification pipeline without a new abstraction layer.
-
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -32,12 +9,6 @@ use tokio::sync::Semaphore;
 use tokio::time::sleep;
 use url::Url;
 
-/// Caps how many hidden scrape windows can be open at once, independent of
-/// `scheduler::MAX_CONCURRENT_FETCHES` (which governs plain RSS fetches).
-/// Each scrape opens a real WebView2 instance -- much heavier than an HTTP
-/// request -- and running several Cloudflare challenges at once is more
-/// likely to get flagged, so this stays at 1 rather than sharing the RSS
-/// cap.
 pub struct BoothScrapeLimiter(pub Arc<Semaphore>);
 
 impl Default for BoothScrapeLimiter {
@@ -47,15 +18,7 @@ impl Default for BoothScrapeLimiter {
 }
 
 const POLL_INTERVAL: Duration = Duration::from_millis(750);
-/// ~25s total, generously over the ~8s Cloudflare took to resolve during
-/// prototyping.
 const MAX_TICKS: u32 = 34;
-/// The extraction script won't conclude "0 items, structure mismatch" until
-/// it's been re-run at least this many times against the same document
-/// (~12s at `POLL_INTERVAL`) -- comfortably over the ~8s Cloudflare took
-/// during prototyping, so an ordinary still-loading page (Cloudflare or
-/// not) gets a real chance to finish before being called broken. See
-/// `window.__boothTick` in `SCRIPT_TEMPLATE`.
 const MIN_TICKS_BEFORE_GIVE_UP: u32 = 16;
 
 const CLOUDFLARE_TITLE_MARKER: &str = "Just a moment";
@@ -83,7 +46,9 @@ pub struct BoothScrapeResult {
 
 #[derive(Debug, thiserror::Error)]
 pub enum BoothScrapeError {
-    #[error("Cloudflareの確認画面を通過できませんでした。しばらくしてからもう一度お試しください。")]
+    #[error(
+        "Cloudflareの確認画面を通過できませんでした。しばらくしてからもう一度お試しください。"
+    )]
     CloudflareBlocked,
     #[error("ショップページの読み込みがタイムアウトしました。")]
     Timeout,
@@ -95,10 +60,6 @@ pub enum BoothScrapeError {
     InvalidPayload(String),
 }
 
-/// CSS selectors used by the extraction script. Field-by-field overridable
-/// via `booth_recipe.json` in the data directory (see `load_recipe`) so a
-/// BOOTH markup change can be worked around without a rebuild -- deliberately
-/// just a flat set of strings for one site, not a general multi-site engine.
 #[derive(Debug, Clone)]
 struct Recipe {
     item_link_selector: String,
@@ -116,7 +77,8 @@ impl Default for Recipe {
             card_selector: "[class*='item-card'], li, article".to_string(),
             title_selector: "[class*='item-card__title'], [class*='title']".to_string(),
             price_selector: "[class*='price']".to_string(),
-            shop_root_selector: "#js-shop, [class*='item-shop'], [class*='shop-items'], main".to_string(),
+            shop_root_selector: "#js-shop, [class*='item-shop'], [class*='shop-items'], main"
+                .to_string(),
             shop_icon_selector: "meta[property='og:image'], link[rel='icon']".to_string(),
         }
     }
@@ -167,17 +129,8 @@ fn recipe_path(app: &AppHandle) -> PathBuf {
     PathBuf::from(crate::paths::resolve(app).path).join(RECIPE_FILENAME)
 }
 
-/// Placeholder-substitution template rather than `format!` -- the script
-/// itself is full of literal `{`/`}`, which `format!` would need doubled
-/// throughout, making it unreadable and easy to get wrong.
 const SCRIPT_TEMPLATE: &str = r#"(function() {
   try {
-    // Persists on `window` across repeated `.eval()` calls against the same
-    // document (each tick re-runs this whole script), and is naturally
-    // reset to undefined whenever Cloudflare's real navigation swaps in a
-    // fresh document. Used below so a page that's simply still loading
-    // (no Cloudflare involved at all) doesn't get misread as "broken" on
-    // the very first tick, before its content has had a chance to render.
     window.__boothTick = (window.__boothTick || 0) + 1;
     if (document.title.indexOf(__CF_MARKER__) !== -1) return;
     var itemLinkSel = __ITEM_LINK_SEL__;
@@ -208,9 +161,6 @@ const SCRIPT_TEMPLATE: &str = r#"(function() {
       });
     }
     var rootFound = !!document.querySelector(rootSel);
-    // Nothing found yet -- rather than conclude "broken" immediately, give
-    // the page a handful more ticks to finish loading/hydrating before
-    // reporting a structure mismatch (see MIN_TICKS_BEFORE_GIVE_UP).
     if (items.length === 0 && !rootFound && window.__boothTick < __MIN_TICKS__) {
       return;
     }
@@ -230,10 +180,6 @@ const SCRIPT_TEMPLATE: &str = r#"(function() {
   }
 })();"#;
 
-/// Every selector is embedded via `serde_json::to_string` (i.e. as a JSON
-/// string literal, which is also valid as a JS string literal) rather than
-/// hand-quoted, so a selector containing a quote or backslash can't break
-/// out of the script.
 fn build_extraction_script(recipe: &Recipe) -> String {
     let j = |s: &str| serde_json::to_string(s).expect("string always serializes");
     SCRIPT_TEMPLATE
@@ -266,11 +212,6 @@ struct RawItem {
     thumbnail: Option<String>,
 }
 
-/// `0 items AND no shop-root element found` is treated as "the page
-/// structure doesn't match our selectors" rather than "an empty shop" --
-/// deliberately not silently reporting a broken scrape as zero updates (see
-/// `commands::feeds::refresh_feed_inner`, which surfaces this via
-/// `feeds.last_error` the same way a parse failure does for RSS).
 fn decode_payload(encoded: &str) -> Result<BoothScrapeResult, BoothScrapeError> {
     let decoded = percent_encoding::percent_decode_str(encoded)
         .decode_utf8()
@@ -299,23 +240,14 @@ fn decode_payload(encoded: &str) -> Result<BoothScrapeResult, BoothScrapeError> 
     })
 }
 
-/// Opens a hidden `WebviewWindow` on the shop URL, waits out Cloudflare's
-/// challenge, and returns the extracted product list.
-///
-/// Called from an async Tauri command (a tokio worker thread, not the main
-/// thread) -- unlike the raw `tray-icon`/`muda` APIs used in `tray.rs`
-/// (which require the calling thread to pump a Win32 message loop itself,
-/// see that module's notes), Tauri's own `WebviewWindowBuilder` dispatches
-/// the actual window/webview creation onto the main event-loop thread
-/// internally, so it's safe to call from here.
-pub async fn scrape_shop(app: &AppHandle, shop_url: &str) -> Result<BoothScrapeResult, BoothScrapeError> {
+pub async fn scrape_shop(
+    app: &AppHandle,
+    shop_url: &str,
+) -> Result<BoothScrapeResult, BoothScrapeError> {
     let limiter = app.state::<BoothScrapeLimiter>();
-    let _permit = limiter
-        .0
-        .clone()
-        .acquire_owned()
-        .await
-        .map_err(|_| BoothScrapeError::WindowCreation("実行枠を確保できませんでした".to_string()))?;
+    let _permit = limiter.0.clone().acquire_owned().await.map_err(|_| {
+        BoothScrapeError::WindowCreation("実行枠を確保できませんでした".to_string())
+    })?;
 
     let url: Url = shop_url
         .parse()
@@ -323,18 +255,11 @@ pub async fn scrape_shop(app: &AppHandle, shop_url: &str) -> Result<BoothScrapeR
     let recipe = load_recipe(app);
     let script = build_extraction_script(&recipe);
 
-    let label = format!("booth-scrape-{}", NEXT_LABEL_ID.fetch_add(1, Ordering::Relaxed));
+    let label = format!(
+        "booth-scrape-{}",
+        NEXT_LABEL_ID.fetch_add(1, Ordering::Relaxed)
+    );
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::External(url))
-        // Built hidden and shown explicitly below, *after* the off-screen
-        // position is set -- building with `.visible(true)` directly (the
-        // first version of this) let the window briefly flash on-screen at
-        // its default position before the `.position()` from the builder
-        // took effect, visible to the user as a browser window popping open
-        // and closing (real report). Still ends up genuinely visible (not
-        // `.visible(false)` for good) by the time any page JS runs and
-        // could check `document.visibilityState` -- the Cloudflare bypass
-        // was only confirmed with a visible window, so that property is
-        // preserved, just with the flash-causing race closed.
         .visible(false)
         .position(-32000.0, -32000.0)
         .inner_size(1024.0, 800.0)
@@ -345,7 +270,9 @@ pub async fn scrape_shop(app: &AppHandle, shop_url: &str) -> Result<BoothScrapeR
     window
         .set_position(tauri::PhysicalPosition::new(-32000, -32000))
         .map_err(|e| BoothScrapeError::WindowCreation(e.to_string()))?;
-    window.show().map_err(|e| BoothScrapeError::WindowCreation(e.to_string()))?;
+    window
+        .show()
+        .map_err(|e| BoothScrapeError::WindowCreation(e.to_string()))?;
 
     let outcome = poll_for_result(&window, &script).await;
     let _ = window.close();
@@ -359,11 +286,6 @@ async fn poll_for_result(
     let mut last_title = String::new();
 
     for _ in 0..MAX_TICKS {
-        // Re-evaluated every tick rather than injected once: Cloudflare's
-        // challenge resolves via a real navigation that replaces the whole
-        // document, which would tear down any JS-side timer left running
-        // from a previous tick. Each tick instead freshly inspects whatever
-        // document currently exists.
         let _ = window.eval(script);
         sleep(POLL_INTERVAL).await;
 
@@ -397,7 +319,8 @@ mod tests {
     use super::*;
 
     fn encode(payload: &str) -> String {
-        percent_encoding::utf8_percent_encode(payload, percent_encoding::NON_ALPHANUMERIC).to_string()
+        percent_encoding::utf8_percent_encode(payload, percent_encoding::NON_ALPHANUMERIC)
+            .to_string()
     }
 
     #[test]
@@ -412,7 +335,8 @@ mod tests {
 
     #[test]
     fn empty_items_with_root_found_is_a_legitimately_empty_shop() {
-        let json = r#"{"items":[],"root_found":true,"shop_title":"Empty Shop","shop_icon_url":null}"#;
+        let json =
+            r#"{"items":[],"root_found":true,"shop_title":"Empty Shop","shop_icon_url":null}"#;
         let result = decode_payload(&encode(json)).unwrap();
         assert!(result.items.is_empty());
     }
@@ -435,22 +359,12 @@ mod tests {
         let mut recipe = Recipe::default();
         recipe.title_selector = r#"weird"selector\with'quotes"#.to_string();
         let script = build_extraction_script(&recipe);
-        // A selector containing a double-quote must not be able to
-        // terminate the surrounding JS string literal early.
         assert!(script.contains(r#"var titleSel = "weird\"selector\\with'quotes""#));
     }
 
-    /// Regression test: a placeholder added to `SCRIPT_TEMPLATE` without a
-    /// matching `.replace()` call in `build_extraction_script` compiles fine
-    /// (it's just a Rust string literal) but silently ships a JS
-    /// `ReferenceError` at runtime, caught by the script's own `catch` and
-    /// misreported as `InvalidPayload` -- exactly what happened with
-    /// `__MIN_TICKS__` before this test existed.
     #[test]
     fn extraction_script_has_no_unreplaced_placeholders() {
         let script = build_extraction_script(&Recipe::default());
-        // Deliberately not a generic "__" scan -- legitimate JS in the
-        // template (e.g. `window.__boothTick`) contains that substring too.
         for placeholder in [
             "__CF_MARKER__",
             "__MIN_TICKS__",
@@ -463,7 +377,10 @@ mod tests {
             "__RESULT_PREFIX__",
             "__ERROR_PREFIX__",
         ] {
-            assert!(!script.contains(placeholder), "unreplaced placeholder: {placeholder}");
+            assert!(
+                !script.contains(placeholder),
+                "unreplaced placeholder: {placeholder}"
+            );
         }
     }
 

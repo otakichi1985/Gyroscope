@@ -1,9 +1,5 @@
 import type { SVGProps } from "react";
 
-// Shared thin-stroke icon set, matching the style already used for the
-// minimize/close glyphs in TitleBar.tsx -- replaces emoji/text glyphs
-// elsewhere in the app so the whole UI reads as one consistent icon system
-// instead of mixing emoji (OS/font-dependent look) with vector icons.
 type IconProps = SVGProps<SVGSVGElement>;
 
 function Icon({ children, ...props }: IconProps & { children: React.ReactNode }) {
@@ -31,9 +27,6 @@ export function CloseIcon(props: IconProps) {
   );
 }
 
-// A plain clock reads as "time/schedule", not "history" -- adding a
-// counter-clockwise sweep with an arrowhead (the same device browsers use
-// for their history icon) is what actually signals "past activity".
 export function ClockIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -44,9 +37,6 @@ export function ClockIcon(props: IconProps) {
   );
 }
 
-// The classic RSS/feed glyph (bottom-left dot + two concentric quarter
-// arcs) -- used for the feed-management button. A gear would collide with the
-// settings button's icon, hence the dedicated RSS mark.
 export function RssIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -57,9 +47,6 @@ export function RssIcon(props: IconProps) {
   );
 }
 
-// A gear -- the universal "settings" glyph (user request: the settings button
-// is the place for everything, so it should read as settings, not "appearance
-// only"). Central hub with short teeth radiating outward.
 export function SettingsIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -70,9 +57,6 @@ export function SettingsIcon(props: IconProps) {
   );
 }
 
-// A paint palette (outline + a few color dots) reads more directly as
-// "appearance/look" than a generic sliders icon, which is easily mistaken
-// for an equalizer or unrelated preferences.
 export function TrashIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -123,10 +107,6 @@ export function WarningIcon(props: IconProps) {
   );
 }
 
-// A single shaft with the arrowhead at one end reads as "this direction,
-// not the other" more clearly than a two-headed up/down glyph would --
-// TimelineToolbar flips it (rotate-180) for the descending state, so one
-// icon covers both, the same way ChevronDownIcon does for expand/collapse.
 export function SortIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -144,7 +124,6 @@ export function ChevronDownIcon(props: IconProps) {
   );
 }
 
-// Single upward-pointing arrow -- used by the floating scroll-to-top button.
 export function ArrowUpIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -163,10 +142,6 @@ export function SearchIcon(props: IconProps) {
   );
 }
 
-// Same diagonal-slash device as BellOffIcon, over a simple landscape-photo
-// glyph -- used as the placeholder for thumbnails/favicons when "外部画像を
-// 読み込まない" is on (SettingsOverlay.tsx), so the blocked slot still reads
-// as "an image was here" rather than a blank/broken box.
 export function ImageOffIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -178,9 +153,6 @@ export function ImageOffIcon(props: IconProps) {
   );
 }
 
-// A thumbtack -- used for the "位置を固定" quick-access toggle
-// (FilterBar.tsx). Head as a filled circle + a downward tip, tilted
-// slightly so it reads as a pin being pushed in rather than a plain lollipop.
 export function PinIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -190,9 +162,6 @@ export function PinIcon(props: IconProps) {
   );
 }
 
-// A compass -- used for the "探す" tab (DiscoverOverlay.tsx), distinct from
-// SearchIcon (the in-timeline article search) since this opens a whole
-// screen for finding new *sites*, not filtering the current one.
 export function CompassIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -210,8 +179,6 @@ export function StarIcon({ filled, ...props }: IconProps & { filled?: boolean })
   );
 }
 
-// Reader-view typography control: a large "A" next to a small "a" -- the
-// canonical text-size glyph (same device as reader modes in browsers/ebooks).
 export function TypeIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -224,8 +191,6 @@ export function TypeIcon(props: IconProps) {
   );
 }
 
-// Arrow leaving a box through the top-right corner -- the standard
-// "open in external browser / new tab" glyph.
 export function ExternalLinkIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -237,7 +202,6 @@ export function ExternalLinkIcon(props: IconProps) {
   );
 }
 
-// Two overlapping pages -- the standard "copy" glyph (used for リンクをコピー).
 export function CopyIcon(props: IconProps) {
   return (
     <Icon {...props}>

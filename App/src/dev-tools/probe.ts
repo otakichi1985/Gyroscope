@@ -1,19 +1,3 @@
-// Turns a point (or a dragged rectangle) on the running app into the short
-// list of things that are actually there.
-//
-// Two rules shape everything here:
-//
-// 1. Only what is really painted gets listed. Layout-only wrappers produce no
-//    features and so never appear -- that is what keeps the list at a handful
-//    of rows instead of the whole ancestor chain. The previous two attempts at
-//    this tool drowned in exactly that.
-// 2. Things you cannot click are still things. Shadows, ::before/::after
-//    decoration and the pointer-events:none ambience (.idle-bg,
-//    .mouse-spotlight, .ordinary-hud, .terminal-data-stream) are unreachable
-//    by a plain hit test, and they are precisely what has been hard to reach
-//    by hand. They are collected separately and folded into the same list.
-//
-// Dev-only; see names.ts.
 
 import { describeElement } from "./names";
 
@@ -43,7 +27,6 @@ function isVisible(el: Element, cs: CSSStyleDeclaration) {
   return r.width > 0 && r.height > 0;
 }
 
-/** Split a comma-separated CSS value without breaking inside rgb(...)/oklch(...). */
 function splitTopLevel(value: string): string[] {
   const out: string[] = [];
   let depth = 0;
@@ -61,10 +44,6 @@ function splitTopLevel(value: string): string[] {
   return out.filter(Boolean);
 }
 
-/**
- * Alpha of a computed color. Tailwind v4 authors in oklch and Chromium can
- * hand it back unresolved, so the `/ a` form is handled alongside rgba().
- */
 function alphaOf(color: string): number {
   if (!color || color === "transparent") return 0;
   const rgb = /^rgba?\(([^)]+)\)$/.exec(color);
@@ -188,10 +167,6 @@ function thingsForLayer(el: Element, pseudo: string, tags: string[]): Thing[] {
 
   if (out.length === 0) return [];
 
-  // The element itself goes first, and only when something above proved it is
-  // actually painted -- that check is what keeps invisible layout wrappers off
-  // the list. Its detail is the size, because "grab the edge and stretch" is
-  // one of the operations this is for.
   if (!pseudo) {
     out.unshift({
       id: `${key}|本体|${rect.left},${rect.top}`,
@@ -216,7 +191,6 @@ function thingsForElement(el: Element, passthrough: boolean): Thing[] {
   ];
 }
 
-/** Visible pointer-events:none elements a hit test can never return. */
 function passthroughElementsIn(
   root: Element,
   hit: (el: Element) => boolean,
@@ -256,7 +230,6 @@ export function probePoint(root: Element, x: number, y: number): Thing[] {
     },
     seen,
   );
-  // Pass-through decoration is drawn over the app, so it is listed first.
   return build([...extras, ...hit], new Set(extras));
 }
 
@@ -279,6 +252,5 @@ export function probeRect(
     if (cs.pointerEvents === "none") passthrough.add(el);
     inside.push(el);
   });
-  // Deepest first, matching how the point probe reads top-down.
   return build(inside.reverse(), passthrough);
 }

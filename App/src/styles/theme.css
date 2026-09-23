@@ -1,0 +1,68 @@
+/* Reactが選んだsemantic colorをライト／ダークの描画値へ変換する。 */
+.panel-bg {
+  background-color: rgb(var(--panel-rgb-light));
+}
+.dark.panel-bg,
+.dark .panel-bg {
+  background-color: rgb(var(--panel-rgb-dark));
+}
+
+.accent-text {
+  color: rgb(var(--accent-rgb-light));
+}
+.accent-border {
+  border-color: rgb(var(--accent-rgb-light));
+}
+.accent-bg {
+  background-color: rgb(var(--accent-rgb-light));
+}
+.accent-bg-soft {
+  background-color: rgb(var(--accent-rgb-light) / 0.15);
+}
+
+/* native controlの既定色を残すとskinのaccentと食い違う。 */
+.range-input {
+  accent-color: rgb(var(--accent-rgb-light));
+}
+.dark .range-input {
+  accent-color: rgb(var(--accent-rgb-dark));
+}
+
+.checkbox-input {
+  accent-color: rgb(var(--accent-rgb-light));
+}
+.dark .checkbox-input {
+  accent-color: rgb(var(--accent-rgb-dark));
+}
+.dark .accent-text {
+  color: rgb(var(--accent-rgb-dark));
+}
+.dark .accent-border {
+  border-color: rgb(var(--accent-rgb-dark));
+}
+.dark .accent-bg {
+  background-color: rgb(var(--accent-rgb-dark));
+  color: rgb(var(--panel-rgb-dark));
+}
+.dark .accent-bg-soft {
+  background-color: rgb(var(--accent-rgb-dark) / 0.18);
+}
+
+/* swatchは選択中skinではなく候補自身の色を使う。 */
+.skin-swatch {
+  background-color: rgb(var(--swatch-rgb-light));
+}
+.dark .skin-swatch {
+  background-color: rgb(var(--swatch-rgb-dark));
+}
+
+.skin-swatch-dual {
+  background: linear-gradient(90deg, rgb(var(--swatch-primary)) 50%, rgb(var(--swatch-complement)) 50%);
+}
+
+.skin-swatch-frame {
+  background-color: rgb(255 255 255 / 0.72);
+}
+.dark .skin-swatch-frame {
+  background-color: rgb(0 0 0 / 0.24);
+}

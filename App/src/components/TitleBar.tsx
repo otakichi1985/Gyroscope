@@ -2,24 +2,13 @@ import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppearanceStore } from "../stores/appearanceStore";
 
-// The browser preview does not provide Tauri's runtime bridge. Keep the
-// visual chrome renderable there, while leaving the native window controls
-// active in the desktop build.
 const isTauriRuntime = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const appWindow = isTauriRuntime ? getCurrentWindow() : null;
 
 export function TitleBar() {
   const positionLocked = useAppearanceStore((s) => s.positionLocked);
-  // `data-tauri-drag-region` is what makes mousedown-and-drag move the
-  // window; omitting it (rather than e.g. disabling via CSS) is the actual
-  // mechanism behind "位置を固定" -- there's no separate Tauri API to turn
-  // window dragging off.
   const dragRegion = positionLocked ? undefined : true;
 
-  // `npm run tauri dev` runs against the Vite dev server, so DEV is true
-  // exactly for the development build. Tag the title bar and the OS window
-  // title so a dev build can't be mistaken for a release one (they look and
-  // behave identically otherwise, and both target the same user data).
   const isDev = import.meta.env.DEV;
   useEffect(() => {
     if (isDev && appWindow) {

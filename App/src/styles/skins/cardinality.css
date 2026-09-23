@@ -1,0 +1,273 @@
+/* amber=選択、blue=確定、red=取消の意味を崩さない。 */
+.skin-cardinality {
+
+  --cardinal-amber: 245 162 0;
+  --cardinal-amber-deep: 180 83 9;
+  --cardinal-blue: 36 124 234;
+  --cardinal-red: 229 58 92;
+
+  --cardinal-blue-deep: 21 101 192;
+  --cardinal-line: 132 138 148;
+  --cardinal-ink: 46 49 55;
+
+  --cardinal-steel: 104 114 125;
+
+  --plate-fill: 250 251 253;
+  --plate-fill-alpha: 0.84;
+  --plate-border: 255 255 255;
+  --plate-border-alpha: 0.9;
+
+  --plate-radius: 0px;
+
+  --glow-rgb: 255 255 255;
+}
+
+/* timelineとoverlayを含むapp-contentは個別のsurface規則で描く。 */
+.skin-cardinality > :not(.app-content):not(.scroll-to-top-btn):not(.update-notice):not(.resize-corner-guides) {
+  position: relative;
+  z-index: 1;
+}
+.skin-cardinality :where(button, input, select, .entry-card, .segmented, .picker-trigger) {
+  border-radius: 0;
+}
+
+.skin-cardinality [role="switch"],
+.skin-cardinality [role="switch"] .toggle-thumb {
+  border-radius: 0;
+}
+.skin-cardinality .app-titlebar,
+.skin-cardinality .app-filterbar,
+.skin-cardinality .timeline-toolbar {
+  border: 1px solid rgb(var(--cardinal-line) / 0.3);
+  color: rgb(var(--cardinal-ink));
+}
+
+.skin-cardinality .icon-button,
+.skin-cardinality .icon-button:hover,
+.skin-cardinality .icon-button.accent-bg-soft {
+  padding: 0;
+  gap: 3px;
+  background-color: transparent;
+  color: rgb(var(--cardinal-ink));
+}
+.skin-cardinality .icon-button > svg {
+  box-sizing: content-box;
+  padding: 6px;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 0.6);
+  background-color: rgb(var(--cardinal-steel) / 0.9);
+  color: rgb(255 255 255);
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out,
+    transform 120ms ease-out;
+}
+.skin-cardinality .icon-button:hover > svg {
+  background-color: rgb(var(--cardinal-steel));
+  border-color: rgb(255 255 255);
+}
+.skin-cardinality .icon-button:active > svg {
+  transform: scale(0.92);
+}
+
+.skin-cardinality .icon-button.accent-bg-soft > svg {
+  border-color: rgb(255 255 255);
+  background-color: rgb(var(--cardinal-amber));
+  color: rgb(255 255 255);
+  stroke-width: 2;
+  box-shadow: 0 0 10px rgb(var(--cardinal-amber) / 0.7);
+}
+
+.skin-cardinality .icon-button[data-opens-screen].accent-bg-soft {
+  position: relative;
+}
+/* 三角形は装飾ではなく、開いている画面との接続状態を示す。 */
+.skin-cardinality .icon-button[data-opens-screen].accent-bg-soft::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  margin-left: -6px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid rgb(var(--cardinal-amber));
+}
+
+.skin-cardinality .segmented,
+.skin-cardinality .pill-button,
+.skin-cardinality .picker-trigger {
+  border: 1px solid rgb(var(--cardinal-line) / 0.36);
+  background-color: rgb(255 255 255 / 0.52);
+  background-image: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.55),
+    rgb(var(--cardinal-line) / 0.1)
+  );
+  color: rgb(var(--cardinal-ink));
+}
+.skin-cardinality .pill-button {
+  color: rgb(var(--cardinal-amber-deep));
+}
+.skin-cardinality .segmented button.accent-bg-soft {
+  color: rgb(255 255 255);
+  background-color: rgb(var(--cardinal-amber));
+  background-image: none;
+  border-color: transparent;
+  box-shadow: none;
+  font-weight: 600;
+}
+.skin-cardinality .segmented button.accent-text {
+  color: rgb(255 255 255);
+}
+
+.skin-cardinality .screen-overlay.panel-bg,
+.dark.skin-cardinality .screen-overlay.panel-bg {
+  border: 1px solid rgb(var(--cardinal-line) / 0.3);
+  background-image: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.5),
+    rgb(var(--cardinal-line) / 0.1) 55%,
+    rgb(var(--cardinal-line) / 0.18)
+  );
+  color: rgb(var(--cardinal-ink));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 2px 6px rgb(0 0 0 / 0.2);
+}
+.skin-cardinality .screen-overlay-header {
+  position: relative;
+  justify-content: flex-start;
+  border: 0;
+  color: rgb(var(--cardinal-ink));
+}
+
+.skin-cardinality .screen-overlay-header > span {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.skin-cardinality .screen-overlay-header::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--cardinal-line) / 0.55) 15% 85%,
+    transparent
+  );
+}
+
+.skin-cardinality .screen-close-button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  gap: 0;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.85);
+  border-radius: 50%;
+  color: rgb(255 255 255);
+  background-color: rgb(var(--cardinal-red));
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  transition:
+    background-color 150ms ease-out,
+    transform 120ms ease-out;
+}
+.skin-cardinality .screen-close-button:hover {
+  color: rgb(255 255 255);
+  background-color: rgb(246 82 116);
+}
+.skin-cardinality .screen-close-button:active {
+  transform: scale(0.9);
+}
+.skin-cardinality .screen-close-label {
+  display: none;
+}
+.skin-cardinality .screen-close-icon {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.4;
+}
+
+.skin-cardinality .accent-bg {
+  color: rgb(255 255 255);
+  background-color: rgb(var(--cardinal-blue-deep));
+  background-image: none;
+}
+
+/* accent-bgより後で確定色を上書きする必要がある。 */
+.skin-cardinality .toggle-on {
+  color: rgb(var(--cardinal-ink));
+  background-color: rgb(var(--cardinal-amber));
+  background-image: none;
+}
+.skin-cardinality .accent-bg-soft {
+  color: rgb(var(--cardinal-ink));
+  background-color: rgb(var(--cardinal-amber) / 0.24);
+  background-image: none;
+  border-color: rgb(var(--cardinal-amber) / 0.8);
+  box-shadow: none;
+}
+
+.skin-cardinality .entry-card,
+.skin-cardinality .entry-compact {
+  position: relative;
+  overflow: hidden;
+  color: rgb(var(--cardinal-ink));
+  background-color: rgb(250 251 253 / calc(0.84 * var(--float-alpha, 1)));
+  background-image: none;
+  border: 1px solid rgb(var(--cardinal-line) / 0.26);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    var(--plate-shadow);
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms ease-out,
+    border-color 150ms ease-out;
+}
+.skin-cardinality .entry-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background-color: rgb(var(--cardinal-amber));
+  opacity: 0;
+  transform: scaleY(0.25);
+  transform-origin: center;
+  transition:
+    opacity 110ms ease-out,
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.skin-cardinality .entry-card:hover {
+  transform: translateX(4px);
+  border-color: rgb(var(--cardinal-line) / 0.4);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255),
+    0 2px 6px rgb(0 0 0 / 0.2);
+}
+.skin-cardinality .entry-card:hover::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+.skin-cardinality .entry-compact:hover {
+  background-color: rgb(var(--cardinal-amber) / 0.22);
+}
+.skin-cardinality .accent-text {
+  color: rgb(var(--cardinal-amber-deep));
+}
+
+.skin-cardinality .idle-bg::before,
+.skin-cardinality .idle-bg::after {
+  content: none;
+}

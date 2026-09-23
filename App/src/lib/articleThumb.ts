@@ -1,15 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
-// Cache + in-flight dedup for per-article thumbnails fetched via the backend
-// `fetch_article_image` command (og:image / twitter:image / first real img).
-// Kept module-level so scrolling a virtualised list doesn't re-fetch the same
-// URL over and over -- the cache survives row mount/unmount, which is the
-// whole point given a windowed list remounts rows constantly.
 const cache = new Map<string, string | null>();
 const inflight = new Map<string, Promise<string | null>>();
 
-// undefined = not looked up yet; string = a usable image URL; null = the
-// page had no usable image (cached so we don't keep asking).
 export function getCachedArticleThumb(url: string): string | null | undefined {
   return cache.get(url);
 }

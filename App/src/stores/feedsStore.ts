@@ -6,29 +6,11 @@ interface FeedsState {
   feeds: Feed[];
   loading: boolean;
   error: string | null;
-  // Genres as a first-class, folder-like list (see commands::feeds::
-  // list_genres) rather than derived purely from whatever `feed.folder`
-  // strings happen to already be in use -- lets a genre exist (and be
-  // picked into) before any feed has been filed into it.
   genres: string[];
-  // Whether a manual "refresh all" (see refreshAllFeeds) is in flight --
-  // drives FilterBar's spinning refresh icon. Not the same as `loading`
-  // above (that's specifically the feed-list fetch, which this doesn't
-  // touch directly -- refreshAllFeeds's own effect on `feeds`/entries
-  // arrives asynchronously via the "feeds-updated" event, see
-  // useFeedsUpdatedListener).
   refreshingAll: boolean;
-  // Set/cleared by useFeedsUpdatedListener on "feeds-refresh-start"/
-  // "feeds-updated" -- unlike `refreshingAll` (only true for a refresh
-  // *this frontend instance* triggered), this reflects any refresh
-  // happening anywhere (the scheduler's silent 60s tick included), so
-  // FilterBar's ambient pulse dot can indicate background activity that
-  // otherwise had no visible signal at all (user feedback).
   backgroundRefreshing: boolean;
   refresh: () => Promise<void>;
   refreshGenres: () => Promise<void>;
-  // Resolves to the total new-entry count across the batch (0 = nothing
-  // changed) so the caller can decide whether to say so.
   refreshAllFeeds: () => Promise<number>;
   createGenre: (name: string) => Promise<void>;
   deleteGenre: (name: string) => Promise<void>;
@@ -50,13 +32,6 @@ export const useFeedsStore = create<FeedsState>((set, get) => ({
   refreshingAll: false,
   backgroundRefreshing: false,
 
-  // Manual "更新" button (TimelineToolbar.tsx) -- doubles as a
-  // psychological confirmation ("yes, it's actually checking right now")
-  // and a debugging aid for feed errors, on top of the silent 60s
-  // scheduler tick (user feedback). `refresh_all_feeds` itself doesn't
-  // touch the frontend stores; useFeedsUpdatedListener's "feeds-updated"
-  // listener picks up the result once the backend batch completes, same
-  // as any other refresh path.
   refreshAllFeeds: async () => {
     set({ refreshingAll: true, error: null });
     try {

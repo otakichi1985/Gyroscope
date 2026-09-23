@@ -1,8 +1,5 @@
 import { usePanesStore } from "../stores/panesStore";
 
-// Timeline pane management strip: add/close the second pane and choose the
-// split direction. Always rendered above the timeline so the controls are in
-// one place. Single-pane rendering underneath is unchanged.
 export function PaneBar() {
   const dual = usePanesStore((s) => s.dual);
   const direction = usePanesStore((s) => s.direction);

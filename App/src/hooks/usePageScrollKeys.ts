@@ -3,12 +3,6 @@ import { activeScrollable, scrollActiveBy, scrollActiveTo } from "../lib/scrollT
 
 const EDITABLE = "input, textarea, [contenteditable='true']";
 
-/**
- * Global page-scroll keys for the active content pane (see scrollTarget.ts):
- * Home jumps to the top, End to the bottom, PageUp/PageDown scroll by roughly
- * a viewport. Ignored while typing in an editable field, where Home/End move
- * the caret and the browser's own page keys do the expected thing.
- */
 export function usePageScrollKeys() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {

@@ -1,11 +1,3 @@
-// Registry of the app's scrollable content panes (the timeline list and each
-// overlay's own scroller). Exactly one pane is "active" at a time -- the
-// timeline when it's showing, otherwise whichever overlay is open -- and the
-// scroll-to-top button plus the Home/End/PageUp/PageDown keys target that pane
-// so they never scroll a hidden list underneath the current screen.
-//
-// Panes register through useScrollTargetRef (src/hooks/useScrollTargetRef.ts),
-// which keeps this Set in sync with mounted containers automatically.
 const scrollables = new Set<HTMLElement>();
 const listeners = new Set<() => void>();
 
@@ -23,8 +15,6 @@ export function unregisterScrollable(el: HTMLElement) {
   notify();
 }
 
-/** Called whenever the set of mounted scrollables changes (screen switch,
- * overlay open/close). Returns an unsubscribe function. */
 export function subscribeScrollables(fn: () => void): () => void {
   listeners.add(fn);
   return () => {
@@ -32,13 +22,6 @@ export function subscribeScrollables(fn: () => void): () => void {
   };
 }
 
-/**
- * The content pane currently on screen: a registered scrollable that is still
- * connected, not inside an inert (hidden) subtree, and with a visible rect.
- * When several qualify, the last one to register wins -- the in-place discover
- * reader mounts after the results list it covers, so it takes priority while
- * it's open.
- */
 export function activeScrollable(): HTMLElement | null {
   let best: HTMLElement | null = null;
   for (const el of scrollables) {
@@ -51,7 +34,6 @@ export function activeScrollable(): HTMLElement | null {
   return best;
 }
 
-/** Scroll the active pane by `delta` px, clamped to its scrollable range. */
 export function scrollActiveBy(delta: number) {
   const el = activeScrollable();
   if (!el) return;
@@ -59,7 +41,6 @@ export function scrollActiveBy(delta: number) {
   el.scrollTop = Math.min(max, Math.max(0, el.scrollTop + delta));
 }
 
-/** Smoothly jump the active pane to its top or bottom edge. */
 export function scrollActiveTo(edge: "top" | "bottom") {
   const el = activeScrollable();
   if (!el) return;

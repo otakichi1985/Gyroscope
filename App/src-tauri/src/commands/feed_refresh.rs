@@ -1,12 +1,10 @@
 use tauri::{AppHandle, Emitter, State};
 
-use crate::db::Db;
 use crate::db::models::Feed;
+use crate::db::Db;
 use crate::error::AppResult;
 use crate::fetch::HttpClient;
 
-/// IPC entry point for refreshing one feed. The network/DB engine remains in
-/// `feeds` because the scheduler calls it directly without IPC.
 #[tauri::command]
 pub async fn refresh_feed(
     app: AppHandle,

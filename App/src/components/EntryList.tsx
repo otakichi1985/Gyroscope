@@ -10,11 +10,9 @@ import { EntryRow } from "./EntryRow";
 import { RssIcon, SearchIcon, StarIcon, WarningIcon } from "./icons";
 import { StatePanel } from "./StatePanel";
 
-// Must match EntryRow's fixed CARD_ROW_HEIGHT. The gap is added separately
-// below, so the initial estimate is already correct before measurement.
 const CARD_BASE_SIZE: Record<CardSize, number> = { small: 72, medium: 96, large: 120 };
 const OTHER_BASE_SIZE: Record<Exclude<ViewMode, "card">, number> = { list: 56, compact: 32 };
-/** Mirrors EntryRow's own card thumbnail sizing, for the skeleton below. */
+
 const CARD_THUMB_SIZE: Record<CardSize, string> = {
   small: "h-12 w-12",
   medium: "h-16 w-16",
@@ -27,12 +25,6 @@ const GAP_PX: Record<string, number> = {
   relaxed: 16,
 };
 
-/**
- * "No articles" is several different situations that want different words
- * -- and, in the first-run case, a way out. A brand new install used to
- * show a bare "記事がありません" with no hint that feeds are what is
- * missing or where to add them.
- */
 function EmptyState({ useStore = useEntriesStore }: { useStore?: EntriesStoreHook }) {
   const feeds = useFeedsStore((s) => s.feeds);
   const { searchQuery, starredOnly } = useStore();
@@ -75,7 +67,6 @@ function EmptyState({ useStore = useEntriesStore }: { useStore?: EntriesStoreHoo
   );
 }
 
-/** Placeholder rows shaped like the real ones for the current view mode. */
 function EntrySkeleton({ mode, cardSize, gap }: { mode: ViewMode; cardSize: CardSize; gap: number }) {
   const rowHeight = mode === "card" ? CARD_BASE_SIZE[cardSize] : OTHER_BASE_SIZE[mode];
   const bar = "rounded bg-black/10 dark:bg-white/10";
@@ -115,9 +106,6 @@ export function EntryList({ useStore = useEntriesStore }: { useStore?: EntriesSt
     return map;
   }, [feeds]);
 
-  // Feed icon (favicon-ish) used as a thumbnail substitute in EntryRow's
-  // card mode when an entry has no thumbnail of its own -- see
-  // src-tauri/src/fetch/favicon.rs.
   const feedIconById = useMemo(() => {
     const map = new Map<number, string | null>();
     for (const feed of feeds) {
@@ -131,20 +119,7 @@ export function EntryList({ useStore = useEntriesStore }: { useStore?: EntriesSt
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reveal window for the row entrance animation (floating skins draw their
-  // cards in rather than having them just be there).
-  //
-  // The animation CANNOT live on the row itself. Rows are virtualised, so
-  // they mount and unmount constantly while scrolling, and an entrance on
-  // the row would replay every time one scrolled back into view. Instead the
-  // scroll container carries `list-reveal` for a short window and the CSS
-  // targets rows only through that class -- so the rows present when a fresh
-  // list arrives animate, and everything mounted later by scrolling does not.
-  //
-  // `loading` is the right trigger: refresh() sets it, fetchMore() uses
-  // `loadingMore` instead, so this fires on a genuine list replacement
-  // (first load, feed/genre change, search, view switch) and never on an
-  // infinite-scroll append.
+  /* 仮想行の再mountではなく、一覧を置き換えた直後だけ登場motionを許可する。 */
   const [revealing, setRevealing] = useState(false);
   const wasLoading = useRef(false);
   useEffect(() => {
@@ -159,9 +134,6 @@ export function EntryList({ useStore = useEntriesStore }: { useStore?: EntriesSt
 
   const parentRef = useRef<HTMLDivElement>(null);
   const smoothScroll = useAppearanceStore((s) => s.smoothScroll);
-  // The same callback ref feeds the virtualizer (via parentRef, set inside
-  // the hook), attaches the smooth-wheel glide, and registers the pane with
-  // the scrollable registry for the scroll-to-top button / page-scroll keys.
   const wheelRef = useSmoothWheelScroll(smoothScroll, parentRef);
   const targetRef = useScrollTargetRef<HTMLDivElement>();
   const scrollRef = useCallback(
@@ -174,32 +146,7 @@ export function EntryList({ useStore = useEntriesStore }: { useStore?: EntriesSt
 
   const baseSize = viewMode === "card" ? CARD_BASE_SIZE[cardSize] : OTHER_BASE_SIZE[viewMode];
 
-  // Identify a row the way React does -- by article, not by slot. The
-  // virtualizer's default is to key everything by array index, and that
-  // breaks in two separate ways once the list is replaced under it:
-  //
-  //  - Measured heights live in a cache keyed by that index which is never
-  //    invalidated on a data change, so after a refresh slot 7 silently
-  //    reuses whatever height the *previous* article in slot 7 had.
-  //  - `measureElement` unobserves whatever node it had previously cached
-  //    under an index. Rows are keyed by `entry.id` here, so a refresh that
-  //    inserts an article at the top makes React reuse every existing row's
-  //    DOM node and merely rewrite its `data-index` -- the ref is not called
-  //    again, because its identity never changes. The newly mounted top row
-  //    then claims index 0, finds the still-mounted old node cached there,
-  //    and unobserves it. That row is left in the DOM with no ResizeObserver
-  //    and no way back into the cache.
-  //
-  // Together those are the "cards overlap after a refresh and stay that way
-  // until you scroll" bug: the shifted row keeps a wrong height, everything
-  // below it is positioned one row too high, and only scrolling it out of
-  // and back into the window (which remounts it, re-running the ref) repairs
-  // it. Note that the mount path alone cannot repair anything -- when a
-  // cached size exists, `measureElement` returns it instead of reading the
-  // DOM, so the delta is zero. The ResizeObserver is the only corrective
-  // path, which is exactly what gets torn off above.
-  //
-  // Keying by entry id makes both caches follow the row instead of the slot.
+  /* 測定cacheを表示位置でなく記事IDへ結び、更新後の高さ誤再利用を防ぐ。 */
   const getItemKey = useCallback((index: number) => entries[index]?.id ?? index, [entries]);
 
   const virtualizer = useVirtualizer({
@@ -210,17 +157,8 @@ export function EntryList({ useStore = useEntriesStore }: { useStore?: EntriesSt
     overscan: 8,
   });
 
-  // Row geometry is a function of these three settings, but changing
-  // `estimateSize` invalidates nothing on its own: the measurements memo keys
-  // off count/padding/gap and the size-cache version, never the estimator,
-  // and a cached measurement always beats the estimate. So heights measured
-  // in compact mode would still be driving layout after a switch to card
-  // mode. Now that sizes are keyed by entry id they would follow the article
-  // across that switch rather than being overwritten by the next occupant of
-  // the slot, so the cache has to be dropped explicitly. Layout effect, not
-  // a passive one, so the corrected positions land in the same paint as the
-  // new row heights.
   useLayoutEffect(() => {
+    /* 行の形を変える設定では、paint前に測定cacheを更新する。 */
     virtualizer.measure();
   }, [virtualizer, viewMode, cardSize, cardGap]);
 
@@ -246,9 +184,6 @@ export function EntryList({ useStore = useEntriesStore }: { useStore?: EntriesSt
     );
   }
 
-  // Skeleton rows rather than a "読み込み中..." line: they occupy the shape
-  // the real content is about to take, so the list does not visibly jump
-  // when it arrives.
   if (loading && entries.length === 0) {
     return <EntrySkeleton mode={viewMode} cardSize={cardSize} gap={gap} />;
   }
@@ -258,13 +193,6 @@ export function EntryList({ useStore = useEntriesStore }: { useStore?: EntriesSt
   }
 
   return (
-    // `key` forces a fresh DOM node (and a reset scroll position) whenever
-    // the bookmark filter toggles, which is what lets `.timeline-enter`'s
-    // `@starting-style` replay -- without it this div just re-renders in
-    // place, and the list swap read as an abrupt in-place mutation rather
-    // than entering a distinct view (user feedback: wanted the bookmark
-    // filter to feel more like switching tabs, closer to how opening
-    // Settings/History/etc. already animates).
     <div
       key={starredOnly ? "starred" : "all"}
       ref={scrollRef}
@@ -295,9 +223,6 @@ export function EntryList({ useStore = useEntriesStore }: { useStore?: EntriesSt
                 entry={entry}
                 mode={viewMode}
                 useStore={useStore}
-                // Discover-saved bookmarks are synthesized with feed_id 0
-                // (see commands::entries) and belong to no real feed -- label
-                // them as such instead of showing a blank source.
                 feedTitle={entry.feed_id === 0 ? "保存した記事" : (feedTitleById.get(entry.feed_id) ?? "")}
                 feedIconUrl={entry.feed_id === 0 ? null : (feedIconById.get(entry.feed_id) ?? null)}
                 cardSize={cardSize}

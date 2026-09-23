@@ -1,8 +1,6 @@
 use rusqlite::Row;
 use serde::Serialize;
 
-/// Feed as exposed to the frontend. Fetch bookkeeping fields (etag,
-/// last_modified) stay DB-only since the UI never needs them.
 #[derive(Debug, Clone, Serialize)]
 pub struct Feed {
     pub id: i64,
@@ -20,8 +18,6 @@ pub struct Feed {
     pub created_at: String,
     pub tags: Vec<String>,
     pub unread_count: i64,
-    // 'rss' (default, existing feeds) or 'booth' (see fetch::booth) --
-    // drives the branch in commands::feeds::refresh_feed_inner.
     pub source_type: String,
 }
 
@@ -30,9 +26,6 @@ pub const FEED_COLUMNS: &str = "f.id, f.url, f.site_url, f.title, f.custom_title
      f.last_error, f.created_at, f.source_type";
 
 impl Feed {
-    /// Maps a row selected with [`FEED_COLUMNS`] (aliased `f`). `tags` and
-    /// `unread_count` are filled in separately by the caller since they come
-    /// from auxiliary queries, not this row itself.
     pub fn from_row(row: &Row) -> rusqlite::Result<Feed> {
         Ok(Feed {
             id: row.get(0)?,
@@ -97,9 +90,6 @@ impl Entry {
     }
 }
 
-/// A read-history row -- a denormalized snapshot taken at the moment an
-/// entry was first marked read, independent of the live `entries`/`feeds`
-/// rows (which may since have been deleted; see migrations.rs v2).
 #[derive(Debug, Clone, Serialize)]
 pub struct ReadHistoryEntry {
     pub id: i64,
@@ -123,8 +113,6 @@ impl ReadHistoryEntry {
     }
 }
 
-/// A parsed feed entry, ready to be upserted. Not yet associated with a
-/// feed_id or database-assigned id.
 #[derive(Debug, Clone)]
 pub struct NewEntry {
     pub guid: String,

@@ -1,0 +1,326 @@
+/* glyphのdiscと白い情報panelを主要な識別表現として扱う。 */
+.skin-ordinary {
+  --ord-ink: 38 42 48;
+  --ord-amber: 240 190 51;
+  --ord-blue: 21 101 192;
+  --ord-teal: 47 140 130;
+  --ord-green: 30 142 78;
+  --ord-coral: 217 72 42;
+  --ord-pink: 209 74 120;
+
+  --plate-fill: 255 255 255;
+  --plate-fill-alpha: 0.95;
+  --plate-border: 255 255 255;
+  --plate-border-alpha: 0.9;
+  --plate-radius: 14px;
+  --glow-rgb: 255 255 255;
+}
+
+/* timelineとoverlayを含むapp-contentは個別のsurface規則で描く。 */
+.skin-ordinary > :not(.ordinary-hud):not(.app-content):not(.scroll-to-top-btn):not(.update-notice):not(.resize-corner-guides) {
+  position: relative;
+  z-index: 1;
+}
+
+.skin-ordinary .app-titlebar,
+.skin-ordinary .app-filterbar,
+.skin-ordinary .timeline-toolbar {
+  margin-left: 0;
+  margin-right: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: rgb(255 255 255);
+  text-shadow:
+    0 1px 3px rgb(0 0 0 / 0.62),
+    0 0 10px rgb(0 0 0 / 0.38);
+}
+.skin-ordinary .app-filterbar .w-px {
+  background-color: rgb(255 255 255 / 0.45);
+}
+
+.skin-ordinary .icon-button,
+.skin-ordinary .icon-button:hover,
+.skin-ordinary .icon-button.accent-bg-soft {
+  padding: 0;
+  gap: 3px;
+  background-color: transparent;
+  color: rgb(255 255 255);
+}
+/* discはbutton全体でなくglyphへ付け、label付きでも円形を保つ。 */
+.skin-ordinary .icon-button > svg {
+  box-sizing: content-box;
+  padding: 6px;
+  border-radius: 50%;
+  background-color: rgb(255 255 255 / 0.96);
+  color: rgb(var(--ord-blue));
+  box-shadow: 0 1px 5px rgb(0 0 0 / 0.32);
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out,
+    transform 120ms ease-out;
+}
+.skin-ordinary .icon-button:hover > svg {
+  background-color: rgb(255 255 255);
+}
+.skin-ordinary .icon-button:active > svg {
+  transform: scale(0.92);
+}
+
+.skin-ordinary .icon-button.accent-bg-soft > svg {
+  background-color: rgb(var(--ord-amber));
+  color: rgb(255 255 255);
+  stroke-width: 2;
+}
+.skin-ordinary .icon-button[data-hue="teal"] > svg {
+  color: rgb(var(--ord-teal));
+}
+.skin-ordinary .icon-button[data-hue="green"] > svg {
+  color: rgb(var(--ord-green));
+}
+.skin-ordinary .icon-button[data-hue="coral"] > svg {
+  color: rgb(var(--ord-coral));
+}
+.skin-ordinary .icon-button[data-hue="pink"] > svg {
+  color: rgb(var(--ord-pink));
+}
+.skin-ordinary .icon-button.accent-bg-soft[data-hue] > svg {
+  color: rgb(255 255 255);
+}
+.skin-ordinary .icon-button span {
+  text-shadow:
+    0 1px 3px rgb(0 0 0 / 0.7),
+    0 0 8px rgb(0 0 0 / 0.4);
+}
+
+.skin-ordinary .segmented,
+.skin-ordinary .pill-button,
+.skin-ordinary .picker-trigger {
+  border: 0;
+  border-radius: 999px;
+  background-color: rgb(255 255 255 / 0.94);
+  box-shadow: 0 1px 5px rgb(0 0 0 / 0.3);
+  color: rgb(var(--ord-ink));
+  text-shadow: none;
+}
+.skin-ordinary .segmented button {
+  border-radius: 999px;
+  color: rgb(var(--ord-ink));
+}
+.skin-ordinary .segmented button.accent-text {
+  color: rgb(var(--ord-ink));
+}
+.skin-ordinary .segmented button.accent-bg-soft {
+  background-color: rgb(var(--ord-amber));
+  border-color: transparent;
+  box-shadow: none;
+}
+.skin-ordinary .pill-button {
+  padding-left: 10px;
+  padding-right: 12px;
+  color: rgb(var(--ord-blue));
+}
+.skin-ordinary .picker-trigger {
+  padding-left: 12px;
+  padding-right: 10px;
+}
+
+.skin-ordinary .screen-overlay.panel-bg,
+.dark.skin-ordinary .screen-overlay.panel-bg {
+  border: 0;
+  background-color: rgb(255 255 255 / calc(0.97 * var(--float-alpha, 1)));
+  color: rgb(var(--ord-ink));
+}
+.skin-ordinary .screen-overlay-header {
+  border: 0;
+  background-color: rgb(var(--ord-amber));
+  color: rgb(var(--ord-ink));
+}
+.skin-ordinary .screen-close-button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: rgb(var(--ord-ink));
+  background-color: rgb(255 255 255 / 0.92);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.22);
+  transition:
+    background-color 150ms ease-out,
+    transform 120ms ease-out;
+}
+.skin-ordinary .screen-close-button:hover {
+  color: rgb(var(--ord-ink));
+  background-color: rgb(255 255 255);
+}
+.skin-ordinary .screen-close-button:active {
+  transform: scale(0.92);
+}
+.skin-ordinary .screen-close-label {
+  display: none;
+}
+.skin-ordinary .screen-close-icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2;
+}
+.skin-ordinary .accent-bg {
+  color: rgb(var(--ord-ink));
+  background-color: rgb(var(--ord-amber));
+  background-image: none;
+}
+.skin-ordinary .toggle-on {
+  background-color: rgb(var(--ord-blue));
+  background-image: none;
+}
+.skin-ordinary .accent-bg-soft {
+  color: rgb(var(--ord-ink));
+  background-color: rgb(var(--ord-amber) / 0.4);
+  background-image: none;
+  border-color: rgb(var(--ord-amber));
+  box-shadow: none;
+}
+
+/* 背面が透明でも開発版表示を読める不透明面を持たせる。 */
+.skin-ordinary .dev-pill {
+  background-color: rgb(var(--ord-amber));
+  text-shadow: none;
+}
+
+.skin-ordinary .entry-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--plate-radius);
+  color: rgb(var(--ord-ink));
+  background-color: rgb(255 255 255 / calc(0.95 * var(--float-alpha, 1)));
+  background-image: none;
+  border-color: rgb(255 255 255 / 0.9);
+  box-shadow:
+    inset 0 1px 0 white,
+    var(--plate-shadow);
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms ease-out;
+}
+.skin-ordinary .entry-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  width: 34px;
+  height: 4px;
+  border-radius: 0 0 3px 3px;
+  background-color: rgb(var(--ord-amber));
+  pointer-events: none;
+}
+.skin-ordinary .entry-card::after {
+  content: none;
+}
+.skin-ordinary .entry-card:hover {
+  transform: translateY(-2px);
+  border-color: rgb(255 255 255);
+  box-shadow:
+    inset 0 1px 0 white,
+    0 0 0 2px rgb(var(--ord-amber)),
+    0 0 18px rgb(var(--ord-amber) / 0.5),
+    0 1px 3px rgb(0 0 0 / 0.18);
+}
+.skin-ordinary .entry-card .accent-text {
+  color: rgb(var(--ord-blue));
+}
+
+/* HUDは操作を持たず、常に背面のhit testingを通す。 */
+.ordinary-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ordinary-arc {
+  position: absolute;
+  left: -25%;
+  width: 150%;
+  height: 120px;
+  border: 0 solid rgb(255 255 255 / 0.88);
+  border-radius: 50%;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.45));
+  animation: ordinary-arc-in 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.ordinary-arc-top {
+  top: -76px;
+  border-bottom-width: 1.5px;
+}
+.ordinary-arc-bottom {
+  bottom: 16px;
+  border-bottom-width: 1.5px;
+  animation-delay: 90ms;
+}
+
+.ordinary-reticle {
+  position: absolute;
+  top: 33px;
+  left: calc(50% - 11px);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid rgb(255 255 255 / 0.92);
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.5));
+  animation: ordinary-reticle-drift 14s linear infinite;
+}
+.ordinary-reticle::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1.5px solid rgb(255 255 255 / 0.92);
+  border-right-color: transparent;
+}
+@keyframes ordinary-arc-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+@keyframes ordinary-reticle-drift {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skin-ordinary .idle-bg::before,
+.skin-ordinary .idle-bg::after {
+  content: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skin-cardinality .idle-mode,
+  .ordinary-arc,
+  .ordinary-reticle,
+  .skin-ordinary .screen-close-button,
+  .skin-ordinary .idle-bg::before,
+  .skin-ordinary .idle-bg::after,
+  .skin-ordinary .idle-mode {
+    animation: none;
+  }
+
+  .ordinary-arc {
+    opacity: 1;
+    transform: none;
+  }
+  .skin-cardinality .entry-card:hover,
+  .skin-ordinary .entry-card:hover {
+    transform: none;
+  }
+}

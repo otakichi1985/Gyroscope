@@ -5,11 +5,6 @@ import { useFeedsStore } from "../stores/feedsStore";
 import { useUiStore } from "../stores/uiStore";
 import {
   useAppearanceStore,
-  type ReaderColumnWidth,
-  type ReaderElementKey,
-  type ReaderFontFamily,
-  type ReaderFontSize,
-  type ReaderLineHeight,
 } from "../stores/appearanceStore";
 import { sanitizeArticleHtml } from "../lib/sanitize";
 import { getSkin } from "../lib/skins";
@@ -17,7 +12,7 @@ import { formatPublished } from "../lib/text";
 import { hostOf, relevanceOf } from "../lib/discoverRanking";
 import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
 import { useScrollTargetRef } from "../hooks/useScrollTargetRef";
-import { readerPresetVar } from "../lib/readerTheme";
+import { readerStyleVariables } from "../lib/readerTheme";
 import type { ScoredSource, SearchCategory } from "../lib/types";
 import { MarqueeTitle } from "./MarqueeTitle";
 import { ScreenOverlay } from "./ScreenOverlay";
@@ -59,71 +54,8 @@ const AVAILABILITIES: [ResultAvailability, string][] = [
   ["noFeed", "RSSなし"],
 ];
 
-// "〇〇users以上ブックマーク" reasons are the raw popularity signal behind
-// the bookmark_count sort -- shown by the count already, so don't repeat it
-// as a per-card tag.
 const NOISE_REASON = /users以上ブックマーク$/;
 
-// Mirrors ReaderOverlay's reader-settings maps: the full-text view here is a
-// reader too, so it honours the same 文字設定 instead of rendering with the
-// app's default typography.
-const FONT_SIZE_MAP: Record<ReaderFontSize, string> = {
-  small: "13px",
-  medium: "15px",
-  large: "17px",
-  xlarge: "19px",
-};
-const LINE_HEIGHT_MAP: Record<ReaderLineHeight, string> = {
-  tight: "1.5",
-  normal: "1.75",
-  loose: "2.05",
-};
-const COLUMN_WIDTH_MAP: Record<ReaderColumnWidth, string> = {
-  narrow: "32em",
-  normal: "40em",
-  wide: "50em",
-};
-
-// Same font/color maps as ReaderOverlay -- keep the two reader surfaces in
-// lockstep so 文字設定 behaves identically in both. "app" follows the global
-// font (see ReaderOverlay for the rationale).
-const FONT_FAMILY_MAP: Record<ReaderFontFamily, string> = {
-  app: "inherit",
-  sans: `system-ui, -apple-system, "Segoe UI", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif`,
-  serif: `"Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", "MS PMincho", serif`,
-};
-const CODE_FONT_MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-const ELEMENT_COLOR_KEYS: Record<ReaderElementKey, string> = {
-  body: "--reader-color-body",
-  heading: "--reader-color-heading",
-  quote: "--reader-color-quote",
-  code: "--reader-color-code",
-  link: "--reader-color-link",
-};
-
-// See src/lib/discoverRanking.ts for hostOf() and relevanceOf() -- pure
-// ranking logic extracted here for unit testing.
-
-/**
- * "探す" screen: finds candidate *sites* to subscribe to, as a discovery
- * step distinct from the timeline's own genre/folder filter (FeedPicker) --
- * that filter re-sorts sites you've already vetted, this finds ones you
- * haven't yet. Two entry points into the same feed-gated/policy-scored
- * pipeline (`commands::search::rank_hits`): a keyword search for something
- * specific in mind, or browsing one of Hatena Bookmark's fixed categories
- * for passive, serendipitous discovery.
- *
- * The keyword input and the genre chips stay visible together: typing and
- * pressing Enter (or the 検索 button) runs a fresh keyword search, clicking a
- * genre browses that category, and once results are on screen the input
- * acts as a live in-result filter either way. Every result is confirmed to
- * have a discoverable feed or not, so registration ("登録") is gated on the
- * RSS badge. A result has to be expanded into its preview (thumbnail, full
- * snippet, a link to open the actual article) before the register button
- * appears. An in-app article viewer was considered for this preview step
- * but deferred -- see `IDEAS_AND_HYPOTHESES.md` -- so "元記事を開く" hands off
- * to the system browser instead of embedding one.
- */
 export function DiscoverOverlay() {
   const { addFeed, feeds } = useFeedsStore();
   const blockImages = useAppearanceStore((s) => s.blockImages);
@@ -136,9 +68,6 @@ export function DiscoverOverlay() {
   const readerColors = useAppearanceStore((s) => s.readerColors);
   const skinId = useAppearanceStore((s) => s.skinId);
   const smoothScroll = useAppearanceStore((s) => s.smoothScroll);
-  // Smooth-wheel glide for the results list and the in-place reader pane, each
-  // also registered with the scrollable registry so the scroll-to-top button
-  // and the page-scroll keys follow which pane is on screen.
   const resultsWheel = useSmoothWheelScroll<HTMLDivElement>(smoothScroll);
   const readerWheel = useSmoothWheelScroll<HTMLDivElement>(smoothScroll);
   const resultsTarget = useScrollTargetRef<HTMLDivElement>();
@@ -168,23 +97,9 @@ export function DiscoverOverlay() {
   const [expandedUrl, setExpandedUrl] = useState<string | null>(null);
   const [registering, setRegistering] = useState<string | null>(null);
   const [registeredHosts, setRegisteredHosts] = useState<Set<string>>(new Set());
-  // URLs of articles saved to the real bookmark store (commands::saved) --
-  // painted as filled ☆ on the cards. Kept as a Set on this screen purely so
-  // re-rendering doesn't refetch; the source of truth is the DB.
   const [savedUrls, setSavedUrls] = useState<Set<string>>(new Set());
-  // Transient feedback for a successful feed registration (the card
-  // disappears right after by default -- "登録済みを隠す" is on -- so
-  // without this it looks like the action silently failed).
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<number | null>(null);
-  // The keyword that produced the current results (null while browsing a
-  // category). The search box doubles as a live in-result filter, but it must
-  // not re-apply itself on top of a keyword search: the backend already
-  // matched the candidates against that keyword, and a second literal
-  // substring pass here dropped results Hatena deemed relevant (user report:
-  // search results for a word were less on-topic than the ones shown after
-  // clearing the box). Only when the box is edited to something *different*
-  // from the executed keyword does it narrow the results again.
   const executedQuery = useRef<string | null>(null);
   const [resultSort, setResultSort] = useState<ResultSort>("newest");
   const [hideRegistered, setHideRegistered] = useState(true);
@@ -192,11 +107,6 @@ export function DiscoverOverlay() {
   const [resultKind, setResultKind] = useState<ResultKind>("all");
   const [resultAvailability, setResultAvailability] = useState<ResultAvailability>("all");
 
-  // In-place full-text reader for a discover card ("全文を読む"): fetches the
-  // article body via commands::article and shows it over the results, so a
-  // discovered summary-only article can be read without leaving the app. The
-  // snippet/title/domain are kept so a readable reader view renders
-  // immediately, and the fetched full text then replaces the snippet.
   const [reader, setReader] = useState<{
     url: string;
     title: string;
@@ -207,8 +117,6 @@ export function DiscoverOverlay() {
   const [readerHtml, setReaderHtml] = useState<string | null>(null);
   const [readerFetching, setReaderFetching] = useState(false);
   const [readerError, setReaderError] = useState<string | null>(null);
-  // URL of the in-flight full-text fetch (if any); a late reply for a target
-  // the reader has since left is dropped (see handleReadFullText).
   const fullTextFetchRef = useRef<string | null>(null);
 
   const existingHosts = new Set(
@@ -266,8 +174,6 @@ export function DiscoverOverlay() {
     invoke<SearchCategory[]>("list_search_categories")
       .then(setCategories)
       .catch(() => {
-        // Non-fatal: the category picker just stays empty and keyword
-        // search is unaffected.
       });
   }, [categories.length]);
 
@@ -276,9 +182,6 @@ export function DiscoverOverlay() {
     if (!query.trim() || loading) return;
     setActiveCategory(null);
     executedQuery.current = query.trim();
-    // Keyword hits default to 関連度: Hatena's RSS search returns candidates
-    // in recency order, so without a relevance sort the top of the list was
-    // just "recent or popular" rather than "on topic" (the reported ブレ).
     setResultSort("relevance");
     await runSearch(() => invoke<ScoredSource[]>("search_sources", { query: query.trim() }));
   }
@@ -291,7 +194,6 @@ export function DiscoverOverlay() {
     await runSearch(() => invoke<ScoredSource[]>("browse_category", { category: slug }));
   }
 
-  // "すべて" = no genre selected: back to the bare keyword-search state.
   function handleReset() {
     setActiveCategory(null);
     executedQuery.current = null;
@@ -320,10 +222,6 @@ export function DiscoverOverlay() {
     setRegistering(source.url);
     setError(null);
     try {
-      // Subscribe to the resolved feed URL (see ScoredSource.feed_url) --
-      // the card's article URL may have no feed link of its own even though
-      // the site publishes one (found via the site root), and add_feed
-      // needs a URL it can discover the feed from.
       await addFeed(source.feed_url ?? source.url);
       setRegisteredHosts((prev) => new Set(prev).add(hostOf(source.url)));
       setNotice(`「${source.title}」をフィードに追加しました`);
@@ -341,24 +239,16 @@ export function DiscoverOverlay() {
       const urls = await invoke<string[]>("list_saved_article_urls");
       setSavedUrls(new Set(urls));
     } catch {
-      // Non-fatal: cards just render unstarred until a successful load.
     }
   }
 
   const activeScreen = useUiStore((s) => s.activeScreen);
-  // Saved-bookmark state can change from the timeline's bookmark view (unstar
-  // / delete), so re-sync the cards' ☆ every time this screen becomes active.
   useEffect(() => {
     if (activeScreen === "discover") {
       loadSavedUrls();
     }
   }, [activeScreen]);
 
-  // Mouse side buttons (App.tsx) navigate back/forward between screens. While
-  // the in-place reader is open, the "back" button is intercepted here --
-  // capture phase, so it runs before App's own handler -- and closes the
-  // reader back to the results first, like the timeline reader does, instead
-  // of jumping straight to the previous screen.
   useEffect(() => {
     if (activeScreen !== "discover") return;
     function onAuxClick(e: MouseEvent) {
@@ -373,10 +263,6 @@ export function DiscoverOverlay() {
     return () => window.removeEventListener("auxclick", onAuxClick, true);
   }, [activeScreen, reader]);
 
-  // One-time migration: before the unified bookmark store existed, "記事を保存"
-  // and ☆ wrote only to localStorage. Fold whatever survived there into the
-  // real store (title/domain included where the old format had them), then
-  // drop the legacy keys. Guarded so it never re-runs for a later mount.
   const legacyMigrated = useRef(false);
   useEffect(() => {
     if (legacyMigrated.current) return;
@@ -396,7 +282,6 @@ export function DiscoverOverlay() {
           });
         }
       } catch {
-        // Malformed legacy value -- ignored, it gets cleared below anyway.
       }
       localStorage.removeItem(key);
     }
@@ -411,17 +296,12 @@ export function DiscoverOverlay() {
             thumbnailUrl: null,
           });
         } catch {
-          // Per-item non-fatal.
         }
       }
       if (legacy.length > 0) await loadSavedUrls();
     })();
   }, []);
 
-  // Toggles an article's bookmark via the real store (commands::saved) --
-  // "記事を保存", the card ☆, and the timeline's bookmark view all write to
-  // the same place now. Un-saving soft-deletes into the bookmark trash, so
-  // the article stays recoverable from ゴミ箱 like any other bookmark.
   async function handleSaveArticle(source: ScoredSource) {
     const isSaved = savedUrls.has(source.url);
     const next = new Set(savedUrls);
@@ -457,9 +337,6 @@ export function DiscoverOverlay() {
     setReaderHtml(null);
     setReaderError(null);
     setReaderFetching(true);
-    // Guard against stale replies: if the reader moves to a different article
-    // (or is closed) while this fetch is in flight, a late result must not
-    // overwrite the view the user is actually looking at.
     fullTextFetchRef.current = source.url;
     try {
       const result = await invoke<{ html: string }>("fetch_article_full_text", { url: source.url });
@@ -473,9 +350,6 @@ export function DiscoverOverlay() {
     }
   }
 
-  // Same interception as ReaderOverlay: an <a> inside dangerouslySetInnerHTML
-  // would navigate this app's own webview (CSP has nowhere for it to go), so
-  // route through the same openUrl() every other link uses.
   function handleReaderClick(e: React.MouseEvent<HTMLDivElement>) {
     const anchor = (e.target as HTMLElement).closest("a");
     if (!anchor) return;
@@ -484,27 +358,21 @@ export function DiscoverOverlay() {
     if (href && HTTP_LINK_RE.test(href)) void openUrl(href);
   }
 
-  const readerColorVars = {} as Record<string, string>;
-  for (const key of Object.keys(ELEMENT_COLOR_KEYS) as ReaderElementKey[]) {
-    const preset = readerColors[key];
-    if (preset) readerColorVars[ELEMENT_COLOR_KEYS[key]] = readerPresetVar(preset);
-  }
-  const readerVars = {
-    "--reader-font-size": FONT_SIZE_MAP[readerFontSize],
-    "--reader-line-height": LINE_HEIGHT_MAP[readerLineHeight],
-    "--reader-max-width": COLUMN_WIDTH_MAP[readerColumnWidth],
-    "--reader-font-family": FONT_FAMILY_MAP[readerFontFamily],
-    "--reader-code-font-family":
-      readerCodeFont === "mono" ? CODE_FONT_MONO : "var(--reader-font-family)",
-    ...readerColorVars,
-  } as React.CSSProperties;
+  const readerVars = readerStyleVariables({
+    fontSize: readerFontSize,
+    lineHeight: readerLineHeight,
+    columnWidth: readerColumnWidth,
+    fontFamily: readerFontFamily,
+    codeFont: readerCodeFont,
+    colors: readerColors,
+  }) as React.CSSProperties;
   const keepOpacityStyle =
     reader && getSkin(skinId).floating && readerKeepOpacity ? ({ "--float-alpha": "1" } as React.CSSProperties) : undefined;
 
   return (
     <ScreenOverlay screen="discover" title="サイトを探す">
       <div ref={resultsScrollRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm">
-        {/* 検索 */}
+
         <section className="flex flex-col gap-1.5">
           <form onSubmit={handleSearch} className="flex min-w-0 gap-1">
             <ClearableInput
@@ -677,9 +545,6 @@ export function DiscoverOverlay() {
                 const expanded = expandedUrl === source.url;
                 const thumbSize =
                   resultSize === "compact" ? "h-8 w-8" : resultSize === "large" ? "h-14 w-14" : "h-10 w-10";
-// Opening an article from here goes straight to the system browser --
-  // there's no reader entry to mark read, so record the read into history
-  // explicitly (best-effort; failing to log is not worth blocking the open).
   async function handleOpenArticle(source: ScoredSource) {
     await openUrl(source.url);
     try {
@@ -689,7 +554,6 @@ export function DiscoverOverlay() {
         feedTitle: source.domain,
       });
     } catch {
-      // Non-fatal.
     }
   }
 
@@ -698,10 +562,7 @@ export function DiscoverOverlay() {
                     key={source.url}
                     className="entry-card flex flex-col overflow-hidden rounded-lg border border-black/5 bg-black/[0.03] transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10"
                   >
-                    {/* Keep the expandable information control and the star
-                        control as sibling buttons. A button with another
-                        button inside it is invalid HTML and confusing for
-                        keyboard and assistive-technology users. */}
+
                     <div className="flex w-full items-start gap-2">
                       <button
                         type="button"
@@ -729,10 +590,7 @@ export function DiscoverOverlay() {
                             resultSize === "compact" ? "text-xs" : resultSize === "large" ? "text-base" : "text-sm"
                           }`}
                         />
-                        {/* The provider site gets the same accent-colored,
-                            undimmed source emphasis the timeline gives its
-                            feed titles (see EntryRow's meta), so "where did
-                            this article come from" reads at a glance. */}
+
                         <div className="accent-text mt-0.5 truncate text-xs">{source.domain}</div>
                         <div className="mt-1 flex flex-wrap items-center gap-1">
                           <span
@@ -790,10 +648,7 @@ export function DiscoverOverlay() {
                           />
                         )}
                         {source.snippet && <p className="text-xs opacity-80">{source.snippet}</p>}
-                        {/* Reading an article here behaves like the timeline:
-                            the primary action opens the in-app full-text reader
-                            (full text is fetched automatically), and opening the
-                            default browser stays as an explicit option below. */}
+
                         <button
                           type="button"
                           onClick={() => handleReadFullText(source)}
@@ -840,16 +695,13 @@ export function DiscoverOverlay() {
               })}
             </ul>
           ))}
-        {/* 提供元 */}
+
         <p className="text-center text-[10px] opacity-40">
           検索結果は「はてなブックマーク」のデータを使用しています
         </p>
       </div>
 
-      {/* In-place full-text reader, drawn over the results so a discovered
-          summary-only article can be read without leaving the app. The
-          snippet renders as a readable reader view right away (title, source,
-          body); the fetched full text then replaces the snippet in place. */}
+
       {reader && (
         <div style={keepOpacityStyle} className="panel-bg absolute inset-0 z-20 flex flex-col p-3">
           <div className="flex items-center gap-2">
@@ -868,9 +720,7 @@ export function DiscoverOverlay() {
               <MarqueeTitle text={reader.title} textClassName="text-sm font-semibold" />
               <div className="accent-text mt-0.5 truncate text-xs">{reader.domain}</div>
             </div>
-            {/* Same "open in the default browser" option the timeline reader
-                always carries -- reading stays in-app by default, jumping to
-                the browser is the explicit choice. */}
+
             <button
               type="button"
               onClick={() => void openUrl(reader.url)}

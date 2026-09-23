@@ -23,10 +23,6 @@ export function TrashOverlay() {
     [wheelRef, targetRef],
   );
 
-  // Re-fetch on every activation, not just first mount: this component
-  // stays mounted for the app's lifetime (see ScreenOverlay), so a
-  // mount-only fetch would keep showing whatever snapshot existed at
-  // startup.
   useEffect(() => {
     if (isActive) refresh();
   }, [isActive, refresh]);

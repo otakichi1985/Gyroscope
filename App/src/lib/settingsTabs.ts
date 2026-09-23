@@ -1,7 +1,3 @@
-// Shared definition of the settings sections and the single-active-tab
-// storage they use. Keeping the type here (instead of in useSettingsController)
-// lets the update-notice popup / uiStore target the アップデート tab without
-// importing from a component file.
 export type SettingsSectionId =
   | "appearance"
   | "reader"
@@ -23,9 +19,6 @@ export const SETTINGS_TABS: { id: SettingsSectionId; label: string }[] = [
 
 const SETTINGS_TAB_STORAGE_KEY = "gyroscope:settings-tab";
 
-/** The settings screen shows one section at a time (tabs); 見た目 is the
- * default so a first-time visitor lands on the same content the accordion
- * used to show opened. */
 export function loadSettingsTab(): SettingsSectionId {
   const saved = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
   if (!saved) return "appearance";
@@ -33,7 +26,6 @@ export function loadSettingsTab(): SettingsSectionId {
     const parsed = JSON.parse(saved) as unknown;
     if (SETTINGS_TABS.some((t) => t.id === parsed)) return parsed as SettingsSectionId;
   } catch {
-    // Malformed value -- fall back to the default below.
   }
   return "appearance";
 }

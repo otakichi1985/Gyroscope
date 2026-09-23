@@ -17,24 +17,12 @@ const MAX_LIST_HEIGHT_PX = 260;
 const MIN_LIST_HEIGHT_PX = 100;
 const POPUP_BORDER_PX = 2;
 
-// Same portal-positioned-popup architecture as FontPicker.tsx (see its own
-// doc comment for why a native <select> doesn't work here either: its
-// popup is an OS-level surface Chromium positions on its own, ignoring
-// this window's bounds). The other half of the motivation this time is
-// purely visual -- a native <select> popup can't be animated or styled at
-// all, which stood out as the one dropdown in this app that just snapped
-// open instantly while everything else here got a slide/fade treatment
-// (user feedback).
 export function FeedPicker({ feeds, filterFeedId, filterFolder, onSelectAll, onSelectFeed, onSelectFolder }: FeedPickerProps) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
 
-  // Groups feeds by their (optional) genre/folder so the popup can offer
-  // "this whole genre" as well as individual feeds -- feeds.folder is set
-  // per-feed in FeedManager.tsx (via the genre picker there) or via OPML
-  // import.
   const { folders, feedsByFolder, unfiledFeeds } = useMemo(() => {
     const byFolder = new Map<string, Feed[]>();
     const unfiled: Feed[] = [];
@@ -69,9 +57,6 @@ export function FeedPicker({ feeds, filterFeedId, filterFolder, onSelectAll, onS
     const spaceBelow = window.innerHeight - rect.bottom - GAP_PX;
     const spaceAbove = rect.top - GAP_PX;
     const openUpward = spaceBelow < MIN_LIST_HEIGHT_PX + POPUP_BORDER_PX && spaceAbove > spaceBelow;
-    // Never force the minimum height when the viewport genuinely has less
-    // room. Doing so pushes the fixed popup past the native window edge,
-    // where no amount of scrolling can reveal the clipped portion.
     const available = Math.max(
       0,
       Math.min(MAX_LIST_HEIGHT_PX, (openUpward ? spaceAbove : spaceBelow) - POPUP_BORDER_PX),
@@ -95,9 +80,6 @@ export function FeedPicker({ feeds, filterFeedId, filterFolder, onSelectAll, onS
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    // Scroll events are observed in the capture phase, so the popup's own
-    // overflow container arrives here too. Ignore those; otherwise the
-    // first wheel tick closes the list before it can actually scroll.
     function handleScroll(e: Event) {
       const target = e.target;
       if (target instanceof Node && listRef.current?.contains(target)) return;
@@ -129,15 +111,6 @@ export function FeedPicker({ feeds, filterFeedId, filterFolder, onSelectAll, onS
         ref={buttonRef}
         type="button"
         onClick={() => (open ? setOpen(false) : handleOpen())}
-        // No `backdrop-blur` on the trigger: it sits on `.panel-bg`, a
-        // fully opaque solid colour, so blurring it returns the same colour
-        // (see EntryRow.tsx for the full note). The popup below is the one
-        // place it earns its cost, since that really does overlap content.
-        // `min-w-36` (not min-w-0): in a narrow window the siblings keep their
-        // width (shrink-0) and would otherwise squeeze this trigger down to
-        // nothing, hiding the selected feed/genre (user report). With a floor
-        // it wraps onto its own line instead (the toolbar wraps) and stretches
-        // full width there via flex-1.
         className="picker-trigger flex min-w-36 flex-1 items-center justify-between gap-1 rounded border border-black/10 bg-black/5 px-2 py-1 text-left text-xs outline-none dark:border-white/10 dark:bg-white/5"
       >
         <span className="truncate">{selectedLabel}</span>
@@ -146,13 +119,6 @@ export function FeedPicker({ feeds, filterFeedId, filterFolder, onSelectAll, onS
       {open &&
         pos &&
         createPortal(
-          // Solid-ish translucent surface + blur rather than this app's
-          // .panel-bg/.accent-* skin-tinted utilities: those read CSS
-          // custom properties set inline on the App root div, which don't
-          // cascade into a document.body portal (same constraint as
-          // FontPicker.tsx). Frosted-glass look achieved with a plain
-          // fixed white/black tint instead, so it doesn't depend on that
-          // scope at all.
           <div
             ref={listRef}
             style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}

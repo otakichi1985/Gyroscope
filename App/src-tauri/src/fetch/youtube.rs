@@ -71,7 +71,10 @@ fn channel_id_from_channel_path(url: &Url) -> Option<String> {
     is_valid_channel_id(id).then(|| id.to_string())
 }
 
-fn fetch_page_html(client: &Client, url: &str) -> impl std::future::Future<Output = AppResult<String>> + Send {
+fn fetch_page_html(
+    client: &Client,
+    url: &str,
+) -> impl std::future::Future<Output = AppResult<String>> + Send {
     let client = client.clone();
     let url = url.to_string();
     async move {
@@ -86,7 +89,8 @@ fn fetch_page_html(client: &Client, url: &str) -> impl std::future::Future<Outpu
 
 async fn fetch_feed(client: &Client, channel_id: &str) -> AppResult<DiscoveredFeed> {
     let feed_url = feed_url_for_channel_id(channel_id);
-    let (body, etag, last_modified) = match fetch_conditional(client, &feed_url, None, None).await? {
+    let (body, etag, last_modified) = match fetch_conditional(client, &feed_url, None, None).await?
+    {
         FetchOutcome::Fetched {
             body,
             etag,
@@ -177,7 +181,9 @@ mod tests {
         ] {
             assert!(is_youtube_url(&Url::parse(raw).unwrap()), "{raw}");
         }
-        assert!(!is_youtube_url(&Url::parse("https://example.com/").unwrap()));
+        assert!(!is_youtube_url(
+            &Url::parse("https://example.com/").unwrap()
+        ));
     }
 
     #[test]
@@ -208,7 +214,9 @@ mod tests {
 
     #[test]
     fn resolves_meta_channel_id() {
-        let html = format!(r#"<html><head><meta itemprop="channelId" content="{CHANNEL_ID}"></head></html>"#);
+        let html = format!(
+            r#"<html><head><meta itemprop="channelId" content="{CHANNEL_ID}"></head></html>"#
+        );
         assert_eq!(
             resolve_channel_id_from_html(&html).as_deref(),
             Some(CHANNEL_ID)
@@ -217,7 +225,8 @@ mod tests {
 
     #[test]
     fn resolves_embedded_json_channel_id() {
-        let html = format!(r#"{{"responseContext":{{"x":1}},"channelId":"{CHANNEL_ID}","rest":2}}"#);
+        let html =
+            format!(r#"{{"responseContext":{{"x":1}},"channelId":"{CHANNEL_ID}","rest":2}}"#);
         assert_eq!(
             resolve_channel_id_from_html(&html).as_deref(),
             Some(CHANNEL_ID)
@@ -252,7 +261,11 @@ mod tests {
               </entry>
             </feed>"#
         );
-        let parsed = parse_feed(sample.as_bytes(), Some(&feed_url_for_channel_id(CHANNEL_ID))).unwrap();
+        let parsed = parse_feed(
+            sample.as_bytes(),
+            Some(&feed_url_for_channel_id(CHANNEL_ID)),
+        )
+        .unwrap();
         assert_eq!(parsed.title.as_deref(), Some("Example Channel"));
         assert_eq!(parsed.entries.len(), 1);
         assert_eq!(

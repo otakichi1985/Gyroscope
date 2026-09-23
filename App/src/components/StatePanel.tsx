@@ -1,16 +1,5 @@
 import type { ReactNode } from "react";
 
-/**
- * The centred icon + message (+ optional call to action) used for every
- * "there is nothing here" / "this failed" state in the app.
- *
- * These were all bare one-line `<p>` tags ("読み込み中...", "記事がありません",
- * the raw error string). Beyond looking unfinished, the empty cases were
- * actively unhelpful: a fresh install showed "記事がありません" with no hint
- * that what was missing was *feeds*, or where to add them. Centralised here
- * so the wording can stay specific per screen while the framing stays
- * identical everywhere.
- */
 export function StatePanel({
   icon,
   title,
@@ -25,8 +14,6 @@ export function StatePanel({
   tone?: "muted" | "error";
 }) {
   return (
-    // `state-panel` is a styling hook for floating skins, where this text
-    // would otherwise sit directly on the desktop with nothing behind it.
     <div className="state-panel flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
       <div className={tone === "error" ? "text-red-500" : "accent-text opacity-70"}>{icon}</div>
       <p className={`text-sm ${tone === "error" ? "text-red-500" : "opacity-80"}`}>{title}</p>

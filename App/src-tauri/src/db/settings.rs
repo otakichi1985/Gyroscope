@@ -1,12 +1,10 @@
-//! Thin key/value helpers over the `settings` table (created but unused
-//! since the v1 migration). First real consumer: the read-history retention
-//! setting (see `commands::settings::get_read_history_retention`).
-
 use rusqlite::{Connection, OptionalExtension};
 
 pub fn get(conn: &Connection, key: &str) -> rusqlite::Result<Option<String>> {
-    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| row.get(0))
-        .optional()
+    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
+        row.get(0)
+    })
+    .optional()
 }
 
 pub fn set(conn: &Connection, key: &str, value: &str) -> rusqlite::Result<()> {
@@ -39,7 +37,10 @@ mod tests {
     fn set_then_get_round_trips() {
         let conn = setup();
         set(&conn, "read_history_retention_days", "30").unwrap();
-        assert_eq!(get(&conn, "read_history_retention_days").unwrap(), Some("30".to_string()));
+        assert_eq!(
+            get(&conn, "read_history_retention_days").unwrap(),
+            Some("30".to_string())
+        );
     }
 
     #[test]

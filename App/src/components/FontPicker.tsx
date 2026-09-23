@@ -16,17 +16,6 @@ const MAX_LIST_HEIGHT_PX = 220;
 const MIN_LIST_HEIGHT_PX = 100;
 const POPUP_CHROME_PX = 32;
 
-/// A dropdown for the (potentially hundreds of entries long) system font
-/// list. A native <select> was used originally, but its popup is an
-/// OS-level surface that Chromium positions/sizes on its own -- it ignores
-/// the app window's bounds entirely and can render past the bottom edge of
-/// this small widget window (reported after the font list started coming
-/// from list_system_fonts, see SettingsOverlay.tsx / window/fonts.rs).
-/// This renders the list ourselves via a portal with an explicit fixed
-/// position/max-height computed from the trigger button and the window's
-/// own inner height, so it's guaranteed to stay inside the window -- plus a
-/// filter box, which a plain constrained list of hundreds of items would
-/// otherwise be painful to scroll through by mouse alone.
 export function FontPicker({
   value,
   options,
@@ -46,8 +35,6 @@ export function FontPicker({
     const spaceBelow = window.innerHeight - rect.bottom - GAP_PX;
     const spaceAbove = rect.top - GAP_PX;
     const openUpward = spaceBelow < MIN_LIST_HEIGHT_PX + POPUP_CHROME_PX && spaceAbove > spaceBelow;
-    // Reserve space for the filter input and popup borders, and never make
-    // the list taller than the viewport can actually show.
     const available = Math.max(
       0,
       Math.min(MAX_LIST_HEIGHT_PX, (openUpward ? spaceAbove : spaceBelow) - POPUP_CHROME_PX),
@@ -72,8 +59,6 @@ export function FontPicker({
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    // The settings panel scrolling should dismiss this fixed popup, but the
-    // font list's own scroll must remain usable.
     function handleScroll(e: Event) {
       const target = e.target;
       if (target instanceof Node && listRef.current?.contains(target)) return;
@@ -110,18 +95,6 @@ export function FontPicker({
       {open &&
         pos &&
         createPortal(
-          // Deliberately not using the .panel-bg/.accent-* skin-tinted
-          // utilities here: those rely on CSS custom properties set inline
-          // on the App root div, which only cascade to its own DOM
-          // descendants -- a document.body portal sits outside that
-          // subtree, so the variables wouldn't resolve. A plain solid
-          // surface (same as this app's overlays looked like before the
-          // skin-tinting pass) is the correct choice for a popup like this
-          // anyway, the same way a native <select> popup doesn't try to
-          // match the page's theme either. Translucent + blurred (not
-          // fully opaque) and `.dropdown-enter`-animated to match
-          // FeedPicker.tsx's later, identical treatment -- kept consistent
-          // between the app's two custom dropdowns.
           <div
             ref={listRef}
             style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}

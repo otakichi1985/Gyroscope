@@ -1,10 +1,5 @@
 import type { Entry } from "./types";
 
-/**
- * Extracts plain text from untrusted HTML via an inert DOMParser document
- * (no browsing context, so images never load and scripts never run) rather
- * than assigning to a live element's innerHTML.
- */
 export function stripHtml(html: string | null | undefined): string {
   if (!html) return "";
   const doc = new DOMParser().parseFromString(html, "text/html");

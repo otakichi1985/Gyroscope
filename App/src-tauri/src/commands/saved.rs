@@ -4,14 +4,6 @@ use tauri::State;
 use crate::db::Db;
 use crate::error::AppResult;
 
-/// Bookmarks saved from the discover ("探す") screen. They live here, not in
-/// `entries`, and are surfaced to the timeline's bookmark view as synthetic
-/// entries with negative ids (see commands::entries) so the starred view,
-/// trash, and restore treat them exactly like a normal starred entry.
-///
-/// `save_article` upserts by URL and un-trashes the row if the article was
-/// previously soft-deleted; `unsave_article` soft-deletes into the same
-/// 30-day trash window as `delete_entry`.
 #[tauri::command]
 pub fn save_article(
     db: State<'_, Db>,
@@ -43,8 +35,6 @@ pub fn unsave_article(db: State<'_, Db>, url: String) -> AppResult<()> {
     Ok(())
 }
 
-/// Active (not trashed) saved-article URLs, used by the discover screen to
-/// paint the ☆ state of its cards on mount.
 #[tauri::command]
 pub fn list_saved_article_urls(db: State<'_, Db>) -> AppResult<Vec<String>> {
     let conn = db.0.lock().unwrap();

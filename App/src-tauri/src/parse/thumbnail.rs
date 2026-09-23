@@ -1,10 +1,6 @@
 use feed_rs::model::Entry;
 use url::Url;
 
-/// Thumbnail priority per SPEC §2.3: `media:thumbnail` -> enclosure
-/// (`media:content` with an image type) -> first `<img>` in the body HTML.
-/// `og:image` is a deliberately separate, opt-in tier (it needs an extra
-/// HTTP request per article) and isn't implemented here.
 pub fn extract(
     entry: &Entry,
     content_html: Option<&str>,

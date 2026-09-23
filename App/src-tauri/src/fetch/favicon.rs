@@ -3,13 +3,6 @@ use url::Url;
 
 use super::client::{fetch_conditional, FetchOutcome};
 
-/// Best-effort site icon discovery, used as a thumbnail substitute for
-/// articles that have none of their own (`feeds.icon_path` existed in the
-/// schema from the start but was never populated -- see CLAUDE.md's known
-/// pitfalls). Two-tier, same spirit as `fetch::discovery::find_feed_link`:
-/// try the conventional `/favicon.ico` first (cheap, no HTML parse, works
-/// for a large fraction of sites), then fall back to parsing the site's
-/// `<head>` for a `<link rel="icon">`-family tag.
 pub async fn discover_favicon(client: &Client, site_url: &str) -> Option<String> {
     let base = Url::parse(site_url).ok()?;
     let root = base.join("/").ok()?;
@@ -26,9 +19,6 @@ pub async fn discover_favicon(client: &Client, site_url: &str) -> Option<String>
         }
     }
 
-    // OPML files in the wild often put the feed URL in htmlUrl as well as
-    // xmlUrl. Parsing that RSS document as HTML finds no <link rel=icon>,
-    // so retry the origin homepage before giving up.
     if base != root {
         let html = fetch_html(client, &root).await?;
         return find_icon_link(&html, &root);
@@ -36,9 +26,6 @@ pub async fn discover_favicon(client: &Client, site_url: &str) -> Option<String>
     None
 }
 
-/// Prefer a cheap HEAD request, but retry with GET because many otherwise
-/// valid sites reject HEAD with 403/405. `send()` leaves the body streaming,
-/// so the successful probe does not need to buffer the icon into memory.
 async fn resource_exists(client: &Client, url: &str) -> bool {
     if matches!(client.head(url).send().await, Ok(resp) if resp.status().is_success()) {
         return true;

@@ -2,9 +2,6 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import type { Entry } from "../lib/types";
 
-// Backs TrashOverlay.tsx -- deleted bookmarks (commands::entries::delete_entry)
-// stay recoverable here for 30 days (scheduler::BOOKMARK_TRASH_RETENTION_DAYS)
-// before the backend purges them for good.
 interface TrashState {
   entries: Entry[];
   loading: boolean;

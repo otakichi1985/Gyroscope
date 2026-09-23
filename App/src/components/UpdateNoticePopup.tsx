@@ -2,13 +2,6 @@ import { useUpdateStore } from "../stores/updateStore";
 import { useUiStore } from "../stores/uiStore";
 import { CloseIcon } from "./icons";
 
-/**
- * In-app notice shown when a background/manual check finds a newer version
- * (in ダウンロードまでおまかせ / 確認のみ modes -- おまかせ installs silently and
- * restarts on its own). Appears once per found version per launch: dismissing
- * it silences the notice for the session, but a still-pending update shows it
- * again on the next start (each launch re-checks) until it's actually applied.
- */
 export function UpdateNoticePopup() {
   const status = useUpdateStore((s) => s.status);
   const downloaded = useUpdateStore((s) => s.downloaded);

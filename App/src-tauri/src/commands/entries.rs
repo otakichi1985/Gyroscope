@@ -17,38 +17,23 @@ pub struct EntriesFilter {
     pub query: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
-    /// "asc" sorts oldest-first; anything else (including absent) keeps the
-    /// original newest-first order, so old callers/rows with no preference
-    /// saved yet behave exactly as before.
     pub sort_order: Option<String>,
 }
 
 const DEFAULT_LIMIT: i64 = 200;
 
-/// Synthetic entries for discover-saved bookmarks (commands::saved): each
-/// saved_articles row is exposed to the timeline as a fake entry with a
-/// negative id (-saved_articles.id), feed_id 0, the article URL as both guid
-/// and link, and is_read/is_starred pinned to 1 (a saved article is by
-/// definition a starred bookmark that's already "seen"). Column order matches
-/// ENTRY_COLUMNS so Entry::from_row maps it unchanged. The frontend branches
-/// on `id < 0` to open such rows in the system browser (no reader entry
-/// exists for them).
-const SAVED_ARTICLE_ENTRY_COLUMNS: &str = "-s.id, 0, s.url, s.title, s.url, NULL, s.snippet, NULL, \
+const SAVED_ARTICLE_ENTRY_COLUMNS: &str =
+    "-s.id, 0, s.url, s.title, s.url, NULL, s.snippet, NULL, \
      s.thumbnail_url, s.saved_at, s.saved_at, 1, 1, s.deleted_at";
 
-/// Turns free-text user input into a safe FTS5 `MATCH` query. Passing raw
-/// input straight to `MATCH` can throw a syntax error (quotes, colons,
-/// hyphens, etc. are all FTS5 query-language punctuation) -- instead, each
-/// whitespace-separated token is stripped down to alphanumerics (Unicode
-/// aware, so this keeps Japanese text intact) and turned into a prefix
-/// match, then joined with spaces (FTS5's default connector is AND).
-/// Returns `None` if nothing searchable is left (e.g. symbols-only input),
-/// so the caller can skip the search filter entirely rather than issuing a
-/// `MATCH ''` that errors.
 fn build_fts_query(input: &str) -> Option<String> {
     let tokens: Vec<String> = input
         .split_whitespace()
-        .map(|tok| tok.chars().filter(|c| c.is_alphanumeric()).collect::<String>())
+        .map(|tok| {
+            tok.chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+        })
         .filter(|tok| !tok.is_empty())
         .map(|tok| format!("{tok}*"))
         .collect();
@@ -65,9 +50,6 @@ pub fn list_entries(db: State<'_, Db>, filter: EntriesFilter) -> AppResult<Vec<E
 
     let fts_query = filter.query.as_deref().and_then(build_fts_query);
 
-    // Soft-deleted (bookmark trash, see delete_entry) entries never show up
-    // in any filter of the normal timeline -- only list_deleted_entries
-    // reaches them.
     let mut parts: Vec<String> = Vec::new();
     let mut bindings: Vec<Box<dyn ToSql>> = Vec::new();
 
@@ -93,11 +75,6 @@ pub fn list_entries(db: State<'_, Db>, filter: EntriesFilter) -> AppResult<Vec<E
     }
     parts.push(base);
 
-    // Discover-saved bookmarks (commands::saved) are only ever visible in the
-    // bookmarked view, and only when it isn't scoped to a feed or folder
-    // (they belong to no feed). They're always "read", so an unread-only
-    // filter drops them too. A plain LIKE match stands in for FTS here --
-    // saved_articles has no FTS index, and its volume is tiny.
     if filter.starred_only.unwrap_or(false)
         && filter.feed_id.is_none()
         && filter.folder.is_none()
@@ -116,15 +93,15 @@ pub fn list_entries(db: State<'_, Db>, filter: EntriesFilter) -> AppResult<Vec<E
         parts.push(saved);
     }
 
-    // The ORDER BY runs over the union, so it has to use the bare result
-    // column names from the first SELECT (no `e.` prefix -- `e` doesn't
-    // exist at this level).
     let order = if filter.sort_order.as_deref() == Some("asc") {
         "published_at ASC, id ASC"
     } else {
         "published_at DESC, id DESC"
     };
-    let sql = format!("{} ORDER BY {order} LIMIT ? OFFSET ?", parts.join(" UNION ALL "));
+    let sql = format!(
+        "{} ORDER BY {order} LIMIT ? OFFSET ?",
+        parts.join(" UNION ALL ")
+    );
     bindings.push(Box::new(filter.limit.unwrap_or(DEFAULT_LIMIT)));
     bindings.push(Box::new(filter.offset.unwrap_or(0)));
 
@@ -136,11 +113,6 @@ pub fn list_entries(db: State<'_, Db>, filter: EntriesFilter) -> AppResult<Vec<E
     Ok(entries)
 }
 
-/// Snapshots the entry (and its feed's display name) into `read_history` so
-/// "what I've read" survives the entry itself being auto-deleted or its
-/// feed removed (SPEC's 30-day old-entry cleanup). `ON CONFLICT DO NOTHING`
-/// keeps the first-read timestamp if the same entry is toggled unread/read
-/// again later, rather than spamming updates.
 fn record_read_history(conn: &Connection, entry_id: i64) -> AppResult<()> {
     conn.execute(
         "INSERT INTO read_history (feed_title, entry_guid, title, link, read_at) \
@@ -157,13 +129,13 @@ fn record_read_history(conn: &Connection, entry_id: i64) -> AppResult<()> {
 #[tauri::command]
 pub fn mark_entry_read(db: State<'_, Db>, id: i64, is_read: bool) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
-    // Saved-article synthetic rows (negative ids) have no read state -- the
-    // UPDATE below would simply match nothing, but skip early to avoid the
-    // pointless record_read_history call.
     if id < 0 {
         return Ok(());
     }
-    conn.execute("UPDATE entries SET is_read = ?1 WHERE id = ?2", params![is_read, id])?;
+    conn.execute(
+        "UPDATE entries SET is_read = ?1 WHERE id = ?2",
+        params![is_read, id],
+    )?;
     if is_read {
         record_read_history(&conn, id)?;
     }
@@ -174,11 +146,11 @@ pub fn mark_entry_read(db: State<'_, Db>, id: i64, is_read: bool) -> AppResult<(
 pub fn toggle_star(db: State<'_, Db>, id: i64, is_starred: bool) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
     if id < 0 {
-        // A saved-article synthetic row: starring/unstarring maps onto the
-        // save/unsave lifecycle -- unstarring soft-deletes it into the trash
-        // (same 30-day window as delete_entry), re-starring restores it.
         if is_starred {
-            conn.execute("UPDATE saved_articles SET deleted_at = NULL WHERE id = ?1", params![-id])?;
+            conn.execute(
+                "UPDATE saved_articles SET deleted_at = NULL WHERE id = ?1",
+                params![-id],
+            )?;
         } else {
             conn.execute(
                 "UPDATE saved_articles SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
@@ -195,13 +167,6 @@ pub fn toggle_star(db: State<'_, Db>, id: i64, is_starred: bool) -> AppResult<()
     Ok(())
 }
 
-/// Soft-deletes an entry (sets `deleted_at`) rather than removing the row --
-/// this is what backs the bookmark "ゴミ箱" (recoverable for
-/// `scheduler::BOOKMARK_TRASH_RETENTION_DAYS` days via `restore_entry`
-/// before `scheduler::cleanup_deleted_entries` purges it for good). The
-/// command itself is generic (not restricted to starred entries); the UI
-/// only exposes it from the bookmark-filtered view. Negative ids route to
-/// discover-saved bookmarks, which ride the same trash window.
 #[tauri::command]
 pub fn delete_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
@@ -224,10 +189,16 @@ pub fn delete_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
 pub fn restore_entry(db: State<'_, Db>, id: i64) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
     if id < 0 {
-        conn.execute("UPDATE saved_articles SET deleted_at = NULL WHERE id = ?1", params![-id])?;
+        conn.execute(
+            "UPDATE saved_articles SET deleted_at = NULL WHERE id = ?1",
+            params![-id],
+        )?;
         return Ok(());
     }
-    conn.execute("UPDATE entries SET deleted_at = NULL WHERE id = ?1", params![id])?;
+    conn.execute(
+        "UPDATE entries SET deleted_at = NULL WHERE id = ?1",
+        params![id],
+    )?;
     Ok(())
 }
 
@@ -249,8 +220,6 @@ pub fn list_deleted_entries(db: State<'_, Db>) -> AppResult<Vec<Entry>> {
 pub fn mark_all_read(db: State<'_, Db>, feed_id: Option<i64>) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
 
-    // Snapshot the still-unread rows into read_history *before* flipping
-    // is_read, same dedupe key/semantics as record_read_history above.
     let history_sql = "INSERT INTO read_history (feed_title, entry_guid, title, link, read_at) \
          SELECT COALESCE(f.custom_title, f.title, f.url), e.guid, e.title, e.link, \
                 strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
@@ -262,7 +231,10 @@ pub fn mark_all_read(db: State<'_, Db>, feed_id: Option<i64>) -> AppResult<()> {
                 &format!("{history_sql} AND e.feed_id = ?1 ON CONFLICT(feed_title, entry_guid) DO NOTHING"),
                 params![id],
             )?;
-            conn.execute("UPDATE entries SET is_read = 1 WHERE feed_id = ?1", params![id])?
+            conn.execute(
+                "UPDATE entries SET is_read = 1 WHERE feed_id = ?1",
+                params![id],
+            )?
         }
         None => {
             conn.execute(
@@ -278,22 +250,16 @@ pub fn mark_all_read(db: State<'_, Db>, feed_id: Option<i64>) -> AppResult<()> {
 #[tauri::command]
 pub fn mark_all_unread(db: State<'_, Db>, feed_id: Option<i64>) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
-    // No read_history write here -- unmarking is not "unreading": the fact
-    // an entry was read stays recorded (see record_read_history's doc).
     match feed_id {
-        Some(id) => conn.execute("UPDATE entries SET is_read = 0 WHERE feed_id = ?1", params![id])?,
+        Some(id) => conn.execute(
+            "UPDATE entries SET is_read = 0 WHERE feed_id = ?1",
+            params![id],
+        )?,
         None => conn.execute("UPDATE entries SET is_read = 0", [])?,
     };
     Ok(())
 }
 
-/// External articles opened from the discover ("探す") screen have no row in
-/// `entries`, so `record_read_history` never runs for them -- they were
-/// vanishing from 既読履歴 entirely. This snapshots such an article into
-/// `read_history` directly, keyed on (feed_title, url) the same way so a
-/// re-open keeps the original read_at. Best-effort by design: recording is
-/// incidental to opening the browser, so the frontend treats failure as
-/// non-fatal.
 #[tauri::command]
 pub fn record_external_read(
     db: State<'_, Db>,
@@ -312,13 +278,20 @@ pub fn record_external_read(
 }
 
 #[tauri::command]
-pub fn list_read_history(db: State<'_, Db>, limit: Option<i64>, offset: Option<i64>) -> AppResult<Vec<ReadHistoryEntry>> {
+pub fn list_read_history(
+    db: State<'_, Db>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> AppResult<Vec<ReadHistoryEntry>> {
     let conn = db.0.lock().unwrap();
     let mut stmt = conn.prepare(&format!(
         "SELECT {READ_HISTORY_COLUMNS} FROM read_history ORDER BY read_at DESC LIMIT ?1 OFFSET ?2"
     ))?;
     let entries: Result<Vec<_>, _> = stmt
-        .query_map(params![limit.unwrap_or(DEFAULT_LIMIT), offset.unwrap_or(0)], ReadHistoryEntry::from_row)?
+        .query_map(
+            params![limit.unwrap_or(DEFAULT_LIMIT), offset.unwrap_or(0)],
+            ReadHistoryEntry::from_row,
+        )?
         .collect();
     Ok(entries?)
 }
@@ -341,15 +314,18 @@ mod tests {
 
     #[test]
     fn strips_fts5_syntax_characters() {
-        // Quotes/colons/hyphens are FTS5 query-language punctuation --
-        // passed through unescaped they'd throw a MATCH syntax error rather
-        // than just failing to find anything.
-        assert_eq!(build_fts_query("\"foo\" bar:baz -qux"), Some("foo* barbaz* qux*".to_string()));
+        assert_eq!(
+            build_fts_query("\"foo\" bar:baz -qux"),
+            Some("foo* barbaz* qux*".to_string())
+        );
     }
 
     #[test]
     fn keeps_japanese_tokens() {
-        assert_eq!(build_fts_query("日本語 検索"), Some("日本語* 検索*".to_string()));
+        assert_eq!(
+            build_fts_query("日本語 検索"),
+            Some("日本語* 検索*".to_string())
+        );
     }
 
     #[test]

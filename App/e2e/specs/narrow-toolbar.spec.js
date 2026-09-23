@@ -1,10 +1,4 @@
-// Regression: timeline chrome must stay reachable when the window is shrunk
-// sideways (user report: controls clipped or squeezed unusable). Two layers:
-// flex-wrap lets controls flow onto a second line, and under ~560px the long
-// text labels collapse to icons via `.toolbar-label` (index.css).
-//
-// The window is resized and then restored to its exact prior size (captured
-// up front), so later specs and DPI-dependent baselines are unaffected.
+// 保存済みのウィンドウ幅に左右されないよう、広幅と狭幅をテスト内で明示する。
 
 const toolbarHasOverflowExpr = `(() => {
   const bar = document.querySelector(".timeline-toolbar");
@@ -30,6 +24,12 @@ describe("narrow window: toolbar collapses instead of clipping", () => {
     const size = await browser.getWindowSize();
     origW = size.width;
     origH = size.height;
+    await browser.setWindowSize(760, origH);
+    await browser.pause(600);
+    const probe = await browser.execute(toolbarHasOverflowExpr);
+    if (!probe.labelDisplay.some((d) => d !== "none")) {
+      throw new Error("labels should be visible before narrowing the window");
+    }
   });
 
   it("collapses labels and avoids overflow at 480px", async () => {
@@ -44,8 +44,7 @@ describe("narrow window: toolbar collapses instead of clipping", () => {
     if (probe.scrollW > probe.clientW + 1) {
       throw new Error(`toolbar overflows: scrollW=${probe.scrollW} clientW=${probe.clientW}`);
     }
-    // The feed/genre picker must keep a readable width instead of being
-    // squeezed to nothing by its shrink-0 siblings (user report).
+    // 可変幅の選択欄が、固定幅の操作群に押し潰されないことも確認する。
     if (probe.pickerW < 100) {
       throw new Error(`picker trigger squeezed too narrow: ${probe.pickerW}px`);
     }
@@ -54,12 +53,13 @@ describe("narrow window: toolbar collapses instead of clipping", () => {
     }
   });
 
-  it("restores labels at the original size", async () => {
-    await browser.setWindowSize(origW, origH);
+  it("restores labels at a wide size", async () => {
+    await browser.setWindowSize(760, origH);
     await browser.pause(600);
     const probe = await browser.execute(toolbarHasOverflowExpr);
     if (!probe.labelDisplay.some((d) => d !== "none")) {
-      throw new Error("labels should reappear at the original size");
+      throw new Error("labels should reappear at a wide size");
     }
+    await browser.setWindowSize(origW, origH);
   });
 });

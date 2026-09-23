@@ -1,0 +1,190 @@
+/* 一覧端を背景へ溶かし、scroll時の硬い切断を避ける。 */
+.entry-list-scroll {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 14px,
+    black calc(100% - 14px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+}
+
+/* 上端だけtoolbar背面へ延ばし、静止時の先頭位置と下端位置は変えない。 */
+.skin-floating .entry-list-scroll {
+
+  height: calc(100% + 64px);
+  margin-top: -64px;
+  padding-top: 68px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 64px,
+    black calc(100% - 14px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, transparent 0, black 64px, black calc(100% - 14px), transparent 100%);
+}
+
+/* OSのresize判定を奪わない視覚ガイド。強度だけをJSから受け取る。 */
+.resize-corner-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.resize-corner-guide {
+  position: absolute;
+  --corner-glow: 0;
+  opacity: var(--corner-glow);
+  border: 0 solid rgb(255 255 255 / 0.85);
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 0.35));
+}
+.resize-corner-guide-tl {
+  top: 0;
+  left: 0;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+.resize-corner-guide-tr {
+  top: 0;
+  right: 0;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+.resize-corner-guide-bl {
+  bottom: 0;
+  left: 0;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+.resize-corner-guide-br {
+  bottom: 0;
+  right: 0;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}
+
+/* DOMへ追加されたpopupだけを一度animationさせる。 */
+.dropdown-enter {
+  opacity: 1;
+  transform: scale(1);
+  transform-origin: top;
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out;
+}
+@starting-style {
+  .dropdown-enter {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* 狭幅では操作を隠さず、補助labelだけを省く。 */
+@media (max-width: 560px) {
+  .timeline-toolbar .toolbar-label,
+  .pane-bar .pane-hint {
+    display: none;
+  }
+}
+
+/* idle判定と座標はReact、描画だけをCSSが担う。 */
+.idle-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 800ms ease-out;
+}
+.idle-bg.idle-bg-active {
+  opacity: 1;
+}
+.idle-bg::before {
+  content: "";
+  position: absolute;
+  width: 140%;
+  height: 140%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgb(var(--accent-rgb-light) / 0.14), transparent 70%);
+  animation: idle-breathe 5s ease-in-out infinite;
+}
+.dark .idle-bg::before {
+  background: radial-gradient(circle, rgb(var(--accent-rgb-dark) / 0.17), transparent 70%);
+}
+.idle-bg.idle-corner-tl::before {
+  top: -40%;
+  left: -40%;
+}
+.idle-bg.idle-corner-tr::before {
+  top: -40%;
+  right: -40%;
+}
+.idle-bg.idle-corner-bl::before {
+  bottom: -40%;
+  left: -40%;
+}
+.idle-bg.idle-corner-br::before {
+  bottom: -40%;
+  right: -40%;
+}
+@keyframes idle-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+.idle-mode .entry-card {
+  animation: card-float 6s ease-in-out infinite;
+}
+.idle-mode .entry-card:nth-child(3n + 1) {
+  animation-delay: -1.3s;
+  animation-duration: 6.5s;
+}
+.idle-mode .entry-card:nth-child(3n + 2) {
+  animation-delay: -3.1s;
+  animation-duration: 5.5s;
+}
+.idle-mode .entry-card:nth-child(3n) {
+  animation-delay: -4.4s;
+  animation-duration: 7s;
+}
+@keyframes card-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2.5px);
+  }
+}
+
+/* pointer座標はCSS変数で受け、再描画範囲をこの層へ閉じ込める。 */
+.mouse-spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease-out;
+  background: radial-gradient(
+    circle 130px at var(--spot-x, 50%) var(--spot-y, 50%),
+    rgb(var(--accent-rgb-light) / 0.08),
+    transparent 70%
+  );
+}
+.mouse-spotlight.spotlight-active {
+  opacity: 1;
+}
+.dark .mouse-spotlight {
+  background: radial-gradient(
+    circle 130px at var(--spot-x, 50%) var(--spot-y, 50%),
+    rgb(var(--accent-rgb-dark) / 0.1),
+    transparent 70%
+  );
+}

@@ -1,35 +1,20 @@
 import { create } from "zustand";
 import type { SettingsSectionId } from "../lib/settingsTabs";
 
-// Single active-screen model rather than 3 independent booleans: the old
-// shape let feedManagerOpen/historyOpen/settingsOpen all be true at once,
-// so a screen opened earlier stayed mounted (and clickable) underneath
-// whichever one was opened last -- reported as "the settings panel isn't
-// visible but clicking still opens it". A single field makes overlapping
-// screens structurally impossible, and gives pressing the same icon again
-// an obvious meaning: go back to the timeline (home), not "undo one level".
 export type Screen = "timeline" | "feedManager" | "history" | "settings" | "trash" | "reader" | "discover";
+
+/* activeScreenを唯一の正本にし、複数画面の同時mountと背面clickを構造で防ぐ。 */
 
 export interface NavEntry {
   screen: Screen;
-  // Which entry the reader pane (Screen "reader") is showing. Only "reader"
-  // needs a payload alongside which screen is active -- the other screens
-  // are self-contained -- so this lives in the entry rather than its own field.
   readerEntryId: number | null;
 }
 
 interface UiState {
   activeScreen: Screen;
   readerEntryId: number | null;
-  // Back/forward history, primarily for the mouse side buttons (auxclick
-  // button 3 = back, 4 = forward). Every screen change pushes onto the
-  // stack; goBack/goForward move the `navIndex` cursor through it. Branching
-  // after going back truncates the forward tail, like a browser history.
   navStack: NavEntry[];
   navIndex: number;
-  // One-shot request for the settings screen to open on a specific tab
-  // (e.g. the update notice's "設定で確認" jumping straight to アップデート).
-  // Consumed and cleared by SettingsOverlay.
   pendingSettingsSection: SettingsSectionId | null;
   toggleScreen: (screen: Exclude<Screen, "timeline" | "reader">) => void;
   openReader: (entryId: number) => void;
@@ -69,8 +54,6 @@ export const useUiStore = create<UiState>((set) => ({
     })),
   openSettingsSection: (section) =>
     set((s) => {
-      // Don't push another history entry when settings is already the active
-      // screen -- switching tabs is not a navigation step.
       const base: Partial<UiState> = {
         activeScreen: "settings",
         readerEntryId: null,

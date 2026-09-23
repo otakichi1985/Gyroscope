@@ -20,10 +20,6 @@ enum StackEntry {
     Other,
 }
 
-/// Parses an OPML document into a flat list of feeds with their (innermost)
-/// folder, if any. Only one level of folder nesting is modeled -- our
-/// `feeds.folder` column is a single string, not a hierarchy -- so nested
-/// `<outline>` groups collapse to their innermost enclosing folder name.
 pub fn parse_opml(xml: &str) -> AppResult<Vec<OpmlFeed>> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
@@ -63,9 +59,6 @@ pub fn parse_opml(xml: &str) -> AppResult<Vec<OpmlFeed>> {
     Ok(feeds)
 }
 
-/// If `attrs` describes a feed, records it and returns `None` (nothing to
-/// push for a self-contained feed outline). If it describes a folder
-/// grouping (no `xmlUrl`), returns the stack entry to push for its children.
 fn push_outline(
     attrs: &BTreeMap<String, String>,
     stack: &[StackEntry],
@@ -103,7 +96,8 @@ fn is_outline_end(e: &BytesEnd) -> bool {
 fn read_attrs(e: &BytesStart, decoder: quick_xml::Decoder) -> AppResult<BTreeMap<String, String>> {
     let mut map = BTreeMap::new();
     for attr in e.attributes() {
-        let attr: Attribute = attr.map_err(|e| AppError::Other(format!("invalid OPML attribute: {e}")))?;
+        let attr: Attribute =
+            attr.map_err(|e| AppError::Other(format!("invalid OPML attribute: {e}")))?;
         let key = String::from_utf8_lossy(attr.key.as_ref()).to_string();
         let value = attr
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
@@ -114,8 +108,6 @@ fn read_attrs(e: &BytesStart, decoder: quick_xml::Decoder) -> AppResult<BTreeMap
     Ok(map)
 }
 
-/// Builds an OPML 2.0 document from the current feed list, grouping by
-/// folder (SPEC §2.1 export requirement).
 pub fn build_opml(feeds: &[Feed]) -> String {
     let mut ungrouped = Vec::new();
     let mut grouped: BTreeMap<String, Vec<&Feed>> = BTreeMap::new();
@@ -134,7 +126,10 @@ pub fn build_opml(feeds: &[Feed]) -> String {
         body.push_str(&outline_line(feed, 4));
     }
     for (folder, feeds) in &grouped {
-        body.push_str(&format!("    <outline text=\"{}\">\n", escape(folder.as_str())));
+        body.push_str(&format!(
+            "    <outline text=\"{}\">\n",
+            escape(folder.as_str())
+        ));
         for feed in feeds {
             body.push_str(&outline_line(feed, 6));
         }

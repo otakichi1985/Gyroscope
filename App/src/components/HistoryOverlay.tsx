@@ -26,13 +26,6 @@ export function HistoryOverlay() {
     [wheelRef, targetRef],
   );
 
-  // Was `useEffect(() => { refresh(); }, [refresh])` -- since `refresh` is a
-  // stable Zustand action reference, that effect only ever ran once, on this
-  // (always-mounted, see App.tsx) component's first mount. Opening History
-  // after that point kept showing whatever snapshot existed at app startup,
-  // never picking up entries read afterward (reported as "履歴が保存できて
-  // いない" -- the writes were fine, the panel just never re-fetched).
-  // Re-fetching on every activation (same pattern as TrashOverlay) fixes it.
   useEffect(() => {
     if (isActive) refresh();
   }, [isActive, refresh]);

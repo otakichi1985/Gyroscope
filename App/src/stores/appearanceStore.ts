@@ -8,19 +8,13 @@ export type ThemeMode = "system" | "light" | "dark";
 export type ReaderFontSize = "small" | "medium" | "large" | "xlarge";
 export type ReaderLineHeight = "tight" | "normal" | "loose";
 export type ReaderColumnWidth = "narrow" | "normal" | "wide";
-/** The article body's typeface: follow the app font, gothic (sans) or
- * mincho (serif). "app" inherits the global font setting so the reader does
- * not override a font the user chose for the whole app. */
+
 export type ReaderFontFamily = "app" | "sans" | "serif";
-/** Whether code/pre in the article keeps its own monospace face or follows
- * the body font. */
+
 export type ReaderCodeFont = "mono" | "body";
-/** A preset tint an element can be given (null = follow the current theme).
- * Presets are theme-adaptive so any choice stays readable on the current
- * surface -- see the `--reader-preset-*` palette in index.css. */
+
 export type ReaderColorPreset = "accent" | "text" | "muted" | "danger" | "warning" | "info" | "success";
-/** The reader elements whose meaning is inferred from the article HTML, each
- * independently colorable by the user (null = follow the current theme). */
+
 export type ReaderElementKey = "body" | "heading" | "quote" | "code" | "link";
 export type ReaderColors = Record<ReaderElementKey, ReaderColorPreset | null>;
 
@@ -73,8 +67,6 @@ interface StoredAppearance {
 }
 
 function loadAppearance(): StoredAppearance {
-  // These values mirror the appearance used while developing and reviewing
-  // the app, so a fresh install starts with the same polished presentation.
   const fallback: StoredAppearance = {
     opacity: 0.85,
     skinId: DEFAULT_SKIN_ID,
@@ -98,9 +90,6 @@ function loadAppearance(): StoredAppearance {
     readerFontFamily: "app",
     readerCodeFont: "mono",
     readerColors: { body: null, heading: null, quote: null, code: null, link: null },
-    // Defaults OFF: the wheel-glide was an addition on top of the actual
-    // request (scroll-to-top + Home/End/page keys), so new installs get the
-    // native wheel behaviour unless the user turns the glide on in Settings.
     smoothScroll: false,
   };
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -114,9 +103,6 @@ function loadAppearance(): StoredAppearance {
     const skinId = SKINS.some((s) => s.id === parsed.skinId) ? (parsed.skinId as string) : fallback.skinId;
     const cardSize = CARD_SIZES.includes(parsed.cardSize as CardSize) ? (parsed.cardSize as CardSize) : fallback.cardSize;
     const cardGap = CARD_GAPS.includes(parsed.cardGap as CardGap) ? (parsed.cardGap as CardGap) : fallback.cardGap;
-    // Before the Latin/Japanese split, one `fontId` controlled every script.
-    // Copy that legacy value into both new fields so existing installations
-    // keep exactly the same typography until the user changes either picker.
     const legacyFontId = typeof parsed.fontId === "string" ? parsed.fontId : "";
     const latinFontId =
       typeof parsed.latinFontId === "string" ? parsed.latinFontId : legacyFontId || fallback.latinFontId;
@@ -224,7 +210,7 @@ interface AppearanceState extends StoredAppearance {
   setReaderKeepOpacity: (value: boolean) => void;
   setReaderFontFamily: (value: ReaderFontFamily) => void;
   setReaderCodeFont: (value: ReaderCodeFont) => void;
-  /** null returns that element to the current theme's color. */
+
   setReaderColor: (key: ReaderElementKey, value: ReaderColorPreset | null) => void;
   setSmoothScroll: (value: boolean) => void;
 }

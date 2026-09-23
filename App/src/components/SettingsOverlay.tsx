@@ -167,7 +167,7 @@ const RETENTION_OPTIONS: { value: string; label: string }[] = [
 ];
 
 // 閲覧履歴（既読の記録、HistoryOverlay）だけを対象にした自動削除の保持期間。
-// 記事本体やブックマークには影響しない -- see scheduler::cleanup_read_history.
+// 記事本体やブックマークには影響しない。削除処理はscheduler::cleanup_read_historyが担う。
 function HistoryRetentionSection() {
   const [days, setDays] = useState<number | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -178,12 +178,6 @@ function HistoryRetentionSection() {
       .catch((e) => setError(String(e)));
   }, []);
 
-  // While `days` is still loading (undefined), show "無期限" rather than an
-  // empty string that matches none of the <option> values below --
-  // `Number("")` is 0, not NaN, so a stray change event firing against that
-  // unmatched blank value would have silently stored a 0-day retention
-  // (i.e. delete everything, every tick) instead of failing loudly.
-  // Disabling the <select> during that window closes the gap entirely.
   const value = days === undefined || days === null ? "unlimited" : String(days);
 
   const handleChange = async (next: string) => {
@@ -245,20 +239,11 @@ function UpdateSection({ onNoUpdate }: { onNoUpdate: () => void }) {
   } = useUpdateStore();
 
   useEffect(() => {
-    // `useAutoCheckForUpdate` already runs `loadStatic` once at startup,
-    // but this section can mount before that resolves, and a rollback
-    // performed earlier in the same session wouldn't otherwise refresh
-    // `backupVersion` here.
     loadStatic();
-    // Only on mount -- `loadStatic` itself is stable (zustand action), and
-    // re-running this on every store update would defeat the point.
   }, [loadStatic]);
 
   const busy = phase !== "idle";
 
-  // 今すぐ確認: run the check, and if it turns out we're already current,
-  // tell the user with the "更新はありません" dialog instead of leaving the
-  // press to end in a silent "最新バージョンです" line.
   const handleCheck = async () => {
     await check();
     if (useUpdateStore.getState().status?.kind === "upToDate") {
@@ -411,9 +396,6 @@ export function SettingsOverlay() {
     systemFonts,
   } = useSettingsController();
 
-  // Settings shows one section at a time (tabs) -- the 7 accordions had made
-  // the panel scroll-heavy, and the update-notice popup can also jump straight
-  // to the アップデート tab via uiStore.
   const pendingSettingsSection = useUiStore((s) => s.pendingSettingsSection);
   const clearPendingSettingsSection = useUiStore((s) => s.clearPendingSettingsSection);
   useEffect(() => {
@@ -422,8 +404,6 @@ export function SettingsOverlay() {
     clearPendingSettingsSection();
   }, [pendingSettingsSection, setActiveSection, clearPendingSettingsSection]);
 
-  // "更新はありません" dialog, raised by UpdateSection's 今すぐ確認 when the
-  // check finds nothing new. Auto-dismisses after a moment so it can't block.
   const [noUpdateOpen, setNoUpdateOpen] = useState(false);
   const noUpdateTimer = useRef<number | null>(null);
   const showNoUpdate = () => {
@@ -446,10 +426,7 @@ export function SettingsOverlay() {
   return (
     <ScreenOverlay screen="settings" title="設定">
       <div ref={settingsScrollRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 text-sm">
-        {/* Section tabs: one active at a time, so the panel stays short enough
-            to browse without scrolling through every section. The アップデート
-            tab carries the same "update available" dot as the settings icon in
-            FilterBar, so where to go is visible before opening the panel. */}
+
         <div className="flex flex-wrap items-center gap-1 border-b border-black/10 pb-2 dark:border-white/10">
           {SETTINGS_TABS.map(({ id, label }) => (
             <button
@@ -568,10 +545,6 @@ export function SettingsOverlay() {
             value={opacity}
             disabled={opacityDisabled}
             onChange={(e) => setOpacity(Number(e.target.value))}
-            // `accent-color` is the only hook a native range control offers
-            // for its fill; left unset it draws in the browser's own blue,
-            // which sat outside every skin's palette (caught on a screenshot
-            // of the amber-and-white SAO theme).
             className="range-input w-full disabled:opacity-40"
           />
           {opacityDisabled && (
@@ -761,9 +734,7 @@ export function SettingsOverlay() {
         )}
       </div>
 
-      {/* 更新はありません -- transient confirmation for 今すぐ確認 when the
-          check finds nothing new. Centered over the settings panel so it
-          can't be missed, and auto-dismisses (or OK) shortly after. */}
+
       {noUpdateOpen && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-4">
           <div className="panel-bg flex flex-col items-stretch gap-2 rounded-lg border border-black/15 p-4 text-sm shadow-xl ring-1 ring-black/5 dark:border-white/15 dark:ring-white/5">

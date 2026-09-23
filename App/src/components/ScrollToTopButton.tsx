@@ -2,17 +2,8 @@ import { useEffect, useState } from "react";
 import { activeScrollable, subscribeScrollables } from "../lib/scrollTarget";
 import { ArrowUpIcon } from "./icons";
 
-// A pane has to be scrolled past this many px before the button appears --
-// at the top there's nowhere to jump, so showing it would just be noise.
 const SHOW_AFTER_PX = 320;
 
-/**
- * Floating "back to top" button (user request: 一気に上に戻れる機能). Appears
- * over whichever content pane is on screen once it's scrolled down far
- * enough, and clicking it glides the pane back to the top. The pane is
- * resolved through the scrollable registry (scrollTarget.ts) so it always
- * targets the list/overlay the user is actually looking at.
- */
 export function ScrollToTopButton() {
   const [visible, setVisible] = useState(false);
 
@@ -23,9 +14,6 @@ export function ScrollToTopButton() {
         Boolean(el && el.scrollTop > SHOW_AFTER_PX && el.scrollHeight > el.clientHeight),
       );
     };
-    // Registry changes (screen switch, overlay open/close) swap which pane is
-    // active; the capture-phase scroll listener catches scrolls on whatever
-    // pane it happens to be.
     const unsubscribe = subscribeScrollables(refresh);
     window.addEventListener("scroll", refresh, true);
     refresh();

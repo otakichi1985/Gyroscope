@@ -1,18 +1,3 @@
-// Step one of the editing tool: point at the app, get back the few things
-// that are actually there. No editing yet -- if the list does not show what
-// you meant, nothing built on top of it would be worth having.
-//
-// Shape agreed with the user:
-// - the app stays live; holding Ctrl is what turns pointing on (same feel as
-//   holding space for the hand tool in CLIP STUDIO PAINT)
-// - click picks a spot, drag picks an area
-// - what comes back is a handful of rows in the app's own words
-//
-// Styled with inline styles on purpose. Tailwind scans source text, and a
-// file about styles is full of bare property names it would mistake for class
-// names -- index.css excludes this directory from that scan for the same
-// reason. Fixed colors, not skin colors, so the tool stays readable whichever
-// skin is being worked on.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -92,8 +77,6 @@ export function DevPointer() {
     };
   }, []);
 
-  // The capture layer sits over everything, so it has to step out of the way
-  // for the duration of the hit test or it would be the only thing found.
   const withoutLayer = useCallback(<T,>(run: () => T): T => {
     const layer = layerRef.current;
     const previous = layer?.style.pointerEvents ?? "";

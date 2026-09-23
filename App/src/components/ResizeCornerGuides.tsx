@@ -1,17 +1,5 @@
 import { useEffect, useRef } from "react";
 
-// Floating skins (see Skin.floating) render no window border at all, so the
-// native OS resize margin -- a handful of pixels that already works, same as
-// every other skin -- is invisible and effectively unfindable by feel alone
-// (user feedback). This never drives the resize itself (that's still the OS
-// hit-testing the raw window edge, unrelated to anything in the DOM); it only
-// paints a soft L-bracket on whichever corner the cursor is currently near.
-//
-// Corners only, not full edges: the reported friction was specifically
-// diagonal (corner) resizing, and a full-edge glow (an earlier version) drew
-// attention to edge-only resizing nobody had actually complained about
-// (user: "四つ角をドラッグして拡大縮小するときであって、上下左右のガイドは
-// あまりいらない").
 const PROXIMITY_PX = 48;
 const ARM_PX = 18;
 
@@ -33,9 +21,6 @@ export function ResizeCornerGuides() {
       return { tl: [0, 0], tr: [w, 0], bl: [0, h], br: [w, h] };
     }
 
-    // Written straight to the DOM via refs rather than React state, same
-    // reasoning as the mouse-spotlight in App.tsx: mousemove fires far too
-    // often to re-render on.
     function handleMove(e: MouseEvent) {
       const corners = cornerPositions();
       for (const corner of CORNERS) {
@@ -45,17 +30,6 @@ export function ResizeCornerGuides() {
         refs[corner].current?.style.setProperty("--corner-glow", strength.toFixed(3));
       }
     }
-    // The window's real border sits a few native, undecorated pixels beyond
-    // where the WebView's own client area ends -- reaching for the corner
-    // to actually grab it crosses out of that client area, which fires a
-    // DOM `mouseleave` indistinguishable from genuinely leaving the window.
-    // Zeroing every corner on any `mouseleave` (an earlier version) made
-    // the highlight vanish at the exact moment the user reached the corner
-    // to resize (user report). `e.clientX/clientY` is still the last real
-    // position, right at the edge, so only clear corners the pointer
-    // *wasn't* near -- the one it was near is presumably still being
-    // reached for and stays lit until a later `mousemove` (post-drag, or
-    // genuinely elsewhere) says otherwise.
     function handleLeave(e: MouseEvent) {
       const corners = cornerPositions();
       for (const corner of CORNERS) {

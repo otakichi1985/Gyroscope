@@ -42,9 +42,6 @@ const CODE_FONTS: { id: ReaderCodeFont; label: string }[] = [
   { id: "body", label: "本文に合わせる" },
 ];
 
-// The reader can infer the *role* of each piece of text from the article's
-// own markup (headings, quotes, code, links) -- so each role is offered as an
-// independently overridable color, with the current theme as the default.
 const COLOR_ROWS: { key: ReaderElementKey; label: string }[] = [
   { key: "body", label: "本文" },
   { key: "heading", label: "見出し" },
@@ -108,10 +105,6 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
   );
 }
 
-/// One colorable element (本文/見出し/引用/コード/リンク): a row of preset
-/// swatches plus a hollow "テーマの色" swatch to return to the theme. Presets
-/// are theme-adaptive (see lib/readerTheme.ts), so any tap lands on a color
-/// that stays readable on the current surface -- quicker than a free picker.
 function ColorRow({
   label,
   value,
@@ -167,11 +160,6 @@ function ColorRow({
   );
 }
 
-/// Shared controls for the reader's "文字設定" panel and the 設定 overlay's
-/// リーダー section -- both write to the same appearance store, so they stay
-/// in sync wherever the user adjusts them. The "不透明度を保つ" toggle only
-/// matters for floating skins (CSS-driven opacity); opaque skins use native
-/// window alpha that this app cannot raise per-screen, so it is hidden there.
 export function ReaderSettingsControls() {
   const store = useAppearanceStore();
   const floating = getSkin(store.skinId).floating === true;

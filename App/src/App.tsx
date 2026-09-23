@@ -31,10 +31,6 @@ import { useFeedsStore } from "./stores/feedsStore";
 import { getSecondaryEntriesStore, usePanesStore } from "./stores/panesStore";
 import { useUiStore } from "./stores/uiStore";
 
-// One of these gets picked at random each time idle starts (see the effect
-// below) -- a moving/drifting glow (an earlier version) read as too busy;
-// anchored to one corner, large and pulsing in place, is calmer (user
-// feedback: "not moving around, glowing bigger at an edge, heartbeat-like").
 const IDLE_PATTERNS = ["idle-corner-tl", "idle-corner-tr", "idle-corner-bl", "idle-corner-br"];
 
 const LATIN_UNICODE_RANGE =
@@ -44,18 +40,6 @@ const JAPANESE_UNICODE_RANGE =
 const TERMINAL_LATIN_FONTS = ["Cascadia Mono", "Consolas"];
 const TERMINAL_JAPANESE_FONTS = ["BIZ UDGothic", "Yu Gothic UI", "MS Gothic"];
 
-// Chromium matches @font-face src:local() against a font *face* name (full or
-// PostScript name), not reliably against the family name. The Yu family is a
-// known casualty -- verified on the dev machine's WebView2 (v151): the plain
-// family names "Yu Gothic UI" / "Yu Gothic" / "Yu Mincho" all fail to resolve
-// through local(), silently dropping the chosen font (the user's "changed the
-// font but nothing happens" report). The per-user SAO UI family hits the same
-// trap. Instead of a hand-maintained alias table, the real face names are
-// fetched once from Rust (list_font_face_names, which reads each font's name
-// table) and each family's src is expanded with them; the plain family name is
-// kept last as a fallback, and every font whose family name doubles as its
-// face name (Arial, Meiryo, MS Gothic, BIZ UDGothic, ...) still resolves
-// through that alone.
 function safeFontName(name: string) {
   return name.replace(/[\\"<>\r\n]/g, "").trim();
 }
@@ -115,11 +99,6 @@ function App() {
   const isIdle = useIdleTimer();
 
   useEffect(() => {
-    // The feed manager used to be the only place that loaded the feed list.
-    // That left the timeline with a stale/empty in-memory list when a
-    // portable update or another process changed the database while the app
-    // was already running. Load the navigation data at app start and resync
-    // it when the window becomes active again.
     const syncFeeds = () => {
       void refreshFeeds();
       void refreshGenres();
@@ -130,11 +109,6 @@ function App() {
     return () => window.removeEventListener("focus", syncFeeds);
   }, [refreshFeeds, refreshGenres]);
 
-  // Mouse side buttons navigate between screens: button 3 (the "back" side
-  // button) steps back through the screen history, button 4 (the "forward"
-  // one) steps forward. preventDefault stops Chromium's own back/forward
-  // behaviour from fighting ours. `auxclick` fires only for non-primary
-  // buttons, so normal clicks are unaffected.
   useEffect(() => {
     function handleAuxClick(e: MouseEvent) {
       if (e.button === 3) {
@@ -153,12 +127,6 @@ function App() {
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
-  // Real face names per installed font family (see src/lib/systemFonts.ts),
-  // fetched once at startup so the split-font @font-face src lists can carry
-  // the names local() actually matches -- not just the family names, which
-  // silently fail for Yu/SAO-style families. Until this resolves (a few
-  // hundred ms), src falls back to the plain family name, then re-renders
-  // with the face names when the map arrives.
   const [faceNames, setFaceNames] = useState<FontFaceNameMap>({});
   useEffect(() => {
     let cancelled = false;
@@ -170,17 +138,6 @@ function App() {
     };
   }, []);
   const skin = getSkin(skinId);
-  // Terminal is designed as a dark CRT surface. Resolve it as dark without
-  // overwriting the user's saved display-mode preference, so switching to a
-  // different skin restores the mode they had chosen before.
-  //
-  // Cardinality and Ordinary force *light* for the mirror-image reason: both
-  // are built around white floating panels carrying dark text. Ordinary ran
-  // as forced-dark until reference stills showed the Augma interface is
-  // predominantly white -- white circular controls, white information cards,
-  // hairline white arcs -- so every `dark:` variant in the overlays was
-  // fighting the theme rather than serving it. The chrome that sits directly
-  // over the desktop is re-lit to white in CSS instead (see .skin-ordinary).
   const forcedLight = skin.visualStyle === "cardinality" || skin.visualStyle === "ordinary";
   const isDark =
     skin.visualStyle === "terminal" ||
@@ -205,19 +162,8 @@ function App() {
     }
   }, [isIdle]);
 
-  // Cursor-following spotlight (user feedback) -- written straight to the
-  // DOM via a ref rather than React state, since mousemove fires far too
-  // often to re-render on. `active` (shown/hidden) is the only piece that
-  // needs to be actual React state, since it changes rarely (enter/leave)
-  // rather than continuously.
   const spotlightRef = useRef<HTMLDivElement>(null);
   const [spotlightActive, setSpotlightActive] = useState(false);
-  // The spotlight repaints a full-window gradient on every mousemove, and on
-  // a per-pixel-alpha (floating) window each repaint re-composites the whole
-  // window -- expensive enough that a burst of mousemove events stalled input
-  // and WebDriver commands (a single click measured ~23s in a floating skin).
-  // Coalesce updates to one per animation frame and read layout once per
-  // frame instead of once per event.
   const spotlightRaf = useRef<number | null>(null);
   const spotlightPos = useRef({ x: 0, y: 0 });
   function handleSpotlightMove(e: React.MouseEvent<HTMLDivElement>) {
@@ -249,25 +195,13 @@ function App() {
     }
   }
 
-  // Floating skins (see Skin.floating) deliberately have no backdrop and no
-  // panel surface, and carry their opacity in CSS instead of native window
-  // alpha -- so the "no vibrancy means force it solid" rule below doesn't
-  // apply to them: there is nothing to look bare, that *is* the design.
   const floating = skin.floating === true;
-  // No vibrancy backdrop means nothing but the raw desktop sits behind this
-  // window -- forcing full opacity here keeps that case looking solid
-  // instead of a very plain flat-colored window with no blur to soften it.
   const alpha = vibrancy === "none" && !floating ? 1 : opacity;
-  // Before useSyncWindowOpacity on purpose: Rust needs to know the mode
-  // before it is handed an alpha to interpret under it.
   useSyncFloatingMode(floating);
   useSyncWindowOpacity(alpha);
   useSyncAlwaysOnTop(alwaysOnTop);
   useSyncMinimizeToTray(minimizeToTray);
   useAutoCheckForUpdate();
-  // Home/End/PageUp/PageDown scroll the active content pane (see
-  // usePageScrollKeys). Hook-level, not per-screen, so it works everywhere
-  // without each overlay wiring its own key handler.
   usePageScrollKeys();
 
   const terminalStyle = skin.visualStyle === "terminal";
@@ -298,10 +232,6 @@ function App() {
     "--panel-rgb-dark": skin.dark,
     "--accent-rgb-light": skin.accentLight,
     "--accent-rgb-dark": skin.accentDark,
-    // Only meaningful while floating: with no native window alpha in play,
-    // every plate multiplies its own fill by this so the opacity slider
-    // still does something -- and here a CSS alpha genuinely reaches the
-    // desktop rather than just tinting Mica's blur.
     ...(floating ? { "--float-alpha": alpha } : {}),
     ...(latinSources.length > 0 || japaneseSources.length > 0
       ? { fontFamily: resolvedFontFamilies.join(", ") }
@@ -313,9 +243,6 @@ function App() {
     <div
       style={panelStyle}
       onPointerDown={handleRootPointerDown}
-      // The inset ring reads as a window edge, which is the one thing a
-      // floating HUD must not have -- dropped along with the panel fill
-      // (the fill itself is cleared in CSS, see .skin-floating).
       className={`${isDark ? "dark" : ""} ${skinStyleClass} ${floating ? "skin-floating" : "ring-1 ring-inset ring-black/10 dark:ring-white/10"} ${isIdle ? "app-idle" : ""} panel-bg relative isolate flex h-screen w-screen flex-col overflow-hidden text-neutral-900 dark:text-neutral-100`}
     >
       {splitFontCss && <style>{splitFontCss}</style>}
@@ -328,20 +255,8 @@ function App() {
           ))}
         </div>
       )}
-      {/* Cardinality deliberately renders no background decoration. It used
-          to hang a connection rail down the left gutter with link lines
-          branching off it, on the reasoning that the reference chains its
-          panels together -- but in the source those connectors run *between
-          panels that are actually there*, and reproduced as loose lines over
-          an empty background they only read as stray rules (user: not
-          wanted). The connection language now lives where it belongs: on the
-          pointer pair flanking the selected rail button. */}
-      {/* Augma's framing, taken from reference stills: two hairline white
-          arcs spanning the full width -- one near the top, one near the
-          bottom, both sagging slightly at the centre -- with a small ring
-          sitting at the low point of the upper one. That is the whole of it;
-          the corner brackets and the coloured orbit rings that used to be
-          here were inventions and are gone. */}
+
+
       {skin.visualStyle === "ordinary" && (
         <div className="ordinary-hud" aria-hidden="true">
           <span className="ordinary-arc ordinary-arc-top" />
@@ -353,31 +268,16 @@ function App() {
       {titleBarVisible && <TitleBar />}
       <FilterBar />
       <div className="app-content relative min-h-0 flex-1">
-        {/* `absolute inset-0` (not `h-full`) matches how the overlay
-            siblings below are sized, and gives EntryList's own `h-full` a
-            definite-height ancestor to resolve against. Inert while any
-            overlay is open -- overlays only visually cover this area, they
-            never disabled it, so Tab-focus (and, before FilterBar's own fix,
-            stray clicks) could still reach hidden rows underneath. */}
+
         <div className="timeline-pane absolute inset-0 flex flex-col" inert={!isTimeline}>
           <PaneBar />
-          {/* Dual-pane split (see panesStore): single-pane DOM stays a single
-              flex column, so rendering and scrolling are unchanged until the
-              second pane is opened. Each pane owns its own entries store
-              (filter + list); the top FilterBar search/bookmark keeps driving
-              the first (left/top) pane. */}
+
           <div
             className={`flex min-h-0 flex-1 ${dualPane && paneDirection === "column" ? "flex-col" : "flex-row"}`}
           >
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <TimelineToolbar />
-              {/* `idle-mode` cascades down to every `.entry-card` (EntryRow.tsx)
-                  for the idle sway -- see index.css. `onMouseMove` here (not on
-                  a separate overlay) is what lets the spotlight track the
-                  cursor without ever sitting on top of the rows and blocking
-                  their own hover/click handling: this container has normal
-                  pointer-events, the rows stay directly interactive, and
-                  mousemove simply bubbles up through them to this handler. */}
+
               <div
                 className={`relative min-h-0 flex-1 ${isIdle ? "idle-mode" : ""}`}
                 onMouseMove={handleSpotlightMove}
@@ -386,11 +286,7 @@ function App() {
               >
                 <EntryList />
                 <div ref={spotlightRef} className={`mouse-spotlight ${spotlightActive ? "spotlight-active" : ""}`} aria-hidden="true" />
-                {/* Ambient idle background -- the timeline looked a little
-                    lifeless left untouched for a while (user feedback). Always
-                    mounted, just faded to opacity-0 until useIdleTimer flips
-                    true, and pointer-events-none so it can never intercept a
-                    click/hover meant for the rows underneath. */}
+
                 <div className={`idle-bg ${idlePattern} ${isIdle ? "idle-bg-active" : ""}`} aria-hidden="true" />
               </div>
             </div>
@@ -415,11 +311,7 @@ function App() {
             )}
           </div>
         </div>
-        {/* Always mounted (not conditionally rendered): each overlay reads
-            uiStore's activeScreen itself and animates in/out via CSS, which
-            is what makes screen switches slide/fade instead of instantly
-            replacing each other, and guarantees only one screen is ever
-            interactive at a time -- see each overlay's own isActive logic. */}
+
         <FeedManagerOverlay />
         <DiscoverOverlay />
         <HistoryOverlay />
@@ -427,16 +319,11 @@ function App() {
         <ReaderOverlay />
         <SettingsOverlay />
       </div>
-      {/* In-app update notice -- a sibling of the overlays so it floats above
-          every screen, not just the settings one. */}
+
       <UpdateNoticePopup />
-      {/* Floating "back to top" button, above the overlays but below the
-          update notice. */}
+
       <ScrollToTopButton />
-      {/* Dev-only pointing tool (src/dev-tools). `import.meta.env.DEV` is
-          replaced with a literal at build time, so the whole subtree -- and
-          the import above with it -- is dropped from the production bundle;
-          index.css additionally keeps its text out of Tailwind's scan. */}
+
       {import.meta.env.DEV && <DevPointer />}
     </div>
   );

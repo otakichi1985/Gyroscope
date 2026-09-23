@@ -21,9 +21,12 @@ fn write_known_genres(conn: &Connection, names: &[String]) -> AppResult<()> {
 #[tauri::command]
 pub fn list_genres(db: State<'_, Db>) -> AppResult<Vec<String>> {
     let conn = db.0.lock().unwrap();
-    let mut set: std::collections::BTreeSet<String> = read_known_genres(&conn)?.into_iter().collect();
+    let mut set: std::collections::BTreeSet<String> =
+        read_known_genres(&conn)?.into_iter().collect();
     let mut stmt = conn.prepare("SELECT DISTINCT folder FROM feeds WHERE folder IS NOT NULL")?;
-    let used: Vec<String> = stmt.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?;
+    let used: Vec<String> = stmt
+        .query_map([], |r| r.get(0))?
+        .collect::<Result<_, _>>()?;
     set.extend(used);
     Ok(set.into_iter().collect())
 }
@@ -47,7 +50,10 @@ pub fn create_genre(db: State<'_, Db>, name: String) -> AppResult<()> {
 #[tauri::command]
 pub fn delete_genre(db: State<'_, Db>, name: String) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
-    conn.execute("UPDATE feeds SET folder = NULL WHERE folder = ?1", params![name])?;
+    conn.execute(
+        "UPDATE feeds SET folder = NULL WHERE folder = ?1",
+        params![name],
+    )?;
     let mut names = read_known_genres(&conn)?;
     names.retain(|n| n != &name);
     write_known_genres(&conn, &names)?;

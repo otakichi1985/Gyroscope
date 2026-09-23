@@ -1,4 +1,3 @@
-// Mirrors src-tauri/src/db/models.rs (serde default: field names as-is, snake_case).
 export interface Feed {
   id: number;
   url: string;
@@ -18,7 +17,6 @@ export interface Feed {
   source_type: "rss" | "booth";
 }
 
-// Mirrors src-tauri/src/db/models.rs::Entry.
 export interface Entry {
   id: number;
   feed_id: number;
@@ -36,13 +34,11 @@ export interface Entry {
   deleted_at: string | null;
 }
 
-// Mirrors src-tauri/src/commands/opml.rs::OpmlImportSummary.
 export interface OpmlImportSummary {
   added: number;
   skipped: number;
 }
 
-// Mirrors src-tauri/src/db/models.rs::ReadHistoryEntry.
 export interface ReadHistoryEntry {
   id: number;
   feed_title: string;
@@ -51,7 +47,6 @@ export interface ReadHistoryEntry {
   read_at: string;
 }
 
-// Mirrors src-tauri/src/commands/search.rs::ScoredSource.
 export interface ScoredSource {
   title: string;
   url: string;
@@ -66,13 +61,11 @@ export interface ScoredSource {
   reasons: string[];
 }
 
-// Mirrors src-tauri/src/commands/search.rs::SearchCategory.
 export interface SearchCategory {
   slug: string;
   label: string;
 }
 
-// Mirrors src-tauri/src/paths.rs::DataDirInfo.
 export interface DataDirInfo {
   path: string;
   is_portable: boolean;

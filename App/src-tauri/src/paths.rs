@@ -1,24 +1,3 @@
-//! Resolves where the SQLite database lives, and lets the user redirect it.
-//!
-//! Two independent axes:
-//! - **Portable vs. installed**: detected via a `.portable` marker file
-//!   placed next to the executable (see `npm run package:portable`, which
-//!   creates it). This is opt-in and file-presence-based on purpose: every
-//!   existing install (NSIS/MSI) and every `cargo build`/`npm run tauri dev`
-//!   run has no marker, so the default data location (`app_data_dir`) is
-//!   byte-for-byte unchanged unless someone deliberately builds/ships a
-//!   portable package.
-//! - **Custom override**: a user-chosen directory, settable from the
-//!   Settings screen regardless of portable/installed. Persisted as a
-//!   pointer file (just the chosen path as text) so it survives restarts.
-//!   In portable mode the pointer file itself lives next to the exe, so a
-//!   portable package with a custom path stays self-contained when moved.
-//! - **Env override (`GYROSCOPE_DATA_DIR`)**: takes precedence over both of
-//!   the above. Not surfaced in the UI; exists so the E2E harness
-//!   (`scripts/run-e2e.mjs`) can launch a debug build against its own
-//!   throwaway database instead of the human's real one, which would
-//!   otherwise be written to by two processes at once.
-
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -42,13 +21,13 @@ pub fn is_portable() -> bool {
     exe_dir().join(PORTABLE_MARKER).is_file()
 }
 
-/// Where the override pointer file (and, in portable mode, the default
-/// `data/` directory) lives.
 fn config_dir(app: &AppHandle) -> PathBuf {
     if is_portable() {
         exe_dir()
     } else {
-        app.path().app_config_dir().expect("no app config dir available")
+        app.path()
+            .app_config_dir()
+            .expect("no app config dir available")
     }
 }
 
@@ -56,7 +35,9 @@ pub fn default_data_dir(app: &AppHandle) -> PathBuf {
     if is_portable() {
         exe_dir().join("data")
     } else {
-        app.path().app_data_dir().expect("no app data dir available")
+        app.path()
+            .app_data_dir()
+            .expect("no app data dir available")
     }
 }
 
@@ -64,9 +45,6 @@ fn override_pointer_path(app: &AppHandle) -> PathBuf {
     config_dir(app).join(OVERRIDE_POINTER_FILE)
 }
 
-/// Highest-priority data directory override (see the module docs): set via
-/// the `GYROSCOPE_DATA_DIR` environment variable. Used by the E2E harness to
-/// keep a debug build on its own throwaway database.
 fn env_override() -> Option<PathBuf> {
     std::env::var_os("GYROSCOPE_DATA_DIR")
         .filter(|v| !v.is_empty())
@@ -79,9 +57,6 @@ fn read_override(app: &AppHandle) -> Option<PathBuf> {
     (!trimmed.is_empty()).then(|| PathBuf::from(trimmed))
 }
 
-/// Writes (or, for `None`, clears) the persisted custom data directory.
-/// Takes effect on next launch -- the open `rusqlite::Connection` isn't
-/// relocated live, see `commands::settings::restart_app`.
 pub fn set_override(app: &AppHandle, dir: Option<&Path>) -> io::Result<()> {
     let pointer = override_pointer_path(app);
     match dir {
@@ -103,11 +78,6 @@ fn ensure_writable(dir: &Path) -> io::Result<()> {
     std::fs::remove_file(&probe)
 }
 
-/// Info surfaced to the frontend (Settings screen). Mirrors this project's
-/// existing convention of not swallowing errors (see `feeds.last_error`):
-/// a custom directory that's become unusable (e.g. an unplugged external
-/// drive) falls back to the default rather than crashing the app, and the
-/// reason is reported back rather than silently discarded.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DataDirInfo {
     pub path: String,
@@ -117,12 +87,6 @@ pub struct DataDirInfo {
     pub fallback_reason: Option<String>,
 }
 
-/// The effective data directory, without `resolve`'s side effects: `resolve`
-/// runs `ensure_writable` (which creates+deletes a `.write-test` probe file)
-/// because the Settings screen needs to know whether a custom dir still works.
-/// The dev-only exit logger (`diag`) is the only caller, so it is gated to
-/// debug builds like `diag` itself (keeps release builds free of a dead_code
-/// warning, since nothing outside `#[cfg(debug_assertions)]` references it).
 #[cfg(debug_assertions)]
 pub fn effective_data_dir(app: &AppHandle) -> PathBuf {
     if let Some(dir) = env_override() {
@@ -184,10 +148,6 @@ pub fn resolve(app: &AppHandle) -> DataDirInfo {
     }
 }
 
-/// Validates `new_dir` and, unless it already has a database of its own
-/// (the user pointing at pre-existing data), copies the current live
-/// database into it via SQLite's online backup API -- safe to run while
-/// `conn` is open and potentially mid-write, unlike a raw file copy.
 pub fn migrate_into(conn: &Connection, new_dir: &Path) -> Result<(), String> {
     ensure_writable(new_dir).map_err(|e| format!("指定したフォルダを使用できません: {e}"))?;
 
@@ -196,9 +156,10 @@ pub fn migrate_into(conn: &Connection, new_dir: &Path) -> Result<(), String> {
         return Ok(());
     }
 
-    let mut dest = Connection::open(&dest_db).map_err(|e| format!("保存先データベースを作成できません: {e}"))?;
-    let backup =
-        rusqlite::backup::Backup::new(conn, &mut dest).map_err(|e| format!("データの移行に失敗しました: {e}"))?;
+    let mut dest = Connection::open(&dest_db)
+        .map_err(|e| format!("保存先データベースを作成できません: {e}"))?;
+    let backup = rusqlite::backup::Backup::new(conn, &mut dest)
+        .map_err(|e| format!("データの移行に失敗しました: {e}"))?;
     backup
         .run_to_completion(5, Duration::from_millis(50), None)
         .map_err(|e| format!("データの移行に失敗しました: {e}"))

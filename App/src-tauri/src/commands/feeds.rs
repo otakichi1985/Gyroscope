@@ -3,6 +3,8 @@ use tauri::{AppHandle, State};
 use tauri_plugin_notification::NotificationExt;
 use url::Url;
 
+use super::feed_queries::{fetch_feed_by_id, tags_for_feed, unread_count};
+use super::feed_source::{is_booth_shop_host, validate_url};
 use crate::db::models::{Feed, NewEntry, FEED_COLUMNS};
 use crate::db::{upsert_entries, Db};
 use crate::error::{AppError, AppResult};
@@ -10,12 +12,7 @@ use crate::fetch::booth::{self, BoothItem, BoothScrapeError, BoothScrapeResult};
 use crate::fetch::client::{fetch_conditional, FetchOutcome};
 use crate::fetch::{discovery, favicon, HttpClient};
 use crate::parse::feed::parse_feed;
-use super::feed_source::{is_booth_shop_host, validate_url};
-use super::feed_queries::{fetch_feed_by_id, tags_for_feed, unread_count};
 
-/// BOOTH default refresh interval -- longer than the global 30-minute RSS
-/// default (`scheduler::DEFAULT_INTERVAL_MIN`). Polling a scraped page as
-/// aggressively as a normal feed risks tripping Cloudflare.
 const BOOTH_DEFAULT_INTERVAL_MIN: i64 = 60;
 fn booth_item_to_entry(item: &BoothItem) -> NewEntry {
     NewEntry {
@@ -80,9 +77,6 @@ pub async fn add_feed(
         }
     }
 
-    // Best-effort: a feed with no discoverable site icon just keeps
-    // icon_path NULL (frontend shows no thumbnail substitute for it),
-    // same as any other missing-image case -- never fails the add itself.
     let icon_path = match &parsed.site_url {
         Some(site_url) => favicon::discover_favicon(&client.0, site_url).await,
         None => None,
@@ -103,29 +97,11 @@ pub async fn add_feed(
         ],
     )?;
     let feed_id = conn.last_insert_rowid();
-    // Discarded: a brand-new feed's entire initial batch is trivially "new"
-    // and notify_enabled defaults to false for feeds that don't exist yet,
-    // so there's nothing to notify about on first import anyway.
     let _ = upsert_entries(&conn, feed_id, &parsed.entries)?;
 
     fetch_feed_by_id(&conn, feed_id)
 }
 
-/// BOOTH counterpart to the RSS path above in `add_feed`. Scrapes the shop
-/// once up front (same as discovering+parsing a feed for the first time),
-/// then immediately marks that whole initial batch read: a shop's existing
-/// catalog isn't "news" the way a fresh RSS feed's backlog is, only
-/// products that appear on a *later* scan should. This is a direct
-/// `UPDATE`, not `commands::entries::mark_all_read` -- that command also
-/// snapshots into `read_history`, and logging the entire catalog as "just
-/// read" there would be wrong (the user never actually read any of it).
-///
-/// `notify_enabled` defaults to on here specifically (every other feed
-/// defaults to off) -- unlike a general RSS subscription, the whole point
-/// of watching a BOOTH shop is to be alerted the moment something new
-/// shows up, so an opt-in-then-remember-to-flip-a-toggle default would
-/// undercut the feature. Still editable per-feed afterward, same as any
-/// other feed's notify toggle.
 async fn add_booth_feed(app: &AppHandle, db: &Db, shop_url: Url) -> AppResult<Feed> {
     let result: BoothScrapeResult = booth::scrape_shop(app, shop_url.as_str())
         .await
@@ -173,22 +149,6 @@ pub fn list_feeds(db: State<'_, Db>) -> AppResult<Vec<Feed>> {
     Ok(feeds)
 }
 
-/// Manual "update" button (`refresh_feed`) and the periodic auto-refresh
-/// (`crate::scheduler`) both go through this: conditional GET, and on
-/// failure the error is stored on the feed row rather than propagated, so
-/// the UI can show a per-feed warning icon instead of losing the rest of
-/// the timeline (SPEC §7 -- errors must be visible, never swallowed).
-///
-/// Also returns how many entries were genuinely new (not just re-fetched),
-/// so batch callers can report a total "N new" (or "no updates") count.
-///
-/// Emitting "feeds-updated" is left to the callers rather than done here,
-/// so a batch refresh (`scheduler::refresh_many`) can emit once for the
-/// whole batch instead of once per feed.
-/// Writes a BOOTH scrape's outcome to the DB and returns (new entries,
-/// whether the feed's own content changed) -- the shape
-/// `refresh_feed_inner` needs to decide on notifications/favicon lookup
-/// afterward, same contract as `apply_rss_outcome` below.
 fn apply_booth_outcome(
     conn: &Connection,
     id: i64,
@@ -217,9 +177,6 @@ fn apply_booth_outcome(
     }
 }
 
-/// RSS counterpart to `apply_booth_outcome` above -- this is the original
-/// `refresh_feed_inner` body, extracted unchanged so both sources can share
-/// the notification/favicon tail that follows.
 fn apply_rss_outcome(
     conn: &Connection,
     id: i64,
@@ -298,9 +255,6 @@ pub(crate) async fn refresh_feed_inner(
     };
     let is_booth = source_type == "booth";
 
-    // The network-bound part happens before the DB lock is taken, same as
-    // the plain-RSS path always did -- only one of these two actually runs
-    // a request, gated by `is_booth`.
     let booth_outcome = if is_booth {
         Some(booth::scrape_shop(app, &url).await)
     } else {
@@ -330,8 +284,6 @@ pub(crate) async fn refresh_feed_inner(
             } else {
                 format!("{}件の新着記事", new_entries.len())
             };
-            // Best-effort: a notification failure (e.g. OS permission denied)
-            // must not fail the refresh itself.
             let _ = app
                 .notification()
                 .builder()
@@ -340,11 +292,6 @@ pub(crate) async fn refresh_feed_inner(
                 .show();
         }
 
-        // BOOTH feeds skip favicon discovery entirely: it's a plain reqwest
-        // request, which Cloudflare would just block the same way it blocks
-        // a bare feed fetch. A BOOTH shop's icon instead comes from the
-        // scrape itself (see apply_booth_outcome), re-attempted on every
-        // successful scrape until it succeeds.
         let favicon_site_url = if feed_content_changed && !is_booth {
             conn.query_row(
                 "SELECT site_url FROM feeds WHERE id = ?1 AND icon_path IS NULL",
@@ -360,9 +307,6 @@ pub(crate) async fn refresh_feed_inner(
     };
     let new_count = new_entries.len();
 
-    // OPML imports register feeds without doing network work. Discover the
-    // favicon on their first successful refresh so the card fallback works
-    // immediately, rather than only after the next full app restart.
     if let Some(site_url) = favicon_site_url {
         if let Some(icon_path) = favicon::discover_favicon(client, &site_url).await {
             let conn = db.0.lock().unwrap();

@@ -10,12 +10,6 @@ const VIEW_MODES: { mode: ViewMode; label: string }[] = [
   { mode: "compact", label: "コンパクト" },
 ];
 
-// Feed/genre scope and display mode both used to live in FilterBar, mixed
-// in with search/mark-all-read/screen-nav controls -- moved here, directly
-// above EntryList (see App.tsx), since unlike those, both only ever affect
-// what the timeline shows and how it's arranged, and conventionally a
-// list's own scope/display controls sit right on top of the list itself
-// (user feedback).
 export function TimelineToolbar({ useStore = useEntriesStore }: { useStore?: EntriesStoreHook }) {
   const feeds = useFeedsStore((s) => s.feeds);
   const refreshFeeds = useFeedsStore((s) => s.refresh);
@@ -32,10 +26,6 @@ export function TimelineToolbar({ useStore = useEntriesStore }: { useStore?: Ent
     sortOrder,
     setSortOrder,
   } = useStore();
-  // Transient "更新はありません" toast -- a manual refresh that silently
-  // finds nothing new was indistinguishable from a broken/no-op button
-  // (user feedback). Only for the manual trigger; the scheduler's silent
-  // tick stays silent even when it finds nothing, same as before.
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -54,14 +44,8 @@ export function TimelineToolbar({ useStore = useEntriesStore }: { useStore?: Ent
   }
 
   return (
-    // flex-wrap: narrow windows wrap the controls onto a second line instead
-    // of clipping them unreachable (user report). Long labels additionally
-    // collapse to icons under ~560px via `.toolbar-label` (index.css).
     <div className="timeline-toolbar flex shrink-0 flex-wrap items-center gap-1 border-b border-black/10 px-2 py-1 text-xs dark:border-white/10">
-      {/* Moved here from FilterBar's icon cluster -- an icon-only button
-          sitting among bookmark/search/nav icons was too easy to hit by
-          accident (user feedback). Paired with a text label and given its
-          own row/left position instead, away from the denser icon row above. */}
+
       <div className="relative shrink-0">
         <button
           type="button"
@@ -70,11 +54,7 @@ export function TimelineToolbar({ useStore = useEntriesStore }: { useStore?: Ent
         >
           <RefreshIcon className={`h-4 w-4 ${refreshingAll ? "animate-spin" : ""}`} />
           <span className="toolbar-label">記事を更新</span>
-          {/* Background-activity pulse, moved here next to the button it's
-              actually about (was floating in FilterBar's icon row, which
-              read as unrelated to this button -- user feedback). Reserves
-              its slot even when idle so the button doesn't shift width
-              when it turns on. */}
+
           <span
             className={`h-1.5 w-1.5 shrink-0 rounded-full accent-bg transition-opacity duration-300 ${
               backgroundRefreshing ? "opacity-100 animate-pulse" : "opacity-0"
@@ -89,11 +69,7 @@ export function TimelineToolbar({ useStore = useEntriesStore }: { useStore?: Ent
         )}
       </div>
 
-      {/* Custom dropdown (FeedPicker.tsx) instead of a native <select> --
-          the native popup can't be positioned to the window bounds
-          (same reasoning FontPicker.tsx already documents) or animated at
-          all, which stood out next to the rest of this app's animated
-          dropdowns/overlays (user feedback). */}
+
       <FeedPicker
         feeds={feeds}
         filterFeedId={filterFeedId}
@@ -103,18 +79,7 @@ export function TimelineToolbar({ useStore = useEntriesStore }: { useStore?: Ent
         onSelectFolder={(folder) => setFilterFolder(folder)}
       />
 
-      {/* Text+icon toggle, not icon-only -- an icon-only glyph here got
-          silently swept into the nav rail's circular icon-badge styling
-          (`.icon-button`, shared with FilterBar's bookmark/search/history
-          buttons), which resizes/recolors on hover for an entirely
-          different purpose and had no business on a toolbar action button
-          (user: "ボタンしか使わないのにサイズが可変する変な背景"). Styled
-          like the 記事を更新 button next to it (`pill-button`, no
-          `icon-button`) instead. The label itself flips between 昇順/降順
-          on every click (user: wanted the text to switch, not just the
-          icon) since this is a frequently-used control where the current
-          state should be legible at a glance, not just inferable from a
-          rotated arrow. */}
+
       <button
         type="button"
         onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}

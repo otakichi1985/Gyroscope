@@ -5,10 +5,6 @@ use tauri::{AppHandle, Manager, State, WebviewWindow};
 use crate::error::AppResult;
 use crate::window::vibrancy::FloatingMode;
 
-/// The last alpha byte (0-255) applied via `apply()`. Windows can drop a
-/// layered window's alpha on certain size transitions (observed: maximizing
-/// resets it to fully opaque), so callers re-apply this value whenever the
-/// window is resized -- see the `WindowEvent::Resized` handler in lib.rs.
 pub struct LastOpacity(pub Mutex<u8>);
 
 impl Default for LastOpacity {
@@ -17,16 +13,6 @@ impl Default for LastOpacity {
     }
 }
 
-/// True window-level opacity (blends the whole window -- including
-/// whatever Mica/Acrylic itself rendered -- against everything actually
-/// behind it: desktop, other apps). This is a different mechanism from the
-/// panel's own CSS background color: Tauri/tao expose no window-opacity API
-/// on Windows, so setting `background-color: rgb(.. / alpha)` on a div only
-/// blends our color against the backdrop *material* (Mica's own blur), not
-/// against the real desktop -- it can never look "more see-through than
-/// Mica already is". Genuine transparency needs a raw `WS_EX_LAYERED` +
-/// `SetLayeredWindowAttributes` call, same style as the Win32 calls already
-/// used in `vibrancy.rs`.
 #[cfg(target_os = "windows")]
 pub fn apply(window: &WebviewWindow, alpha_byte: u8) -> AppResult<()> {
     use raw_window_handle::HasWindowHandle;
@@ -52,7 +38,9 @@ pub fn apply(window: &WebviewWindow, alpha_byte: u8) -> AppResult<()> {
             SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED as isize);
         }
         if SetLayeredWindowAttributes(hwnd, 0, alpha_byte, LWA_ALPHA) == 0 {
-            return Err(AppError::Other("SetLayeredWindowAttributes failed".to_string()));
+            return Err(AppError::Other(
+                "SetLayeredWindowAttributes failed".to_string(),
+            ));
         }
     }
     Ok(())
@@ -63,16 +51,6 @@ pub fn apply(_window: &WebviewWindow, _alpha_byte: u8) -> AppResult<()> {
     Ok(())
 }
 
-/// Drops `WS_EX_LAYERED` entirely, handing alpha back to the webview.
-///
-/// Needed by floating mode (`vibrancy::FloatingMode`): a layered window set
-/// up through `SetLayeredWindowAttributes(LWA_ALPHA)` gets one constant alpha
-/// applied to the whole window, which is exactly the wrong tool once the
-/// window is meant to be transparent in some places and solid in others. With
-/// the style removed, the transparent window's per-pixel alpha (WebView2
-/// composites straight into DWM) is what reaches the screen, and the opacity
-/// slider is applied in CSS instead -- the one situation where a CSS alpha
-/// genuinely reaches the desktop rather than just tinting Mica's blur.
 #[cfg(target_os = "windows")]
 pub fn clear_layered(window: &WebviewWindow) -> AppResult<()> {
     use raw_window_handle::HasWindowHandle;
@@ -105,16 +83,6 @@ pub fn clear_layered(_window: &WebviewWindow) -> AppResult<()> {
     Ok(())
 }
 
-/// Re-applies the last requested opacity after a window-state transition
-/// that Windows may have taken as a cue to reset a layered window's alpha.
-///
-/// Three such transitions have shown up in practice (resize/maximize, the
-/// always-on-top toggle, and tray show/hide) and each needed the same two
-/// checks, so they share this entry point. Expect to need it again: any new
-/// state toggle that makes DWM recompose the window is a candidate.
-///
-/// Does nothing while floating -- the window is intentionally not layered
-/// there, and re-applying would collapse it back to one constant alpha.
 pub fn restore(app: &AppHandle, window: &WebviewWindow) {
     let floating = app
         .try_state::<FloatingMode>()
@@ -137,8 +105,6 @@ pub fn set_window_opacity(
     alpha: f64,
 ) -> AppResult<()> {
     let alpha_byte = (alpha.clamp(0.0, 1.0) * 255.0).round() as u8;
-    // Recorded even while floating, so leaving a floating skin can restore
-    // the value the slider is actually sitting at.
     *state.0.lock().unwrap() = alpha_byte;
     if *floating.0.lock().unwrap() {
         return Ok(());
@@ -146,13 +112,6 @@ pub fn set_window_opacity(
     apply(&window, alpha_byte)
 }
 
-/// Wraps Tauri's own `set_always_on_top` and immediately re-applies the last
-/// opacity afterwards. The always-on-top toggle goes through Win32
-/// `SetWindowPos(HWND_TOPMOST/NOTOPMOST)` under the hood, which -- like
-/// resizing -- can reset a layered window's alpha; unlike resizing, it
-/// doesn't fire `WindowEvent::Resized`, so the existing reapply-on-resize
-/// hook in lib.rs never catches it (found via user report: opacity snapped
-/// back to 100% specifically when toggling this, fixed by a resize).
 #[tauri::command]
 pub fn set_always_on_top(
     window: WebviewWindow,
@@ -165,9 +124,6 @@ pub fn set_always_on_top(
     window
         .set_always_on_top(value)
         .map_err(|e| AppError::Other(e.to_string()))?;
-    // Nothing to restore while floating: the window is deliberately not
-    // layered there, and re-applying would silently switch the whole window
-    // back to one constant alpha.
     if *floating.0.lock().unwrap() {
         return Ok(());
     }

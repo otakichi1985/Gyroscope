@@ -1,0 +1,82 @@
+.skin-terminal.panel-bg,
+/* geometry変更を許す唯一のskin。色だけのskinへ波及させない。 */
+.skin-terminal .panel-bg {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0,
+    transparent 3px,
+    rgb(7 15 10 / 0.035) 3px,
+    rgb(7 15 10 / 0.035) 4px
+  );
+}
+.dark.skin-terminal.panel-bg,
+.dark.skin-terminal .panel-bg {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0,
+    transparent 3px,
+    rgb(74 246 38 / 0.035) 3px,
+    rgb(74 246 38 / 0.035) 4px
+  );
+}
+.skin-terminal :where(button, input, select, .entry-card) {
+  border-radius: 2px;
+}
+.skin-terminal .toggle-thumb,
+.skin-terminal .skin-swatch-frame {
+  border-radius: 1px;
+}
+
+.skin-terminal > :not(.terminal-data-stream):not(.scroll-to-top-btn):not(.update-notice):not(.resize-corner-guides) {
+  position: relative;
+  z-index: 1;
+}
+/* animation対象を固定要素へ限定し、記事cardの継続再描画を避ける。 */
+.terminal-data-stream {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  color: rgb(var(--accent-rgb-dark));
+  opacity: 0.07;
+  pointer-events: none;
+}
+.terminal-data-stream span {
+  position: absolute;
+  top: 0;
+  writing-mode: vertical-rl;
+  font-family: "RssWidgetLatin", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  line-height: 1;
+  letter-spacing: 0.55em;
+  word-break: break-all;
+  transform: translateY(calc(-100% - 32px));
+  animation-name: terminal-data-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+@keyframes terminal-data-fall {
+  0% {
+    transform: translateY(calc(-100% - 32px));
+  }
+  72%,
+  100% {
+    transform: translateY(calc(100vh + 32px));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-data-stream {
+    opacity: 0.035;
+  }
+  .terminal-data-stream span {
+    animation: none;
+    transform: translateY(-12%);
+    will-change: auto;
+  }
+}
+
+/* 暗色skinのON track上でthumbを識別できる色へ反転する。 */
+.dark .toggle-on .toggle-thumb {
+  background-color: rgb(var(--panel-rgb-dark));
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.28), 0 1px 2px rgb(0 0 0 / 0.35);
+}

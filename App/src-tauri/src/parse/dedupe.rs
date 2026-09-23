@@ -1,13 +1,5 @@
 use chrono::{DateTime, Utc};
 
-/// Effective dedup key stored in `entries.guid`, per SPEC §2.2:
-/// guid -> link -> title+published fallback.
-///
-/// `guid` must already be `None` when the source feed had no real
-/// `<guid>`/`<id>` element -- see `parse::feed`, which configures feed-rs's
-/// id generator to leave `Entry::id` empty in that case instead of letting
-/// the crate synthesize one, so this function (not feed-rs) owns the
-/// fallback behaviour the spec asks for.
 pub fn dedupe_key(
     guid: Option<&str>,
     link: Option<&str>,
@@ -36,7 +28,12 @@ mod tests {
 
     #[test]
     fn prefers_guid() {
-        let key = dedupe_key(Some("guid-1"), Some("https://example.com/a"), Some("A"), None);
+        let key = dedupe_key(
+            Some("guid-1"),
+            Some("https://example.com/a"),
+            Some("A"),
+            None,
+        );
         assert_eq!(key, "guid-1");
     }
 

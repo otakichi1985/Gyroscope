@@ -1,0 +1,265 @@
+/* app chromeはDOM追加時だけ上から順に現れる。 */
+.skin-ordinary .app-titlebar,
+.skin-ordinary .app-filterbar,
+.skin-ordinary .timeline-toolbar {
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    translate 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.skin-ordinary .app-filterbar {
+  transition-delay: 70ms;
+}
+.skin-ordinary .timeline-toolbar {
+  transition-delay: 140ms;
+}
+@starting-style {
+  .skin-ordinary .app-titlebar,
+  .skin-ordinary .app-filterbar,
+  .skin-ordinary .timeline-toolbar {
+    opacity: 0;
+    translate: 0 -6px;
+  }
+}
+
+.skin-ordinary .icon-button.accent-bg-soft {
+  position: relative;
+}
+.skin-ordinary .icon-button.accent-bg-soft::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--ord-amber));
+  pointer-events: none;
+  animation: ordinary-tap-ring 520ms ease-out both;
+}
+@keyframes ordinary-tap-ring {
+  from {
+    opacity: 0.85;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+.skin-ordinary .entry-card::before {
+  transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.skin-ordinary .entry-card:hover::before {
+  width: 64px;
+}
+
+.skin-ordinary .screen-overlay:not([inert])::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--ordinary-cyan)) 45%,
+    rgb(var(--ordinary-blue)) 55%,
+    transparent
+  );
+  pointer-events: none;
+  animation: ordinary-edge-sweep 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes ordinary-edge-sweep {
+  from {
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.skin-ordinary .ordinary-reticle {
+  animation:
+    ordinary-reticle-drift 14s linear infinite,
+    ordinary-reticle-breathe 6s ease-in-out infinite;
+}
+@keyframes ordinary-reticle-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skin-ordinary .icon-button.accent-bg-soft::after,
+  .skin-ordinary .screen-overlay:not([inert])::after,
+  .skin-ordinary .ordinary-reticle {
+    animation: none;
+  }
+
+  .skin-ordinary .icon-button.accent-bg-soft::after,
+  .skin-ordinary .screen-overlay:not([inert])::after {
+    display: none;
+  }
+}
+
+/* 一覧更新ごとに既存行を動かさず、新しくmountされたcardだけを対象にする。 */
+.skin-floating .list-reveal .entry-card,
+.skin-floating .list-reveal .entry-compact {
+  animation: card-reveal 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.skin-floating .list-reveal > div > div:nth-child(3n + 1) { --reveal-x: -4px; }
+.skin-floating .list-reveal > div > div:nth-child(3n + 2) { --reveal-x: 3px; }
+.skin-floating .list-reveal > div > div:nth-child(3n) { --reveal-x: -2px; }
+.skin-floating .list-reveal > div > div:nth-child(1) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(1) .entry-compact { animation-delay: 0ms; }
+.skin-floating .list-reveal > div > div:nth-child(2) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(2) .entry-compact { animation-delay: 45ms; }
+.skin-floating .list-reveal > div > div:nth-child(3) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(3) .entry-compact { animation-delay: 90ms; }
+.skin-floating .list-reveal > div > div:nth-child(4) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(4) .entry-compact { animation-delay: 135ms; }
+.skin-floating .list-reveal > div > div:nth-child(5) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(5) .entry-compact { animation-delay: 180ms; }
+.skin-floating .list-reveal > div > div:nth-child(6) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(6) .entry-compact { animation-delay: 225ms; }
+.skin-floating .list-reveal > div > div:nth-child(7) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(7) .entry-compact { animation-delay: 270ms; }
+.skin-floating .list-reveal > div > div:nth-child(n + 8) .entry-card,
+.skin-floating .list-reveal > div > div:nth-child(n + 8) .entry-compact { animation-delay: 315ms; }
+
+.skin-cardinality .list-reveal .entry-card,
+.skin-cardinality .list-reveal .entry-compact {
+  animation-name: card-reveal-drop;
+}
+@keyframes card-reveal-drop {
+  from {
+    opacity: 0;
+    translate: var(--reveal-x, 0) -6px;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes card-reveal {
+  from {
+    opacity: 0;
+    translate: var(--reveal-x, 0) 4px;
+    scale: 0.995;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+.skin-floating.app-idle {
+  scale: 0.985;
+}
+.skin-floating {
+  scale: 1;
+  transition: scale 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.skin-floating.app-idle .app-titlebar,
+.skin-floating.app-idle .app-filterbar,
+.skin-floating.app-idle .timeline-toolbar {
+  animation: block-sway-a 23s ease-in-out infinite;
+}
+.skin-floating.app-idle .entry-list-scroll {
+  animation: block-sway-b 31s ease-in-out -11s infinite;
+}
+@keyframes block-sway-a {
+  0% {
+    translate: -3px -2px;
+  }
+  33% {
+    translate: 3px -3px;
+  }
+  66% {
+    translate: 4px 3px;
+  }
+  100% {
+    translate: -3px -2px;
+  }
+}
+@keyframes block-sway-b {
+  0% {
+    translate: 3px 3px;
+  }
+  33% {
+    translate: -4px 1px;
+  }
+  66% {
+    translate: -2px -4px;
+  }
+  100% {
+    translate: 3px 3px;
+  }
+}
+
+.skin-ordinary.app-idle .ordinary-hud {
+  animation: float-counter-drift 26s ease-in-out infinite;
+}
+@keyframes float-counter-drift {
+  0% {
+    transform: translate3d(2px, 1px, 0);
+  }
+  25% {
+    transform: translate3d(-1px, 3px, 0);
+  }
+  50% {
+    transform: translate3d(-3px, -1px, 0);
+  }
+  75% {
+    transform: translate3d(1px, -3px, 0);
+  }
+  100% {
+    transform: translate3d(2px, 1px, 0);
+  }
+}
+
+/* motion無効時もcardやHUDを非表示の開始状態へ残さない。 */
+@media (prefers-reduced-motion: reduce) {
+  .skin-floating .list-reveal .entry-card,
+  .skin-floating .list-reveal .entry-compact,
+  .skin-floating.app-idle .app-titlebar,
+  .skin-floating.app-idle .app-filterbar,
+  .skin-floating.app-idle .timeline-toolbar,
+  .skin-floating.app-idle .entry-list-scroll,
+  .skin-ordinary.app-idle .ordinary-hud {
+    animation: none;
+  }
+  .skin-floating.app-idle {
+    scale: 1;
+  }
+
+  .skin-floating .list-reveal .entry-card,
+  .skin-floating .list-reveal .entry-compact {
+    opacity: 1;
+    translate: none;
+    scale: none;
+  }
+}

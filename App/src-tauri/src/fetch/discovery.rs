@@ -14,10 +14,6 @@ pub struct DiscoveredFeed {
     pub last_modified: Option<String>,
 }
 
-/// Resolves a user-supplied URL to an actual feed. If it's already a feed,
-/// uses it directly; otherwise treats the response as an HTML page and
-/// follows `<link rel="alternate" type="application/{rss,atom}+xml">`
-/// (SPEC §2.1).
 pub async fn discover(client: &Client, input_url: &Url) -> AppResult<DiscoveredFeed> {
     if youtube::is_youtube_url(input_url) {
         return youtube::resolve(client, input_url).await;
@@ -55,8 +51,6 @@ async fn fetch_once(
             etag,
             last_modified,
         } => Ok((body, etag, last_modified)),
-        // A first request never sends conditional headers, so a server
-        // returning 304 here would be non-compliant; treat it as empty.
         FetchOutcome::NotModified => Ok((Vec::new(), None, None)),
     }
 }

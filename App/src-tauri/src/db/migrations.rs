@@ -1,10 +1,6 @@
 use rusqlite::Connection;
 
-/// Schema migrations, applied in order and tracked via `PRAGMA user_version`.
-/// Each entry is the full SQL for that version; add new entries to the end
-/// rather than editing existing ones once shipped.
 const MIGRATIONS: &[&str] = &[
-    // v1: initial schema
     r#"
     CREATE TABLE feeds (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,10 +56,6 @@ const MIGRATIONS: &[&str] = &[
         value TEXT NOT NULL
     );
     "#,
-    // v2: read history -- deliberately not a foreign key to entries/feeds,
-    // since entries get auto-deleted after 30 days (SPEC data model) and
-    // feeds can be deleted outright; this table snapshots what's needed to
-    // still show "what I've read" after the source row is gone.
     r#"
     CREATE TABLE read_history (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,15 +68,6 @@ const MIGRATIONS: &[&str] = &[
     );
     CREATE INDEX idx_read_history_read_at ON read_history(read_at DESC);
     "#,
-    // v3: full-text search (SPEC §2.3). `body_text` is HTML-stripped plain
-    // text computed in Rust at upsert time (see parse::text::strip_html /
-    // db::upsert_entries) -- SQLite itself has no HTML-stripping function,
-    // so it can't be derived purely in SQL/triggers. `entries_fts` is an
-    // external-content FTS5 table (indexes entries.title/body_text without
-    // duplicating them into the FTS table's own storage); the three
-    // triggers keep it in sync automatically on every insert/update/delete
-    // so callers never have to remember to touch the index themselves --
-    // this is SQLite's own recommended pattern for external-content tables.
     r#"
     ALTER TABLE entries ADD COLUMN body_text TEXT;
 
@@ -104,29 +87,12 @@ const MIGRATIONS: &[&str] = &[
         INSERT INTO entries_fts(rowid, title, body_text) VALUES (new.id, new.title, new.body_text);
     END;
     "#,
-    // v4: soft-delete for bookmarked entries (user-facing "ゴミ箱"). Deleting
-    // a starred entry sets deleted_at instead of removing the row outright,
-    // so it can be restored; scheduler::cleanup_deleted_entries hard-deletes
-    // rows past a fixed 30-day buffer. `list_entries` excludes non-null rows
-    // unconditionally so deleted entries vanish from every filter, not just
-    // the bookmark view.
     r#"
     ALTER TABLE entries ADD COLUMN deleted_at TEXT;
     "#,
-    // v5: BOOTH shop monitoring. `source_type` distinguishes an RSS/Atom
-    // feed from a scraped BOOTH shop -- see fetch::booth and
-    // commands::feeds::refresh_feed_inner's branch on this column. Existing
-    // rows all default to 'rss', so nothing about current feeds changes.
     r#"
     ALTER TABLE feeds ADD COLUMN source_type TEXT NOT NULL DEFAULT 'rss';
     "#,
-    // v6: bookmarks saved from the discover ("探す") screen. Unified with the
-    // timeline's starred-entry bookmarks: rows live here and are surfaced as
-    // synthetic entries with negative ids (see commands::entries) so the
-    // starred view and the trash treat them exactly like a normal starred
-    // entry. `url` is the identity -- re-saving the same article upserts
-    // rather than duplicating, and re-saving a trashed article restores it.
-    // `deleted_at` feeds the same 30-day trash retention as delete_entry.
     r#"
     CREATE TABLE saved_articles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

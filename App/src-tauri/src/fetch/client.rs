@@ -4,7 +4,6 @@ use reqwest::{Client, StatusCode};
 
 use crate::error::{AppError, AppResult};
 
-/// SPEC §2.2: identify the app explicitly to servers we poll.
 pub const USER_AGENT: &str = concat!(
     "Gyroscope/",
     env!("CARGO_PKG_VERSION"),
@@ -31,11 +30,6 @@ pub enum FetchOutcome {
     },
 }
 
-/// GETs `url`, sending `If-None-Match`/`If-Modified-Since` when previous
-/// cache validators are available (SPEC §2.2). Retries transient failures
-/// (timeouts, connection errors, 5xx) with exponential backoff, up to
-/// `MAX_ATTEMPTS` total tries. gzip/brotli decoding is handled transparently
-/// by reqwest (feature-enabled in Cargo.toml), no code needed here.
 pub async fn fetch_conditional(
     client: &Client,
     url: &str,
@@ -85,7 +79,10 @@ pub async fn fetch_conditional(
     }
 }
 
-fn header_string(response: &reqwest::Response, name: reqwest::header::HeaderName) -> Option<String> {
+fn header_string(
+    response: &reqwest::Response,
+    name: reqwest::header::HeaderName,
+) -> Option<String> {
     response
         .headers()
         .get(name)

@@ -10,7 +10,6 @@ use crate::fetch::HttpClient;
 
 const MAX_CONCURRENT_FAVICON_FETCHES: usize = 6;
 
-/// Fill missing RSS favicons once at startup without delaying window creation.
 pub(crate) async fn backfill_favicons(app: &AppHandle) {
     let targets: Vec<(i64, String)> = {
         let db = app.state::<Db>();

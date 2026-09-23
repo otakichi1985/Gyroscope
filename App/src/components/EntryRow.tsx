@@ -30,16 +30,11 @@ export function isVideoEntry(entry: Pick<Entry, "link">): boolean {
   }
 }
 
-// Card mode only, per the request that prompted this ("カードのサイズ") --
-// list/compact stay at their existing fixed sizing.
 const CARD_THUMB_SIZE: Record<CardSize, string> = {
   small: "h-12 w-12",
   medium: "h-16 w-16",
   large: "h-24 w-24",
 };
-// Fixed outer heights keep the virtualizer's measurements stable when a
-// thumbnail or feed icon becomes available after the entry first renders.
-// Each value still leaves enough room for that size's clamped text + meta.
 const CARD_ROW_HEIGHT: Record<CardSize, string> = {
   small: "h-[72px]",
   medium: "h-[96px]",
@@ -62,11 +57,8 @@ interface EntryRowProps {
   feedTitle: string;
   feedIconUrl: string | null;
   cardSize: CardSize;
-  // Only true in the bookmark-filtered view (see EntryList.tsx) -- deleting
-  // is scoped to "curating my bookmarks", not a general per-entry action, so
-  // the button doesn't show up in the regular timeline.
   showDelete: boolean;
-  /** Which timeline pane this row belongs to (dual-pane mode). */
+
   useStore?: EntriesStoreHook;
 }
 
@@ -76,23 +68,11 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
   const deleteEntry = useStore((s) => s.deleteEntry);
   const blockImages = useAppearanceStore((s) => s.blockImages);
   const clickBehavior = useAppearanceStore((s) => s.clickBehavior);
-  // Covers both "no thumbnail_url at all" and "had one but it failed to
-  // load" (broken link, hotlink protection, etc.) -- both count as "can't
-  // show an image for this article" per the request that prompted the
-  // feed-icon fallback below.
   const [thumbFailed, setThumbFailed] = useState(false);
   const [feedIconFailed, setFeedIconFailed] = useState(false);
-  // Video entries (YouTube) expand inline instead of opening the reader --
-  // most videos are watched in the browser, so the card itself only previews.
   const [expanded, setExpanded] = useState(false);
   const isVideo = isVideoEntry(entry);
 
-  // Lazily fetch a real thumbnail (og:image etc.) for entries whose feed
-  // provided none -- previously those rows dropped to the favicon / image-off
-  // placeholder. Only in card mode (the only mode that renders a thumbnail),
-  // only when there's no feed-provided image, and only when the row is
-  // actually visible: rows are virtualised with overscan, so without an
-  // IntersectionObserver gate we'd fetch for a bunch of off-screen rows.
   const rowRef = useRef<HTMLDivElement>(null);
   const [fetchedThumb, setFetchedThumb] = useState<string | null>(null);
   const shouldFetchThumb =
@@ -104,8 +84,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
       fetchArticleThumb(entry.link!).then((url) => {
         if (!cancelled) setFetchedThumb(url);
       });
-    // Fall back to fetching immediately when IntersectionObserver is
-    // unavailable (defensive; WebView2 has it).
     const el = rowRef.current;
     if (!el || typeof IntersectionObserver === "undefined") {
       void apply();
@@ -130,25 +108,13 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     };
   }, [shouldFetchThumb, entry.link]);
 
-  // The thumbnail actually shown: the feed-provided one if present, otherwise
-  // the lazily-fetched og:image.
   const thumbUrl = entry.thumbnail_url || fetchedThumb;
 
-  // A refresh can replace either URL without remounting this keyed row.
-  // Let the new resource try instead of keeping an old failure forever.
   useEffect(() => setThumbFailed(false), [entry.thumbnail_url]);
   useEffect(() => setFeedIconFailed(false), [feedIconUrl]);
 
   async function handleOpen() {
-    // Saved-article bookmarks (negative ids) have no reader read-state, so
-    // skip markRead for them -- but otherwise they behave exactly like normal
-    // entries now: the default "reader" click behavior opens them in the
-    // in-app reader (whose full-text auto-fetch replaces their short snippet),
-    // and the "browser" click behavior is the option that opens the default
-    // browser instead.
     if (!entry.is_read && entry.id >= 0) markRead(entry.id, true);
-    // Video entries never enter the reader: the click only expands the inline
-    // preview (bigger thumbnail, full title, description, open-in-browser).
     if (isVideo) {
       setExpanded((v) => !v);
       return;
@@ -186,10 +152,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
 
   const title = entry.title ?? entry.link ?? "(無題)";
   const published = formatPublished(entry.published_at);
-  // feedTitle gets its own accent-colored, undimmed span (rather than
-  // folding it into one plain opacity-60 "meta" string) so the source
-  // stands out from the date next to it, per the request to emphasize
-  // where each article came from.
   const meta = (feedTitle || published) && (
     <>
       {feedTitle && <span className="accent-text">{feedTitle}</span>}
@@ -223,8 +185,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     </button>
   );
 
-  // Read state is shown as an explicit checkmark rather than dimming the
-  // whole row (dimming made read rows hard to read at a glance).
   const readCheck = (
     <button
       type="button"
@@ -239,9 +199,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     </button>
   );
 
-  // Read-state lamp: fresh (unread, <24h) / unread / read at a glance,
-  // without opening the row (user request). Fixed hues (not skin accent)
-  // so the three states stay distinguishable in every skin and theme.
   const lamp = getEntryLamp(entry);
   const lampDot = (
     <span
@@ -258,9 +215,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     />
   );
 
-  // A single outer <button> would nest the star <button> inside it, which is
-  // invalid HTML (interactive content inside interactive content) and makes
-  // click targeting unreliable — use a div with button semantics instead.
   const rowProps = {
     role: "button" as const,
     tabIndex: 0,
@@ -276,9 +230,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     }
   }
 
-  // Inline preview for video entries: bigger thumbnail, full (wrapped) title,
-  // channel + date, description, and the open-in-browser button. Rendered
-  // inside the clicked row for every view mode; clicks inside never toggle.
   const videoDetail = isVideo && expanded && (
     <div
       onClick={(e) => e.stopPropagation()}
@@ -318,9 +269,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     </div>
   );
 
-  // Video entries in card/list mode: a roomier collapsed row (16:9 preview,
-  // fully wrapped title, channel + date) instead of the fixed-height article
-  // card. The click expands the inline preview below, never the reader.
   if (isVideo && mode !== "compact") {
     return (
       <div
@@ -377,19 +325,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     return (
       <div
         {...rowProps}
-        // Compact mode stays deliberately light on chrome (that's the
-        // whole point of this density level) -- a hairline bottom border is
-        // enough separation without turning it into a full card like the
-        // other two modes below (user feedback: entries were hard to tell
-        // apart; a full glass-card treatment here would fight the "as many
-        // rows as possible" intent).
-        //
-        // `entry-compact` exists for the floating skins only. Those have no
-        // panel behind the list at all, so "a hairline border is enough"
-        // stops being true: the rows were left as bare text hanging over the
-        // desktop (user report). They get a surface back in index.css --
-        // deliberately not `entry-card`, which would also hand every other
-        // skin's card treatment to a density mode that does not want it.
         className="entry-compact flex w-full cursor-pointer items-baseline gap-2 rounded border-b border-black/5 px-2 py-1 text-sm transition duration-150 hover:bg-black/5 active:scale-[0.98] active:bg-black/10 dark:border-white/5 dark:hover:bg-white/5 dark:active:bg-white/10"
       >
         {lampDot}
@@ -408,34 +343,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     return (
       <div
         {...rowProps}
-        // Translucent-tinted background + border + blur (rather than just a
-        // hover-only highlight) so each entry reads as its own frosted-glass
-        // card at rest, not just plain text that happens to sit in a row
-        // (user feedback: entries were hard to tell apart; also part of a
-        // broader push for this app's inner chrome to echo its own
-        // Mica/Acrylic-glass window backdrop instead of looking like flat
-        // rectangles floating on top of it).
-        // Deliberately NO `backdrop-blur` here, despite the frosted-glass
-        // look: what sits behind a card is `.panel-bg`, a fully opaque
-        // solid colour (see index.css). Blurring a uniform colour returns
-        // that same colour, so the filter was a guaranteed visual no-op --
-        // while still forcing a render surface per row on a virtualised
-        // list, and making descendants (MarqueeTitle's animated track)
-        // liable to repaint on the main thread every frame. The glass
-        // reading comes from the translucent tint + hairline border, which
-        // are doing all the actual work. Only the portalled popups
-        // (FeedPicker/FontPicker) keep a backdrop-blur, because those
-        // genuinely sit over non-uniform content.
-        //
-        // `entry-card`: marker for the idle-sway animation (index.css,
-        // toggled by App.tsx's `.idle-mode` ancestor). This element owns the
-        // only `transition` shorthand that applies to it -- index.css
-        // deliberately does not declare one, see the note there.
-        // `active:scale-[0.98]` is the click/press feedback (user feedback:
-        // wanted motion on interaction, not just a flat color change), which
-        // needs a transition covering `transform`; plain `transition` does
-        // (unlike `transition-colors`) without `transition-all`'s blanket
-        // "animate literally every property".
         className="entry-card flex w-full cursor-pointer items-start gap-2 rounded-lg border border-black/5 bg-black/[0.03] px-2 py-1.5 transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10"
       >
         {lampDot}
@@ -450,22 +357,14 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     );
   }
 
-  // card
   return (
     <div
       {...rowProps}
       ref={rowRef}
-      // Same glass-card language as list mode, just with room for the
-      // thumbnail and a soft shadow since card mode is the most spacious view.
-      // See list mode above for `entry-card`/`transition`/`active:scale`.
       className={`entry-card ${CARD_ROW_HEIGHT[cardSize]} flex w-full cursor-pointer gap-2 overflow-hidden rounded-lg border border-black/5 bg-black/[0.03] px-2 py-2 shadow-sm transition duration-150 hover:bg-black/[0.06] active:scale-[0.98] active:bg-black/10 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] dark:active:bg-white/10`}
     >
       {lampDot}
       {blockImages ? (
-        // Block at the element level, not just visually -- an <img> that's
-        // merely hidden with CSS still fires the network request (the exact
-        // tracking-pixel behavior this setting exists to prevent), so no
-        // <img> tag is rendered at all here.
         <div
           className={`${CARD_THUMB_SIZE[cardSize]} flex shrink-0 items-center justify-center rounded bg-black/5 dark:bg-white/5`}
         >
@@ -479,10 +378,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
           className={`${CARD_THUMB_SIZE[cardSize]} shrink-0 rounded object-cover`}
         />
       ) : feedIconUrl && !feedIconFailed ? (
-          // A favicon-ish image is small/square and looks stretched and
-          // blurry filling the same box object-cover does for a real
-          // thumbnail -- contain it with padding on a neutral fill instead,
-          // so it reads as a deliberate icon badge rather than a bad photo.
           <div
             className={`${CARD_THUMB_SIZE[cardSize]} flex shrink-0 items-center justify-center rounded bg-black/5 p-2 dark:bg-white/5`}
           >

@@ -4,17 +4,10 @@ interface ClearableInputProps extends React.InputHTMLAttributes<HTMLInputElement
   value: string;
   onClear: () => void;
   clearLabel: string;
-  // The wrapper div carries the positioning/flex classes the parent layout
-  // needs (e.g. `min-w-0 flex-1` inside a flex row); `className` styles the
-  // input itself. Both are optional and merged onto their respective nodes.
   wrapperClassName?: string;
   inputRef?: React.Ref<HTMLInputElement>;
 }
 
-// A text input with an always-present clear (×) button that appears once
-// there is something to clear. Shared by every free-text field so the
-// affordance is consistent across the app (search, discover keyword, feed
-// URL, genre name) -- previously only the search fields had it.
 export function ClearableInput({
   value,
   onClear,

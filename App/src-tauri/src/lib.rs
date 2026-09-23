@@ -26,8 +26,12 @@ fn ensure_startup_window_visible(window: &tauri::WebviewWindow) {
         .ok()
         .zip(window.outer_size().ok())
         .and_then(|(position, size)| {
-            let right = position.x.saturating_add(size.width.min(i32::MAX as u32) as i32);
-            let bottom = position.y.saturating_add(size.height.min(i32::MAX as u32) as i32);
+            let right = position
+                .x
+                .saturating_add(size.width.min(i32::MAX as u32) as i32);
+            let bottom = position
+                .y
+                .saturating_add(size.height.min(i32::MAX as u32) as i32);
             window.available_monitors().ok().map(|monitors| {
                 monitors.into_iter().any(|monitor| {
                     let monitor_position = monitor.position();
@@ -38,8 +42,10 @@ fn ensure_startup_window_visible(window: &tauri::WebviewWindow) {
                     let monitor_bottom = monitor_position
                         .y
                         .saturating_add(monitor_size.height.min(i32::MAX as u32) as i32);
-                    let overlap_width = right.min(monitor_right) - position.x.max(monitor_position.x);
-                    let overlap_height = bottom.min(monitor_bottom) - position.y.max(monitor_position.y);
+                    let overlap_width =
+                        right.min(monitor_right) - position.x.max(monitor_position.x);
+                    let overlap_height =
+                        bottom.min(monitor_bottom) - position.y.max(monitor_position.y);
                     overlap_width >= 40 && overlap_height >= 40
                 })
             })
@@ -88,62 +94,18 @@ pub fn run() {
             app.manage(commands::update::PendingUpdate::default());
             app.manage(fetch::booth::BoothScrapeLimiter::default());
 
-            // MUST stay a direct call on the main thread. tray-icon creates a
-            // real HWND (with its own WNDPROC) on whatever thread calls it,
-            // and muda's menu does the same -- so the owning thread has to be
-            // one that pumps a Win32 message loop. Only the main thread does
-            // (tao's event loop); `tauri::async_runtime::spawn` hands you a
-            // tokio worker that never pumps.
-            //
-            // Putting the tray on a tokio worker (previously done as a
-            // mitigation for a suspected "explorer isn't ready yet" startup
-            // race) is what caused the system-wide hangs reported after
-            // running the portable build: a top-level window whose thread
-            // never pumps blocks every cross-process SendMessage aimed at it,
-            // and the shell talks to notification-area owner windows
-            // constantly. Observed fallout was explorer.exe and
-            // SystemSettings.exe both logging Application Hang (event 1002,
-            // hang type "Cross-process;Activation") and needing a reboot.
-            //
-            // It also explains the old "tray icon never appears" bug: the
-            // crate handles a failed Shell_NotifyIcon(NIM_ADD) by waiting for
-            // the shell's TaskbarCreated broadcast to re-register, and a
-            // broadcast can only arrive via a message pump. So no delay is
-            // needed here -- the retry path works by itself once the tray
-            // lives on the pumping thread.
             let _ = tray::setup(app.handle());
 
-            // A stale window-state position or a hidden launch parent can
-            // leave the process alive without giving the user a usable
-            // window. Recover the startup path before background work begins;
-            // normal visible windows keep their saved position and size.
             ensure_startup_window_visible(&window);
             diag::log(app.handle(), "startup_window: shown_and_focused");
 
             scheduler::start(app.handle());
 
-            // Catch-up for feeds added before favicon discovery existed
-            // (add_feed only fetches a favicon for newly-added feeds).
-            // Network-bound and per-feed, so it's spawned rather than run
-            // inline here -- SPEC §7 requires startup to stay under 2s.
             let favicon_app = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 commands::feed_maintenance::backfill_favicons(&favicon_app).await;
             });
 
-            // By default (MinimizeToTray = true), closing the main window
-            // hides it to the tray rather than quitting the process -- see
-            // the "タスクトレイに最小化" setting, backed by
-            // tray::MinimizeToTray. When the user turns that setting off,
-            // CloseRequested is left unhandled so Tauri's normal behavior
-            // applies: the window closes and, since it's the only window,
-            // the process exits -- same end result as the tray menu's "終了"
-            // item (`app.exit(0)`), just reached via the X button instead.
-            //
-            // Windows can drop a layered window's alpha on certain size
-            // transitions (observed: maximizing resets it to fully opaque),
-            // so re-apply the last value the user asked for on every resize
-            // (covers maximize/restore/manual drag-resize alike).
             let close_window = window.clone();
             let close_app = app.handle().clone();
             let resize_window = window.clone();
@@ -156,7 +118,10 @@ pub fn run() {
                         api.prevent_close();
                         let _ = close_window.hide();
                     } else {
-                        diag::log(&close_app, "close_requested: not prevented (process exit path)");
+                        diag::log(
+                            &close_app,
+                            "close_requested: not prevented (process exit path)",
+                        );
                     }
                 }
                 tauri::WindowEvent::Resized(_) => {

@@ -1,7 +1,5 @@
 import type { Entry } from "./types";
 
-/// Read-state lamp for timeline rows: unread / fresh (unread and published
-/// within the last 24h) / read, glanceable without opening the row.
 export type EntryLamp = "fresh" | "unread" | "read";
 
 export const FRESH_WINDOW_MS = 24 * 60 * 60 * 1000;

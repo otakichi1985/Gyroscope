@@ -1,8 +1,5 @@
 use serde::Serialize;
 
-/// Single error type for all Tauri commands. Serialized as a plain string
-/// so the frontend can show it directly (e.g. next to a feed's warning
-/// icon, per SPEC §7 -- errors must never be swallowed).
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("database error: {0}")]

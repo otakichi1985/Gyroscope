@@ -1,15 +1,4 @@
-// Human names for what the pointer finds.
-//
-// This file exists because the whole point of the tool is that the list it
-// shows has to read like the app, not like the DOM: "記事カード" rather than
-// "div.entry-card". Everything the user is expected to read passes through
-// here.
-//
-// Dev-only. Nothing in src/dev-tools ships (index.css excludes this directory
-// from Tailwind's source scan, and App.tsx mounts it behind import.meta.env.DEV).
 
-// Checked with classList.contains, so order is only about which name wins when
-// an element carries several: most specific first.
 const CLASS_NAMES: readonly (readonly [string, string])[] = [
   ["screen-close-button", "閉じるボタン"],
   ["screen-overlay-header", "画面の見出し"],
@@ -62,11 +51,6 @@ function namedByClass(el: Element): string | null {
   return null;
 }
 
-/**
- * A name a person can read. Unnamed elements borrow their nearest named
- * ancestor ("記事カードの中の画像") rather than falling back to a tag name,
- * which would put DOM vocabulary in front of someone who does not read code.
- */
 export function describeElement(el: Element): string {
   const byClass = namedByClass(el);
   if (byClass) return byClass;

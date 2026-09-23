@@ -12,14 +12,7 @@ pub struct ParsedFeed {
     pub entries: Vec<NewEntry>,
 }
 
-/// Parses raw feed bytes (RSS 2.0 / RSS 1.0 (RDF) / Atom / JSON Feed --
-/// feed-rs handles all of these uniformly). `base_uri` should be the feed's
-/// own URL, used to resolve any relative links inside it.
 pub fn parse_feed(bytes: &[u8], base_uri: Option<&str>) -> AppResult<ParsedFeed> {
-    // The default id generator synthesizes an id whenever a real
-    // <guid>/<id> is missing, which would hide that fact from us. We want
-    // our own guid -> link -> title+published fallback (see `dedupe`), so
-    // we force it to leave `Entry::id` empty in that case instead.
     let parser = Builder::new()
         .base_uri(base_uri)
         .id_generator(|_links, _title, _uri| String::new())
@@ -43,10 +36,6 @@ pub fn parse_feed(bytes: &[u8], base_uri: Option<&str>) -> AppResult<ParsedFeed>
 fn convert_entry(entry: feed_rs::model::Entry) -> NewEntry {
     let link = entry.links.first().map(|l| l.href.clone());
     let title = entry.title.as_ref().map(|t| t.content.clone());
-    // YouTube's videos.xml carries the video description as
-    // <media:description>, which feed-rs parses into MediaObject.description
-    // rather than entry.summary -- without this fallback video entries would
-    // permanently show no snippet at all.
     let summary = entry
         .summary
         .as_ref()

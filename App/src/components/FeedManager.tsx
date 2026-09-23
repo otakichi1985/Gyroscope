@@ -67,11 +67,7 @@ function GenreManager() {
       )}
       <div className="text-xs font-medium opacity-70">ジャンルを追加</div>
       <form onSubmit={handleCreate} className="flex items-center gap-1">
-        {/* Not the dashed "+" composer anymore -- a filled chip read as a
-            button, and two near-identical rows (feed URL / genre name) were
-            indistinguishable. Instead each form now carries an explicit
-            label (フィードを追加 / ジャンルを追加) above it, so the rows are
-            told apart by what they say, not by how they're framed. */}
+
         <ClearableInput
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -224,20 +220,12 @@ export function FeedManager() {
         https://www.youtube.com/@example）にも対応しています
       </p>
 
-      {/* Genre-first, folder-like organization: create a genre here, then
-          assign feeds into it below via a <select> -- replaces the old
-          free-text-per-feed field, where reusing a genre meant retyping the
-          exact same string and any mismatch (case, full/half-width, a
-          stray space) silently created a separate genre instead of joining
-          the existing one (user feedback). */}
+
       <GenreManager />
 
       {loading && feeds.length === 0 ? (
         <p className="opacity-60">読み込み中...</p>
       ) : feeds.length === 0 ? (
-        // Kept inline rather than the full-height StatePanel: this sits
-        // directly under the add-feed form that already tells you what to
-        // do, so it only needs to fill the gap, not restate the CTA.
         <p className="rounded border border-dashed border-black/15 px-3 py-6 text-center text-xs opacity-50 dark:border-white/15">
           フィードがまだありません
         </p>
@@ -256,19 +244,11 @@ export function FeedManager() {
                 )}
                 <span className="truncate font-medium">{feed.custom_title ?? feed.title ?? feed.url}</span>
                 {feed.source_type === "booth" && (
-                  // BOOTH feeds get a longer default refresh interval and a
-                  // different fetch mechanism under the hood (see
-                  // fetch::booth) -- this badge is the only place that's
-                  // visible to the user, so they know why e.g. the interval
-                  // field defaulted to 60 instead of 30.
                   <span className="accent-bg-soft accent-text shrink-0 rounded px-1 text-[10px] font-medium">
                     BOOTH
                   </span>
                 )}
                 {feed.unread_count > 0 && (
-                  // tabular-nums so the count keeps a fixed width as it
-                  // changes -- otherwise every refresh nudges the row's
-                  // layout by a pixel or two as digits swap.
                   <span className="shrink-0 text-xs tabular-nums opacity-60">({feed.unread_count})</span>
                 )}
               </div>
@@ -302,11 +282,6 @@ export function FeedManager() {
                 <button
                   type="button"
                   onClick={() => setFeedNotify(feed.id, !feed.notify_enabled)}
-                  // Icon-only bell buttons read as "something about
-                  // notifications" but never made it obvious that the
-                  // setting is a plain on/off toggle. A labelled pill with
-                  // an explicit 通知ON/通知OFF state (accent fill when on)
-                  // makes the toggle and its current state visible at rest.
                   className={`flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors duration-150 ${
                     feed.notify_enabled
                       ? "accent-bg-soft accent-text font-medium"

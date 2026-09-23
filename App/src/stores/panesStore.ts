@@ -32,9 +32,6 @@ function persist(dual: boolean, direction: PaneDirection) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(shape));
 }
 
-// Secondary pane's store. Created once at module load so both panes share
-// the peer-refresh registry in entriesStore; it only fetches when the dual
-// pane is actually shown.
 const secondaryStore: EntriesStoreHook = createEntriesStore();
 
 export function getSecondaryEntriesStore(): EntriesStoreHook {
@@ -42,7 +39,7 @@ export function getSecondaryEntriesStore(): EntriesStoreHook {
 }
 
 interface PanesState {
-  /** Second timeline pane visible. Max 2 panes: a wider split doesn't fit the small resident window. */
+
   dual: boolean;
   /** row = 左右に並べる, column = 上下に並べる. */
   direction: PaneDirection;
@@ -61,8 +58,6 @@ export const usePanesStore = create<PanesState>((set, get) => ({
     set({ dual });
     persist(dual, get().direction);
     if (dual) {
-      // Populate the newly shown pane immediately instead of leaving it empty
-      // until the next background tick.
       void secondaryStore.getState().refresh();
     }
   },

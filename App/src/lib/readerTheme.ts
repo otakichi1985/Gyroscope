@@ -1,12 +1,15 @@
-import type { ReaderColorPreset } from "../stores/appearanceStore";
+import type {
+  ReaderCodeFont,
+  ReaderColorPreset,
+  ReaderColors,
+  ReaderColumnWidth,
+  ReaderElementKey,
+  ReaderFontFamily,
+  ReaderFontSize,
+  ReaderLineHeight,
+} from "../stores/appearanceStore";
 import type { Skin } from "./skins";
 
-/// The preset palette offered by the reader's 配色 rows. The swatch color a
-/// user taps here (JS side, `readerPresetColor`) is exactly the color that
-/// lands on the article text (CSS side, the matching `--reader-preset-*`
-/// variable in index.css) -- keep the two in lockstep. Each preset has a
-/// light and a dark variant so it stays readable on both themes; the accent
-/// follows the current skin.
 export const READER_COLOR_PRESETS: {
   id: ReaderColorPreset;
   label: string;
@@ -22,8 +25,63 @@ export const READER_COLOR_PRESETS: {
   { id: "success", label: "緑", light: "#16a34a", dark: "#86efac" },
 ];
 
-/// The CSS variable a preset resolves to inside `.reader-content`.
 export const readerPresetVar = (preset: ReaderColorPreset) => `var(--reader-preset-${preset})`;
+
+const FONT_SIZE: Record<ReaderFontSize, string> = {
+  small: "13px",
+  medium: "15px",
+  large: "17px",
+  xlarge: "19px",
+};
+const LINE_HEIGHT: Record<ReaderLineHeight, string> = {
+  tight: "1.5",
+  normal: "1.75",
+  loose: "2.05",
+};
+const COLUMN_WIDTH: Record<ReaderColumnWidth, string> = {
+  narrow: "32em",
+  normal: "40em",
+  wide: "50em",
+};
+const FONT_FAMILY: Record<ReaderFontFamily, string> = {
+  app: "inherit",
+  sans: `system-ui, -apple-system, "Segoe UI", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif`,
+  serif: `"Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", "MS PMincho", serif`,
+};
+const ELEMENT_COLOR: Record<ReaderElementKey, string> = {
+  body: "--reader-color-body",
+  heading: "--reader-color-heading",
+  quote: "--reader-color-quote",
+  code: "--reader-color-code",
+  link: "--reader-color-link",
+};
+const CODE_FONT_MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+
+interface ReaderStyleSettings {
+  fontSize: ReaderFontSize;
+  lineHeight: ReaderLineHeight;
+  columnWidth: ReaderColumnWidth;
+  fontFamily: ReaderFontFamily;
+  codeFont: ReaderCodeFont;
+  colors: ReaderColors;
+}
+
+/* Readerとサイト探索の全文表示で同じ設定値を同じCSS変数へ写す。 */
+export function readerStyleVariables(settings: ReaderStyleSettings): Record<string, string> {
+  const variables: Record<string, string> = {
+    "--reader-font-size": FONT_SIZE[settings.fontSize],
+    "--reader-line-height": LINE_HEIGHT[settings.lineHeight],
+    "--reader-max-width": COLUMN_WIDTH[settings.columnWidth],
+    "--reader-font-family": FONT_FAMILY[settings.fontFamily],
+    "--reader-code-font-family":
+      settings.codeFont === "mono" ? CODE_FONT_MONO : "var(--reader-font-family)",
+  };
+  for (const key of Object.keys(ELEMENT_COLOR) as ReaderElementKey[]) {
+    const preset = settings.colors[key];
+    if (preset) variables[ELEMENT_COLOR[key]] = readerPresetVar(preset);
+  }
+  return variables;
+}
 
 function rgbTupleToHex(tuple: string): string {
   const [r, g, b] = tuple.trim().split(/\s+/).map((n) => Number(n));
@@ -31,8 +89,6 @@ function rgbTupleToHex(tuple: string): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-/// The concrete color a preset renders as for the given theme, used to paint
-/// the swatches. Mirrors the CSS palette so the swatch preview is truthful.
 export function readerPresetColor(preset: ReaderColorPreset, isDark: boolean, skin: Skin): string {
   if (preset === "accent") return rgbTupleToHex(isDark ? skin.accentDark : skin.accentLight);
   const entry = READER_COLOR_PRESETS.find((p) => p.id === preset);

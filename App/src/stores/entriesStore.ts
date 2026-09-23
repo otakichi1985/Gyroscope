@@ -21,14 +21,8 @@ function loadSortOrder(): SortOrder {
 }
 
 let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
-// Only the newest list request may update the screen. Rapid search/filter
-// changes can otherwise resolve out of order and show stale results.
 let listRequestId = 0;
 
-// Every store instance (main pane + secondary pane) registers its refresh
-// here so a background update or a cross-pane-visible mutation (read/star/
-// delete) can resync all panes. Each pane keeps its own filter; only the
-// list contents are re-fetched.
 const peerRefreshes = new Set<() => Promise<void>>();
 
 function refreshPeers(except: () => Promise<void>) {
@@ -37,7 +31,6 @@ function refreshPeers(except: () => Promise<void>) {
   }
 }
 
-/** Re-fetch every registered pane store (background refresh, feed changes). */
 export function refreshAllEntriesStores() {
   for (const refresh of peerRefreshes) void refresh();
 }
@@ -70,14 +63,6 @@ interface EntriesState {
   markAllUnread: () => Promise<void>;
 }
 
-/**
- * Factory so each timeline pane owns an independent filter + list.
- * The main pane keeps using the `useEntriesStore` singleton below (existing
- * behaviour unchanged); the secondary pane gets its own instance from
- * `panesStore`. View mode / sort order stay global via localStorage, like
- * before, so both panes render the same way until per-pane display settings
- * are explicitly requested.
- */
 export function createEntriesStore() {
   const store = create<EntriesState>((set, get) => ({
     entries: [],
@@ -160,9 +145,6 @@ export function createEntriesStore() {
       await get().refresh();
     },
 
-    // Local SQLite is fast enough that this debounce isn't strictly needed for
-    // latency -- it's here to avoid a full list re-fetch/re-render on every
-    // single keystroke while typing.
     setSearchQuery: (query: string) => {
       set({ searchQuery: query });
       clearTimeout(searchDebounceTimer);
@@ -189,7 +171,6 @@ export function createEntriesStore() {
       });
       try {
         await invoke("mark_entry_read", { id, isRead });
-        // Read state is visible in every pane showing this entry.
         refreshPeers(get().refresh);
       } catch (error) {
         set({ entries: previous, error: String(error) });
@@ -211,11 +192,6 @@ export function createEntriesStore() {
       }
     },
 
-    // Soft-delete (see commands::entries::delete_entry) -- the entry moves to
-    // the bookmark trash, so it's removed from this list optimistically same
-    // as the other actions here, but never restored back into it locally
-    // (the user has to go through TrashOverlay to bring it back, which
-    // re-fetches from list_entries on its own).
     deleteEntry: async (id: number) => {
       const previous = get().entries;
       set({ entries: previous.filter((entry) => entry.id !== id) });
@@ -253,5 +229,4 @@ export function createEntriesStore() {
 
 export type EntriesStoreHook = ReturnType<typeof createEntriesStore>;
 
-/** Main timeline pane. Behaviour is unchanged from before multi-pane. */
 export const useEntriesStore = createEntriesStore();

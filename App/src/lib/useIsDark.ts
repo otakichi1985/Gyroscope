@@ -2,10 +2,6 @@ import { useEffect, useState } from "react";
 import { useAppearanceStore } from "../stores/appearanceStore";
 import { getSkin } from "./skins";
 
-/// Resolves whether the app is currently rendering in dark mode, mirroring
-/// App.tsx (terminal forces dark, cardinality/ordinary force light). Chrome
-/// outside App's render tree (e.g. the 配色 swatches) uses this to make the
-/// same theme decision the CSS `dark:` variants are making.
 export function useIsDark(): boolean {
   const skinId = useAppearanceStore((s) => s.skinId);
   const themeMode = useAppearanceStore((s) => s.themeMode);
