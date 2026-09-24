@@ -21,10 +21,17 @@ function loadSortOrder(): SortOrder {
 }
 
 const peerRefreshes = new Set<() => Promise<void>>();
+const peerReadUpdates = new Set<(id: number, isRead: boolean) => void>();
 
 function refreshPeers(except: () => Promise<void>) {
   for (const refresh of peerRefreshes) {
     if (refresh !== except) void refresh();
+  }
+}
+
+function updateReadPeers(except: (id: number, isRead: boolean) => void, id: number, isRead: boolean) {
+  for (const update of peerReadUpdates) {
+    if (update !== except) update(id, isRead);
   }
 }
 
@@ -54,6 +61,7 @@ interface EntriesState {
   setViewMode: (mode: ViewMode) => void;
   setSortOrder: (order: SortOrder) => Promise<void>;
   markRead: (id: number, isRead: boolean) => Promise<void>;
+  applyReadState: (id: number, isRead: boolean) => void;
   toggleStar: (id: number, isStarred: boolean) => Promise<void>;
   deleteEntry: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
@@ -165,15 +173,21 @@ export function createEntriesStore() {
 
     markRead: async (id: number, isRead: boolean) => {
       const previous = get().entries;
-      set({
-        entries: previous.map((entry) => (entry.id === id ? { ...entry, is_read: isRead } : entry)),
-      });
+      get().applyReadState(id, isRead);
       try {
         await invoke("mark_entry_read", { id, isRead });
-        refreshPeers(get().refresh);
+        updateReadPeers(get().applyReadState, id, isRead);
       } catch (error) {
         set({ entries: previous, error: String(error) });
       }
+    },
+
+    applyReadState: (id: number, isRead: boolean) => {
+      set((state) => ({
+        entries: state.entries.map((entry) =>
+          entry.id === id ? { ...entry, is_read: isRead } : entry,
+        ),
+      }));
     },
 
     toggleStar: async (id: number, isStarred: boolean) => {
@@ -223,6 +237,7 @@ export function createEntriesStore() {
     },
   }));
   peerRefreshes.add(store.getState().refresh);
+  peerReadUpdates.add(store.getState().applyReadState);
   return store;
 }
 

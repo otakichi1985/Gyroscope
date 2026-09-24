@@ -29,3 +29,33 @@ test("two timeline stores accept their own overlapping refreshes", async () => {
   assert.equal(left.getState().loading, false);
   assert.equal(right.getState().loading, false);
 });
+
+test("marking an entry read updates the other pane without reloading its list", async () => {
+  const commands: string[] = [];
+  const entry = { id: 7, is_read: false };
+  Object.assign(globalThis, {
+    localStorage: { getItem: () => null, setItem: () => {} },
+    window: {
+      __TAURI_INTERNALS__: {
+        invoke: async (command: string) => {
+          commands.push(command);
+          if (command === "list_entries") return [{ ...entry }];
+          assert.equal(command, "mark_entry_read");
+          return null;
+        },
+      },
+    },
+  });
+  const { createEntriesStore } = await import("../src/stores/entriesStore.ts");
+  const left = createEntriesStore();
+  const right = createEntriesStore();
+  await Promise.all([left.getState().refresh(), right.getState().refresh()]);
+  commands.length = 0;
+
+  await left.getState().markRead(7, true);
+
+  assert.deepEqual(commands, ["mark_entry_read"]);
+  assert.equal(left.getState().entries[0].is_read, true);
+  assert.equal(right.getState().entries[0].is_read, true);
+  assert.equal(right.getState().loading, false);
+});
