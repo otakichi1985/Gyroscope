@@ -1,5 +1,6 @@
 /* 一覧端を背景へ溶かし、scroll時の硬い切断を避ける。 */
 .entry-list-scroll {
+  padding-inline: 4px;
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,

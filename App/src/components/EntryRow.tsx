@@ -140,11 +140,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     toggleStar(entry.id, !entry.is_starred);
   }
 
-  function handleToggleRead(e: React.MouseEvent) {
-    e.stopPropagation();
-    markRead(entry.id, !entry.is_read);
-  }
-
   function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
     deleteEntry(entry.id);
@@ -164,12 +159,12 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
     <button
       type="button"
       onClick={handleToggleStar}
-      className={`flex shrink-0 items-center rounded p-0.5 transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
+      className={`flex shrink-0 self-start items-center rounded p-1.5 transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
         entry.is_starred ? "accent-text" : "opacity-60 hover:opacity-100"
       }`}
       aria-label={entry.is_starred ? "スターを外す" : "スターを付ける"}
     >
-      <StarIcon filled={entry.is_starred} className="h-3.5 w-3.5" />
+      <StarIcon filled={entry.is_starred} className="h-4 w-4" />
     </button>
   );
 
@@ -182,20 +177,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
       title="ゴミ箱に移動"
     >
       <TrashIcon className="h-3.5 w-3.5" />
-    </button>
-  );
-
-  const readCheck = (
-    <button
-      type="button"
-      onClick={handleToggleRead}
-      className={`shrink-0 rounded px-1 text-xs transition-colors duration-150 active:bg-black/10 dark:active:bg-white/10 ${
-        entry.is_read ? "text-emerald-600 dark:text-emerald-400" : "opacity-30 hover:opacity-70"
-      }`}
-      aria-label={entry.is_read ? "未読にする" : "既読にする"}
-      title={entry.is_read ? "既読" : "未読"}
-    >
-      ✓
     </button>
   );
 
@@ -294,7 +275,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
             <p className="text-sm font-medium break-words">{title}</p>
             {meta && <div className="mt-0.5 text-xs">{meta}</div>}
           </div>
-          {readCheck}
           {starButton}
           {deleteButton}
         </div>
@@ -312,7 +292,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
           {feedTitle && (
             <span className="accent-text max-w-[30%] shrink-0 truncate text-[10px]">{feedTitle}</span>
           )}
-          {readCheck}
           {starButton}
           {deleteButton}
         </div>
@@ -332,7 +311,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
         {feedTitle && (
           <span className="accent-text max-w-[30%] shrink-0 truncate text-[10px]">{feedTitle}</span>
         )}
-        {readCheck}
         {starButton}
         {deleteButton}
       </div>
@@ -350,7 +328,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
           <MarqueeTitle text={title} textClassName={`text-sm ${entry.is_read ? "" : "font-medium"}`} />
           {meta && <div className="truncate text-xs">{meta}</div>}
         </div>
-        {readCheck}
         {starButton}
         {deleteButton}
       </div>
@@ -400,7 +377,6 @@ export function EntryRow({ entry, mode, feedTitle, feedIconUrl, cardSize, showDe
         <p className={`mt-0.5 ${CARD_SNIPPET_CLAMP[cardSize]} text-xs opacity-70`}>{entrySnippet(entry)}</p>
         {meta && <div className="mt-0.5 truncate text-xs">{meta}</div>}
       </div>
-      {readCheck}
       {starButton}
       {deleteButton}
     </div>

@@ -37,8 +37,8 @@
   box-shadow: var(--plate-shadow);
 }
 .skin-floating .entry-list-scroll {
-  padding-left: var(--plate-inset);
-  padding-right: var(--plate-inset);
+  padding-left: 4px;
+  padding-right: 4px;
 
   padding-bottom: var(--plate-inset);
 }
