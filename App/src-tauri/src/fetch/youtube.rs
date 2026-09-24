@@ -2,7 +2,7 @@ use reqwest::Client;
 use url::Url;
 
 use crate::error::{AppError, AppResult};
-use crate::fetch::client::{fetch_conditional, FetchOutcome};
+use crate::fetch::client::{fetch_conditional, fetch_youtube_feed, FetchOutcome};
 use crate::fetch::discovery::DiscoveredFeed;
 use crate::parse::feed::parse_feed;
 
@@ -89,8 +89,7 @@ fn fetch_page_html(
 
 async fn fetch_feed(client: &Client, channel_id: &str) -> AppResult<DiscoveredFeed> {
     let feed_url = feed_url_for_channel_id(channel_id);
-    let (body, etag, last_modified) = match fetch_conditional(client, &feed_url, None, None).await?
-    {
+    let (body, etag, last_modified) = match fetch_youtube_feed(client, &feed_url).await? {
         FetchOutcome::Fetched {
             body,
             etag,
