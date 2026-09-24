@@ -20,9 +20,6 @@ function loadSortOrder(): SortOrder {
   return stored === "asc" ? "asc" : "desc";
 }
 
-let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
-let listRequestId = 0;
-
 const peerRefreshes = new Set<() => Promise<void>>();
 
 function refreshPeers(except: () => Promise<void>) {
@@ -64,6 +61,8 @@ interface EntriesState {
 }
 
 export function createEntriesStore() {
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let listRequestId = 0;
   const store = create<EntriesState>((set, get) => ({
     entries: [],
     loading: false,
