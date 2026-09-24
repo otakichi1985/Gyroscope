@@ -116,6 +116,33 @@ export function SortIcon(props: IconProps) {
   );
 }
 
+export function CardViewIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+      <rect x="4" y="4.5" width="3.5" height="3.5" rx="0.5" />
+      <path d="M9 5.5h3M9 7.5h2.5M4 10.5h8" />
+    </Icon>
+  );
+}
+
+export function ListViewIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+      <path d="M4 5.3h8M4 8h8M4 10.7h8" />
+    </Icon>
+  );
+}
+
+export function CompactViewIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 3.5h11M2.5 6.5h11M2.5 9.5h11M2.5 12.5h11" />
+    </Icon>
+  );
+}
+
 export function ChevronDownIcon(props: IconProps) {
   return (
     <Icon {...props}>

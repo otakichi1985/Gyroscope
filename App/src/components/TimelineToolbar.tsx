@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useEntriesStore, type EntriesStoreHook, type ViewMode } from "../stores/entriesStore";
 import { useFeedsStore } from "../stores/feedsStore";
 import { FeedPicker } from "./FeedPicker";
-import { RefreshIcon, SortIcon } from "./icons";
+import { CardViewIcon, CompactViewIcon, ListViewIcon, RefreshIcon, SortIcon } from "./icons";
 
 const VIEW_MODES: { mode: ViewMode; label: string }[] = [
   { mode: "card", label: "カード" },
   { mode: "list", label: "リスト" },
   { mode: "compact", label: "コンパクト" },
 ];
+const VIEW_ICONS = { card: CardViewIcon, list: ListViewIcon, compact: CompactViewIcon };
 
 export function TimelineToolbar({ useStore = useEntriesStore }: { useStore?: EntriesStoreHook }) {
   const feeds = useFeedsStore((s) => s.feeds);
@@ -91,18 +92,25 @@ export function TimelineToolbar({ useStore = useEntriesStore }: { useStore?: Ent
       </button>
 
       <div className="segmented flex shrink-0 gap-0.5 rounded bg-black/5 p-0.5 dark:bg-white/5">
-        {VIEW_MODES.map(({ mode, label }) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => setViewMode(mode)}
-            className={`min-h-6 rounded px-1.5 py-0.5 transition-colors duration-150 ${
-              viewMode === mode ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        {VIEW_MODES.map(({ mode, label }) => {
+          const ViewIcon = VIEW_ICONS[mode];
+          return (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setViewMode(mode)}
+              aria-label={`${label}表示`}
+              aria-pressed={viewMode === mode}
+              title={`${label}表示`}
+              className={`min-h-6 items-center justify-center rounded px-1.5 py-0.5 transition-colors duration-150 ${
+                viewMode === mode ? "accent-bg-soft accent-text font-medium" : "opacity-60 hover:opacity-100"
+              }`}
+            >
+              <ViewIcon className="view-mode-icon h-4 w-4" aria-hidden="true" />
+              <span className="view-mode-label">{label}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -82,10 +82,24 @@
 }
 
 /* 狭幅では操作を隠さず、補助labelだけを省く。 */
+.view-mode-icon {
+  display: none;
+}
 @media (max-width: 560px) {
   .timeline-toolbar .toolbar-label,
   .pane-bar .pane-hint {
     display: none;
+  }
+  .timeline-toolbar .view-mode-icon {
+    display: block;
+  }
+  .timeline-toolbar .view-mode-label {
+    display: none;
+  }
+  .timeline-toolbar .segmented button {
+    display: flex;
+    min-width: 28px;
+    min-height: 28px;
   }
 }
 
