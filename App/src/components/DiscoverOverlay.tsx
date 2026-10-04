@@ -9,7 +9,14 @@ import {
 import { sanitizeArticleHtml } from "../lib/sanitize";
 import { getSkin } from "../lib/skins";
 import { formatPublished } from "../lib/text";
-import { hostOf, relevanceOf } from "../lib/discoverRanking";
+import {
+  arrangeSources,
+  hostOf,
+  MIN_BOOKMARK_OPTIONS,
+  type ResultAvailability,
+  type ResultKind,
+  type ResultSort,
+} from "../lib/discoverRanking";
 import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
 import { useScrollTargetRef } from "../hooks/useScrollTargetRef";
 import { readerStyleVariables } from "../lib/readerTheme";
@@ -21,14 +28,12 @@ import { ExternalLinkIcon, ImageOffIcon, StarIcon } from "./icons";
 
 const HTTP_LINK_RE = /^https?:\/\//i;
 
-type ResultSort = "relevance" | "recommended" | "newest" | "oldest";
 type ResultSize = "compact" | "standard" | "large";
-type ResultKind = "all" | "personal" | "technical" | "academic" | "qa" | "developer";
-type ResultAvailability = "all" | "feed" | "noFeed";
 
 const SORTS: [ResultSort, string][] = [
   ["relevance", "関連度"],
   ["recommended", "おすすめ"],
+  ["bookmarks", "ブックマーク数"],
   ["newest", "新着"],
   ["oldest", "古い"],
 ];
@@ -106,6 +111,7 @@ export function DiscoverOverlay() {
   const [resultSize, setResultSize] = useState<ResultSize>("standard");
   const [resultKind, setResultKind] = useState<ResultKind>("all");
   const [resultAvailability, setResultAvailability] = useState<ResultAvailability>("all");
+  const [minBookmarks, setMinBookmarks] = useState(0);
 
   const [reader, setReader] = useState<{
     url: string;
@@ -130,44 +136,20 @@ export function DiscoverOverlay() {
 
   const visibleResults = useMemo(() => {
     if (!results) return null;
-    const q = query.trim().toLocaleLowerCase();
-    const executed = executedQuery.current?.toLocaleLowerCase() ?? null;
-    const liveFiltering = executed === null || q !== executed;
-    const filtered = results.filter((source) => {
-      if (hideRegistered && isRegistered(source)) return false;
-      if (liveFiltering && q && !`${source.title} ${source.snippet} ${source.domain}`.toLocaleLowerCase().includes(q))
-        return false;
-      if (resultAvailability === "feed" && !source.feed_available) return false;
-      if (resultAvailability === "noFeed" && source.feed_available) return false;
-      if (resultKind !== "all") {
-        const kindMatch =
-          (resultKind === "personal" && source.reasons.includes("個人ブログ基盤")) ||
-          (resultKind === "technical" && source.reasons.includes("技術記事プラットフォーム")) ||
-          (resultKind === "academic" &&
-            (source.reasons.includes("学術機関") || source.reasons.includes("論文"))) ||
-          (resultKind === "qa" && source.reasons.includes("技術Q&A掲示板")) ||
-          (resultKind === "developer" && source.reasons.includes("開発者一次情報"));
-        if (!kindMatch) return false;
-      }
-      return true;
+    const q = query.trim();
+    const executed = executedQuery.current;
+    const liveFiltering = executed === null || q.toLocaleLowerCase() !== executed.toLocaleLowerCase();
+    return arrangeSources(results, {
+      sort: resultSort,
+      query,
+      liveFilter: liveFiltering ? q : "",
+      minBookmarks,
+      hideRegistered,
+      isRegistered,
+      kind: resultKind,
+      availability: resultAvailability,
     });
-    return [...filtered].sort((a, b) => {
-      if (resultSort === "relevance") {
-        return (
-          relevanceOf(b, query) - relevanceOf(a, query) ||
-          b.score - a.score ||
-          b.bookmark_count - a.bookmark_count
-        );
-      }
-      if (resultSort === "newest" || resultSort === "oldest") {
-        const direction = resultSort === "newest" ? -1 : 1;
-        const dateOrder = (b.published_at ?? "").localeCompare(a.published_at ?? "");
-        if (dateOrder !== 0) return direction * dateOrder;
-        return results.indexOf(a) - results.indexOf(b);
-      }
-      return b.score - a.score || b.bookmark_count - a.bookmark_count;
-    });
-  }, [results, query, resultSort, hideRegistered, resultKind, resultAvailability, feeds, registeredHosts]);
+  }, [results, query, resultSort, minBookmarks, hideRegistered, resultKind, resultAvailability, feeds, registeredHosts]);
 
   useEffect(() => {
     if (categories.length > 0) return;
@@ -468,7 +450,22 @@ export function DiscoverOverlay() {
                 />
                 登録済みを隠す
               </label>
-              <span className="ml-auto shrink-0 text-[10px] opacity-60">
+              <label className="flex shrink-0 items-center gap-1 text-[10px] opacity-70">
+                ブックマーク
+                <select
+                  value={minBookmarks}
+                  onChange={(e) => setMinBookmarks(Number(e.target.value))}
+                  aria-label="ブックマーク数の下限"
+                  className="rounded border border-black/10 bg-black/5 px-1 py-0.5 text-xs dark:border-white/10 dark:bg-white/5"
+                >
+                  {MIN_BOOKMARK_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {value === 0 ? "下限なし" : `${value}以上`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span className="ml-auto shrink-0 text-[10px] opacity-60" role="status" aria-live="polite">
                 {visibleResults?.length ?? 0}件 / 全{results.length}件
               </span>
             </div>
@@ -602,6 +599,7 @@ export function DiscoverOverlay() {
                           >
                             {source.feed_available ? "RSS登録可" : "RSSなし"}
                           </span>
+                          <span className="text-[10px] opacity-60">{source.bookmark_count} users</span>
                           {already && <span className="text-[10px] opacity-50">登録済み</span>}
                         </div>
                         {source.reasons.filter((reason) => !NOISE_REASON.test(reason)).length > 0 && (
