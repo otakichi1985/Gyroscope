@@ -7,6 +7,12 @@
   background-color: rgb(var(--panel-rgb-dark));
 }
 
+/* 文字色を持つskinだけ、ダーク時の本文色を差し替える。 */
+.dark.skin-text,
+.dark .skin-text {
+  color: rgb(var(--text-rgb-dark));
+}
+
 .accent-text {
   color: rgb(var(--accent-rgb-light));
 }

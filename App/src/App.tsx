@@ -232,6 +232,7 @@ function App() {
     "--panel-rgb-dark": skin.dark,
     "--accent-rgb-light": skin.accentLight,
     "--accent-rgb-dark": skin.accentDark,
+    ...(skin.textDark ? { "--text-rgb-dark": skin.textDark } : {}),
     ...(floating ? { "--float-alpha": alpha } : {}),
     ...(latinSources.length > 0 || japaneseSources.length > 0
       ? { fontFamily: resolvedFontFamilies.join(", ") }
@@ -243,7 +244,7 @@ function App() {
     <div
       style={panelStyle}
       onPointerDown={handleRootPointerDown}
-      className={`${isDark ? "dark" : ""} ${skinStyleClass} ${floating ? "skin-floating" : "ring-1 ring-inset ring-black/10 dark:ring-white/10"} ${isIdle ? "app-idle" : ""} panel-bg relative isolate flex h-screen w-screen flex-col overflow-hidden text-neutral-900 dark:text-neutral-100`}
+      className={`${isDark ? "dark" : ""} ${skinStyleClass} ${floating ? "skin-floating" : "ring-1 ring-inset ring-black/10 dark:ring-white/10"} ${isIdle ? "app-idle" : ""} panel-bg relative isolate flex h-screen w-screen flex-col overflow-hidden text-neutral-900 ${skin.textDark ? "skin-text" : "dark:text-neutral-100"}`}
     >
       {splitFontCss && <style>{splitFontCss}</style>}
       {skin.visualStyle === "terminal" && (

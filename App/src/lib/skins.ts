@@ -10,6 +10,8 @@ export interface Skin {
   accentLight: string;
   accentDark: string;
 
+  textDark?: string;
+
   dualSwatch?: boolean;
 
   swatchPrimary?: string;
@@ -105,6 +107,20 @@ export const SKINS: Skin[] = [
     accentDark: "45 212 191",
     swatchLight: "32 181 170",
     swatchDark: "45 212 191",
+  },
+  {
+    id: "solarized",
+    label: "ソーラライズド",
+    category: "basic",
+    description: "Solarizedの生成り色と深い青緑の背景に、青を差した目に優しいテーマ",
+    light: "253 246 227",
+    dark: "0 43 54",
+    // 原色の青(38 139 210)は背景上で4.5:1に届かないため、強調色だけ明度を調整する。
+    accentLight: "28 104 158",
+    accentDark: "88 167 224",
+    textDark: "238 232 213",
+    swatchLight: "38 139 210",
+    swatchDark: "38 139 210",
   },
   {
     id: "contrast",
