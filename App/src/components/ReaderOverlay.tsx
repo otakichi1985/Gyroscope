@@ -9,6 +9,7 @@ import {
   useAppearanceStore,
 } from "../stores/appearanceStore";
 import { useEntriesStore } from "../stores/entriesStore";
+import type { Entry } from "../lib/types";
 import { getSecondaryEntriesStore } from "../stores/panesStore";
 import { useUiStore } from "../stores/uiStore";
 import { useSmoothWheelScroll } from "../hooks/useSmoothWheelScroll";
@@ -54,7 +55,31 @@ export function ReaderOverlay() {
     if (isReaderActive) scrollRef.current?.scrollTo({ top: 0 });
   }, [isReaderActive, readerEntryId]);
 
-  const entry = entries.find((e) => e.id === readerEntryId) ?? secondaryEntries.find((e) => e.id === readerEntryId) ?? null;
+  const storedEntry =
+    entries.find((e) => e.id === readerEntryId) ?? secondaryEntries.find((e) => e.id === readerEntryId) ?? null;
+
+  // 一覧に無い記事（ダイジェストなど）は DB から1件だけ取って開く。
+  const [fetchedEntry, setFetchedEntry] = useState<Entry | null>(null);
+  useEffect(() => {
+    if (storedEntry || readerEntryId === null) {
+      setFetchedEntry(null);
+      return;
+    }
+    let cancelled = false;
+    setFetchedEntry(null);
+    void invoke<Entry | null>("get_entry", { id: readerEntryId })
+      .then((fetched) => {
+        if (!cancelled) setFetchedEntry(fetched);
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedEntry(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [readerEntryId, storedEntry]);
+
+  const entry = storedEntry ?? fetchedEntry;
 
   const [fetchedHtml, setFetchedHtml] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);

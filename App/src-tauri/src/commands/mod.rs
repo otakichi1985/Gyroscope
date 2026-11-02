@@ -1,4 +1,5 @@
 pub mod article;
+pub mod digest;
 pub mod entries;
 pub mod feed_genres;
 pub mod feed_maintenance;

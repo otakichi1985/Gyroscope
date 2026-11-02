@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { SettingsSectionId } from "../lib/settingsTabs";
 
-export type Screen = "timeline" | "feedManager" | "history" | "settings" | "trash" | "reader" | "discover";
+export type Screen = "timeline" | "feedManager" | "history" | "settings" | "trash" | "reader" | "discover" | "digest";
 
 /* activeScreenを唯一の正本にし、複数画面の同時mountと背面clickを構造で防ぐ。 */
 

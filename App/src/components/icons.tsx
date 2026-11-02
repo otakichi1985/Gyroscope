@@ -116,8 +116,17 @@ export function SortIcon(props: IconProps) {
   );
 }
 
-export function CardViewIcon(props: IconProps) {
+export function DigestIcon(props: IconProps) {
   return (
+    <Icon {...props}>
+      <rect x="2.5" y="1.5" width="11" height="13" rx="1.5" />
+      <path d="M5 4.5h6M5 7.5h6M5 10.5h3.5" />
+      <circle cx="10.5" cy="10.5" r="0.9" />
+    </Icon>
+  );
+}
+
+export function CardViewIcon(props: IconProps) {  return (
     <Icon {...props}>
       <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
       <rect x="4" y="4.5" width="3.5" height="3.5" rx="0.5" />

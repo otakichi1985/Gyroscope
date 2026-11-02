@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { DiscoverOverlay } from "./components/DiscoverOverlay";
+import { DigestOverlay } from "./components/DigestOverlay";
 import { EntryList } from "./components/EntryList";
 import { FeedManagerOverlay } from "./components/FeedManagerOverlay";
 import { FilterBar } from "./components/FilterBar";
@@ -315,6 +316,7 @@ function App() {
 
         <FeedManagerOverlay />
         <DiscoverOverlay />
+        <DigestOverlay />
         <HistoryOverlay />
         <TrashOverlay />
         <ReaderOverlay />

@@ -126,6 +126,17 @@ fn record_read_history(conn: &Connection, entry_id: i64) -> AppResult<()> {
     Ok(())
 }
 
+/// 画面の一覧に無い記事（ダイジェストなど）をリーダーで開くための1件取得。
+#[tauri::command]
+pub fn get_entry(db: State<'_, Db>, id: i64) -> AppResult<Option<Entry>> {
+    let conn = db.0.lock().unwrap();
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {ENTRY_COLUMNS} FROM entries WHERE id = ?1 AND deleted_at IS NULL"
+    ))?;
+    let mut rows = stmt.query_map(params![id], Entry::from_row)?;
+    Ok(rows.next().transpose()?)
+}
+
 #[tauri::command]
 pub fn mark_entry_read(db: State<'_, Db>, id: i64, is_read: bool) -> AppResult<()> {
     let conn = db.0.lock().unwrap();
