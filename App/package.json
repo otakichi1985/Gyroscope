@@ -1,6 +1,7 @@
 {
   "name": "gyroscope",
   "private": true,
+  "license": "MIT",
   "version": "0.2.15",
   "type": "module",
   "scripts": {
