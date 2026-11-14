@@ -11,7 +11,60 @@ use rusqlite::{params, Connection};
 use crate::parse::text::strip_html;
 use models::NewEntry;
 
-pub struct Db(pub Mutex<Connection>);
+pub struct Db(pub DbCell);
+
+/// The database connection, published once by setup. The main window
+/// is created before setup runs, and opening the database (schema
+/// creation on first launch above all) is the slowest part of setup —
+/// so the frontend can invoke commands before the connection exists.
+/// The cell is registered with the builder up front and setup fills
+/// it in; `lock()` waits for publication instead of letting early
+/// commands fail, and afterwards behaves like the plain mutex guard
+/// the call sites already know (`db.0.lock().unwrap()`).
+pub struct DbCell {
+    inner: Mutex<Option<Connection>>,
+    ready: std::sync::Condvar,
+}
+
+impl DbCell {
+    pub fn pending() -> Self {
+        DbCell {
+            inner: Mutex::new(None),
+            ready: std::sync::Condvar::new(),
+        }
+    }
+
+    pub fn init(&self, conn: Connection) {
+        *self.inner.lock().unwrap() = Some(conn);
+        self.ready.notify_all();
+    }
+
+    pub fn lock(&self) -> Result<DbGuard<'_>, ()> {
+        let guard = self.inner.lock().map_err(|_| ())?;
+        let guard = self
+            .ready
+            .wait_while(guard, |conn| conn.is_none())
+            .map_err(|_| ())?;
+        Ok(DbGuard { guard })
+    }
+}
+
+pub struct DbGuard<'a> {
+    guard: std::sync::MutexGuard<'a, Option<Connection>>,
+}
+
+impl std::ops::Deref for DbGuard<'_> {
+    type Target = Connection;
+    fn deref(&self) -> &Connection {
+        self.guard.as_ref().expect("DbGuard held before init")
+    }
+}
+
+impl std::ops::DerefMut for DbGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Connection {
+        self.guard.as_mut().expect("DbGuard held before init")
+    }
+}
 
 pub fn open(data_dir: &Path) -> rusqlite::Result<Connection> {
     std::fs::create_dir_all(data_dir).expect("failed to create app data directory");

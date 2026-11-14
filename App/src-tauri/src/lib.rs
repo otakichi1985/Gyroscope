@@ -70,6 +70,10 @@ pub fn run() {
                 .with_state_flags(StateFlags::POSITION | StateFlags::SIZE)
                 .build(),
         )
+        // Registered before setup so State<Db> always resolves; setup
+        // publishes the connection into the cell once it is open (see
+        // DbCell — early commands wait instead of failing).
+        .manage(Db(db::DbCell::pending()))
         .setup(|app| {
             diag::log(app.handle(), "startup");
             let window = app
@@ -83,7 +87,7 @@ pub fn run() {
                 eprintln!("data dir fallback: {reason}");
             }
             let conn = db::open(Path::new(&data_dir_info.path)).expect("failed to open database");
-            app.manage(Db(std::sync::Mutex::new(conn)));
+            app.state::<Db>().0.init(conn);
 
             let client = fetch::client::build_client().expect("failed to build HTTP client");
             app.manage(HttpClient(client));
