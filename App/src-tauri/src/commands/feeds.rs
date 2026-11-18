@@ -56,7 +56,9 @@ pub async fn add_feed(
         return add_booth_feed(&app, &db, parsed_url).await;
     }
 
-    let discovered = discovery::discover(&client.0, &parsed_url).await?;
+    let discover_target = crate::commands::search::known_platform_feed_url(&parsed_url)
+        .unwrap_or_else(|| parsed_url.clone());
+    let discovered = discovery::discover(&client.0, &discover_target).await?;
     let parsed = parse_feed(&discovered.body, Some(&discovered.feed_url))?;
 
     // YouTube等は入力URLと解決後のfeed URLが異なるため、解決後にも重複確認する。

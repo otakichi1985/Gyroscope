@@ -180,6 +180,7 @@ pub fn run() {
             commands::search::search_sources,
             commands::search::browse_category,
             commands::search::list_search_categories,
+            commands::search::preview_author_feed,
             commands::digest::list_digests,
             commands::digest::read_digest,
             commands::digest::digest_dir_path,

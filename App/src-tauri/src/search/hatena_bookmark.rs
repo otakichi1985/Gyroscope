@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use reqwest::Client;
 use url::Url;
@@ -28,12 +28,36 @@ pub struct SearchHit {
     pub bookmark_count: u32,
 }
 
-pub async fn search(client: &Client, query: &str) -> AppResult<Vec<SearchHit>> {
+fn build_search_url(query: &str, page: u32) -> Url {
     let mut url = Url::parse(SEARCH_URL).expect("SEARCH_URL is a valid URL");
-    url.query_pairs_mut()
-        .append_pair("q", query)
-        .append_pair("mode", "rss");
-    fetch_and_parse(client, url).await
+    let mut pairs = url.query_pairs_mut();
+    pairs.append_pair("q", query).append_pair("mode", "rss");
+    if page > 1 {
+        pairs.append_pair("page", &page.to_string());
+    }
+    drop(pairs);
+    url
+}
+
+pub async fn search(client: &Client, query: &str) -> AppResult<Vec<SearchHit>> {
+    let url_p1 = build_search_url(query, 1);
+    let url_p2 = build_search_url(query, 2);
+    let client1 = client.clone();
+    let client2 = client.clone();
+    let h1 = tauri::async_runtime::spawn(async move { fetch_and_parse(&client1, url_p1).await });
+    let h2 = tauri::async_runtime::spawn(async move { fetch_and_parse(&client2, url_p2).await });
+    let mut hits = h1
+        .await
+        .map_err(|e| AppError::Other(format!("検索タスクに失敗しました: {e}")))??;
+    if let Ok(Ok(more)) = h2.await {
+        let mut seen: HashSet<String> = hits.iter().map(|h| h.url.clone()).collect();
+        for hit in more {
+            if seen.insert(hit.url.clone()) {
+                hits.push(hit);
+            }
+        }
+    }
+    Ok(hits)
 }
 
 pub async fn browse_category(client: &Client, category: &str) -> AppResult<Vec<SearchHit>> {
@@ -249,5 +273,19 @@ mod tests {
         let client = Client::new();
         let result = browse_category(&client, "not-a-real-category").await;
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn build_search_url_adds_page_only_after_first() {
+        let p1 = build_search_url("rust async", 1);
+        assert_eq!(
+            p1.as_str(),
+            "https://b.hatena.ne.jp/search/text?q=rust+async&mode=rss"
+        );
+        let p2 = build_search_url("rust async", 2);
+        assert_eq!(
+            p2.as_str(),
+            "https://b.hatena.ne.jp/search/text?q=rust+async&mode=rss&page=2"
+        );
     }
 }

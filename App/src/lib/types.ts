@@ -66,6 +66,20 @@ export interface SearchCategory {
   label: string;
 }
 
+export interface AuthorArticlePreview {
+  title: string;
+  url: string;
+  summary: string;
+  published_at: string | null;
+  thumbnail_url: string | null;
+}
+
+export interface AuthorFeedPreview {
+  feed_url: string;
+  feed_title: string;
+  articles: AuthorArticlePreview[];
+}
+
 export interface DataDirInfo {
   path: string;
   is_portable: boolean;

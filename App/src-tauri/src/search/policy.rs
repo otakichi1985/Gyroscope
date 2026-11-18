@@ -13,7 +13,10 @@ const SHOPPING_URL_PATTERNS: &[&str] = &["/cart", "/checkout", "/product/", "/it
 
 const BOOST_DOMAINS: &[(&str, &str)] = &[
     ("hatenablog.com", "個人ブログ基盤"),
+    ("hatenablog.jp", "個人ブログ基盤"),
+    ("hateblo.jp", "個人ブログ基盤"),
     ("hatenadiary.jp", "個人ブログ基盤"),
+    ("hatenadiary.com", "個人ブログ基盤"),
     ("note.com", "個人ブログ基盤"),
     ("zenn.dev", "技術記事プラットフォーム"),
     ("qiita.com", "技術記事プラットフォーム"),
@@ -21,6 +24,17 @@ const BOOST_DOMAINS: &[(&str, &str)] = &[
     ("stackexchange.com", "技術Q&A掲示板"),
     ("github.com", "開発者一次情報"),
     ("github.io", "開発者一次情報"),
+    ("developer.mozilla.org", "開発者一次情報"),
+    ("rust-lang.org", "開発者一次情報"),
+    ("react.dev", "開発者一次情報"),
+    ("typescriptlang.org", "開発者一次情報"),
+    ("go.dev", "開発者一次情報"),
+    ("python.org", "開発者一次情報"),
+    ("web.dev", "開発者一次情報"),
+    ("gihyo.jp", "技術メディア"),
+    ("publickey1.jp", "技術メディア"),
+    ("infoq.com", "技術メディア"),
+    ("martinfowler.com", "技術メディア"),
     ("arxiv.org", "論文"),
     ("news.ycombinator.com", "技術系掲示板"),
 ];
@@ -33,6 +47,47 @@ const BOOST_SCORE: i32 = 2;
 const AFFILIATE_PENALTY: i32 = 1;
 
 pub const MIN_BOOKMARK_COUNT: u32 = 2;
+
+pub fn query_relevance(query: &str, title: &str, snippet: &str, domain: &str) -> i32 {
+    let lower_query = query.trim().to_lowercase();
+    if lower_query.is_empty() {
+        return 0;
+    }
+    let tokens: Vec<&str> = lower_query.split_whitespace().collect();
+    if tokens.is_empty() {
+        return 0;
+    }
+    let lower_title = title.to_lowercase();
+    let lower_snippet = snippet.to_lowercase();
+    let lower_domain = domain.to_lowercase();
+
+    let mut score = 0;
+    let mut matched_tokens = 0;
+    if tokens.len() > 1 && lower_title.contains(&lower_query) {
+        score += 4;
+    }
+    for token in &tokens {
+        let in_title = lower_title.contains(token);
+        let in_domain = lower_domain.contains(token);
+        let in_snippet = lower_snippet.contains(token);
+        if in_title {
+            score += 4;
+        }
+        if in_domain {
+            score += 2;
+        }
+        if in_snippet {
+            score += 1;
+        }
+        if in_title || in_domain || in_snippet {
+            matched_tokens += 1;
+        }
+    }
+    if tokens.len() > 1 && matched_tokens == tokens.len() {
+        score += 3;
+    }
+    score
+}
 
 pub fn bookmark_boost(count: u32) -> (i32, Option<String>) {
     match count {
@@ -187,5 +242,25 @@ mod tests {
         assert_eq!(bookmark_boost(20).0, 2);
         assert_eq!(bookmark_boost(50).0, 3);
         assert!(bookmark_boost(5).1.is_some());
+    }
+
+    #[test]
+    fn query_relevance_prefers_title_and_full_token_match() {
+        let title_hit = query_relevance(
+            "rust async",
+            "Rust Async Runtime Deep Dive",
+            "概要",
+            "example.com",
+        );
+        let snippet_hit = query_relevance(
+            "rust async",
+            "別の記事",
+            "rust async についてのメモ",
+            "example.com",
+        );
+        let partial_hit = query_relevance("rust async", "Rust入門", "概要", "example.com");
+        assert!(title_hit > snippet_hit);
+        assert!(title_hit > partial_hit);
+        assert_eq!(query_relevance("", "Rust", "", "example.com"), 0);
     }
 }
