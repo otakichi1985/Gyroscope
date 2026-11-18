@@ -8,13 +8,22 @@ function Icon({ children, ...props }: IconProps & { children: React.ReactNode })
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.25}
+      strokeWidth={1.75}
       strokeLinecap="round"
       strokeLinejoin="round"
       {...props}
     >
       {children}
     </svg>
+  );
+}
+
+export function HomeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 7.5 8 2.8l5.5 4.7" />
+      <path d="M4.2 6.5V13a.8.8 0 0 0 .8.8h6a.8.8 0 0 0 .8-.8V6.5" />
+    </Icon>
   );
 }
 
@@ -243,6 +252,15 @@ export function CopyIcon(props: IconProps) {
     <Icon {...props}>
       <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" />
       <rect x="6.5" y="6.5" width="9" height="9" rx="1.5" />
+    </Icon>
+  );
+}
+
+export function UserIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="8" cy="5.5" r="2.6" />
+      <path d="M3 13.5a5 5 0 0 1 10 0" />
     </Icon>
   );
 }

@@ -25,9 +25,9 @@ export function ScreenOverlay({ screen, title, headerActions, style, children }:
       }`}
       inert={!isActive}
     >
-      <div className="screen-overlay-header flex h-8 shrink-0 items-center justify-between border-b border-black/10 px-2 text-sm font-medium dark:border-white/10">
-        <span className="truncate">{title}</span>
-        <div className="flex shrink-0 items-center gap-1">
+      <div className="screen-overlay-header flex min-h-8 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-black/10 px-2 py-1 text-sm font-medium dark:border-white/10">
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+        <div className="flex flex-wrap items-center justify-end gap-1">
           {headerActions}
 
           <button

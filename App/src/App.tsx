@@ -55,7 +55,7 @@ function fontFaceRule(alias: string, names: string[], unicodeRange: string, face
     ),
   ).map((name) => `local("${name}")`);
   if (sources.length === 0) return "";
-  return `@font-face{font-family:"${alias}";src:${sources.join(",")};font-display:swap;unicode-range:${unicodeRange};}`;
+  return `@font-face{font-family:"${alias}";src:${sources.join(",")};font-weight:100 900;font-display:swap;unicode-range:${unicodeRange};}`;
 }
 
 function createTerminalStreams(count: number) {
